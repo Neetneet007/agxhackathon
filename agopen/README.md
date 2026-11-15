@@ -216,6 +216,17 @@ Fuelling and implement changes are done by a person. The tractor does not move w
 
 Job order is also a rule: nothing is sown before it is plowed (see [Build a job list](#build-a-job-list-and-start-the-day)).
 
+## Field status, the crop manager and "Let the AI drive"
+
+**What is on each field.** Every field has a record, `crop-record.json`, kept in that field's own AgOpenWeb folder next to its boundary: a growing crop and its planting date, stubble after a harvest, or plowed soil, and since when. The record is updated when plowing or sowing finishes, so the farm remembers between runs. The Add jobs panel lists every field with its status, how far along the crop is, when it should be ready, and what needs doing next. `FRESH=1 agopen/start-demo.sh` puts the farm back to its starting mix (four fields growing, three in stubble, two plowed) and forgets the surveys.
+
+**How far along, and how sure.** Growth figures come from the last drone survey of the field. The margin on them widens by a point every 20 plan minutes since that survey, and after four plan hours the survey counts as out of date. A field that has never been surveyed is worked out from its planting date alone, with a margin of 20 points. Surveys are remembered between runs in `agopen/out/field-memory.json`. Temperature comes from the weather mast; humidity is derived from it (the simulated mast has no humidity sensor), and both scale the growth rate used for the harvest date. The crop itself, like the drone, is simulated.
+
+**Crop manager.** Once the day is running it goes through the fields every 20 plan minutes. A standing crop that has never been surveyed, or not for four plan hours, gets the drone, with the reason in the log ("corn planted 107 days ago, about 89% along, never surveyed"). After the survey it reports the stage, stand, soil moisture and pests, and the next step; pest patches are spot-sprayed by the drone when spraying is allowed.
+
+**Let the AI drive.** A switch at the top of the Add jobs panel (`POST /ai {"on": true}`). Off, the operator builds the job list. On, the crop manager reads every field's record, queues the work each one needs (plowed soil: sow; stubble: plow, then sow), nearest and ready-to-sow fields first and no more than five jobs open at a time, and starts the day. Growing fields are left alone. The operator can still add or remove jobs, and every tractor still waits for Good to go at the depot.
+
+
 ## Fuel truck
 
 The fuel truck "FUEL" is a fourth AgOpenWeb vehicle, on port 5178. It carries fuel to a tractor that is working in a field, when that is cheaper than the tractor driving to the depot and back. If no truck node is running, the option is not offered and every refuel is at the depot.

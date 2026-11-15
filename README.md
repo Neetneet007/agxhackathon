@@ -30,6 +30,7 @@ LIVE_ARGS="--preset" agopen/start-demo.sh    # options for live.js, here: start 
 **What it does**
 
 - **Fault recovery.** Type `stuck` or `dead` in a tractor's Terminal window (`ok` to recover). The coordinator detects it from telemetry only, hands the unfinished job to another tractor and explains the change.
+- **Field status and "Let the AI drive".** Each field's record (growing crop and planting date, stubble, or plowed soil) lives in its AgOpenWeb folder and is remembered between runs. The Add jobs panel shows how far along each crop is, when it should be ready and how sure that is given the last drone survey. A crop manager sends the drone to fields that have not been surveyed, and with **Let the AI drive** on it queues the plowing and sowing each field needs and starts the day. `FRESH=1 agopen/start-demo.sh` resets the fields to the starting mix.
 - **Explanations on the page.** After every re-plan the dashboard shows one line per job that moved and why ("Latest plan change"), and every job row has a **Why?** button that gives the planner's reasons and the alternatives it rejected (`GET /why/<job id>`).
 - **Full-length passes.** Every pass runs edge to edge and the tractor turns outside the field boundary, so coverage reaches the edges. There is no headland lap.
 - **People in the loop.** A refuel or an implement change locks the tractor until a person presses **Good to go** on the status page. An implement change is then written to that tractor's AgOpenWeb (`profile.load`). Nothing is sown before it is plowed.

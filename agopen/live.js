@@ -479,7 +479,7 @@ function draftJobs({ fields = [], steps = [], priority = 'medium', deadline = '1
 }
 function releaseReady() {
   // A finished job changes the state of its field's ground.
-  for (const b of backlog) if (!b.applied && sim.jobs.get(b.id)?.status === 'done') { b.applied = true; ground[b.field] = groundAfter(ground[b.field], b.type); droneScan(b.field); }
+  for (const b of backlog) if (!b.applied && sim.jobs.get(b.id)?.status === 'done') { b.applied = true; ground[b.field] = groundAfter(ground[b.field], b.type); recordWork(b.field, b.type); droneScan(b.field); }
   const ready = backlog.filter(b => b.status !== 'released' && (!b.waitsFor || sim.jobs.get(b.waitsFor)?.status === 'done'));
   for (const b of backlog) if (b.status === 'draft' && !ready.includes(b)) b.status = 'waiting';
   if (!ready.length) return;
@@ -499,7 +499,7 @@ function startDay() {
   if (mode === 'running') throw new Error('The day is already running.');
   if (!backlog.length) throw new Error('Add at least one job first.');
   mode = 'running';
-  trail('operator', 'planner', 'start', `Day started with ${backlog.length} job(s) on the list.`);
+  trail(aiDrive ? 'crop-manager' : 'operator', 'planner', 'start', `Day started with ${backlog.length} job(s) on the list.`);
   releaseReady();
 }
 
@@ -774,7 +774,7 @@ const droneReports = [], droneSprayed = [];
 function droneScan(name) {
   const g = geom[name], f = scenario.fields.find(x => x.name === name);
   if (!g || !f) return false;
-  drone.assign({ type: 'scan', field: { name, boundary: g.boundary, ground: GROUND_WORD[ground[name]], crop: ground[name] === 'stubble' ? f.crop : undefined } });
+  drone.assign({ type: 'scan', field: { name, boundary: g.boundary, ground: GROUND_WORD[ground[name]], crop: ground[name] === 'stubble' ? (fieldRecord[name]?.crop || undefined) : undefined } });
   trail('drone', 'operator', 'scan', `Drone sent to map ${name}.`);
   return true;
 }
@@ -793,6 +793,191 @@ function escortSprayer() {
   trail('drone', 'weather', 'wind-watch', `${u.id} is spraying ${sim.label(sim.jobs.get(jobId))}: drone sent to fly above it and read the wind at 10, 30 and 50 m.`);
 }
 
+// ---- What is on each field now. The crop and its planting date come from the field's own record in AgOpenWeb
+// (field.geojson); work done today comes from the job records AgOpenWeb writes as the tractors work. How far
+// along the crop is comes from the last drone scan, and the margin on it widens the longer ago that was. With
+// no scan at all it is worked out from the planting date alone, with a wide margin.
+const SEASON_DAYS = { corn: 120, soybeans: 110, wheat: 110, hay: 60, alfalfa: 45, orchard: 200 };
+const fieldRecord = {};
+// What the farm remembers about each field between runs: the last survey of each field and when it was made.
+const MEMORY_FILE = path.join(here, 'out', 'field-memory.json');
+let lastScan = {};
+try { lastScan = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')).surveys || {}; } catch { /* nothing remembered yet */ }
+const remember = () => { try { fs.writeFileSync(MEMORY_FILE, JSON.stringify({ note: 'Last drone survey of each field. Delete this file to forget.', surveys: lastScan }, null, 1)); } catch { /* not fatal */ } };
+const stageOf = (m) => (m >= 95 ? 'Ready' : m >= 75 ? 'Ripening' : m >= 45 ? 'Flowering and grain fill' : m >= 15 ? 'Leaf growth' : 'Emerging');
+// Each field's record is a small file, crop-record.json, kept in that field's own AgOpenWeb folder next to its
+// boundary. It says what is on the field (a growing crop, stubble after harvest, or plowed soil) and since when,
+// and it is updated as work is finished, so the farm remembers between runs. The first time, the farm is given
+// a mix: some fields growing, some harvested and waiting for the plow, some plowed and waiting for seed.
+const dayStr = (daysAgo = 0) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+const daysSince = (d) => (d ? Math.max(0, Math.round((Date.now() - Date.parse(d)) / 86400000)) : null);
+const recordFile = (name) => path.join(FIELDS_DIR, name, 'crop-record.json');
+const saveRecord = (name) => { try { fs.writeFileSync(recordFile(name), JSON.stringify(fieldRecord[name], null, 1)); } catch { /* field folder missing */ } };
+const START_MIX = ['growing', 'harvested', 'plowed', 'growing', 'harvested', 'growing', 'plowed', 'harvested', 'growing'];
+scenario.fields.forEach((f, i) => {
+  let rec = null;
+  try { rec = JSON.parse(fs.readFileSync(recordFile(f.name), 'utf8')); } catch { /* none yet */ }
+  if (!rec) {
+    let planted = null;
+    try { planted = JSON.parse(fs.readFileSync(path.join(FIELDS_DIR, f.name, 'field.geojson'), 'utf8')).features.find(x => x.properties?.role === 'metadata')?.properties?.plantedOn || null; } catch { /* no field file */ }
+    const state = START_MIX[i % START_MIX.length];
+    rec = state === 'growing' ? { state, crop: f.crop || null, plantedOn: planted || dayStr(60) }
+      : state === 'harvested' ? { state, crop: null, lastCrop: f.crop || null, nextCrop: f.crop || null, harvestedOn: dayStr(6 + (i * 5) % 13) }
+        : { state, crop: null, lastCrop: f.crop || null, nextCrop: f.crop || null, plowedOn: dayStr(1 + (i * 3) % 5) };
+    fieldRecord[f.name] = rec; saveRecord(f.name);
+  }
+  fieldRecord[f.name] = rec;
+  ground[f.name] = rec.state === 'plowed' ? 'tilled' : rec.state === 'growing' && daysSince(rec.plantedOn) === 0 ? 'sown' : 'stubble';
+});
+// Work finished in a field changes its record.
+function recordWork(name, type) {
+  const rec = fieldRecord[name]; if (!rec) return;
+  if (type === 'till') Object.assign(rec, { state: 'plowed', lastCrop: rec.crop || rec.lastCrop || null, nextCrop: rec.nextCrop || rec.crop || rec.lastCrop || null, crop: null, plowedOn: dayStr() });
+  else if (type === 'seed') Object.assign(rec, { state: 'growing', crop: rec.nextCrop || rec.lastCrop || 'corn', plantedOn: dayStr(), cropPicked: false });
+  else return;
+  saveRecord(name);
+}
+let todaysWork = {}, todaysWorkAt = 0;
+function readTodaysWork() {                       // job records from every tractor's AgOpenWeb copy, started this run
+  if (Date.now() - todaysWorkAt < 5000) return todaysWork;
+  todaysWorkAt = Date.now();
+  const out = {};
+  const root = path.resolve(FIELDS_DIR, '../../..');
+  for (const u of units) {
+    const port = Number(new URL(u.url).port) - 1000;
+    for (const f of scenario.fields) {
+      const dir = path.join(root, `data-${port}`, 'AgOpenWeb', 'Fields', f.name, 'jobs');
+      let names = [];
+      try { names = fs.readdirSync(dir).filter(n => n.startsWith(RUN)); } catch { continue; }
+      for (const n of names) {
+        try { const j = JSON.parse(fs.readFileSync(path.join(dir, n, 'job.json'), 'utf8')); (out[f.name] ||= []).push({ type: j.workType, startedAt: j.startedAt, ha: j.areaWorkedHectares || 0, tractor: u.id }); } catch { /* being written */ }
+      }
+    }
+  }
+  return (todaysWork = out);
+}
+const WORK_WORD = { till: 'Plowing', seed: 'Sowing', spray: 'Spraying', mow: 'Mowing' };
+function fieldStatus() {
+  const c = weather.current();
+  const tempC = c ? c.reading.low.tempC : null;
+  // No humidity sensor in the simulated mast: it is derived from the temperature (cool air near saturation, warm air drier).
+  const humidityPct = tempC == null ? null : Math.round(Math.max(20, Math.min(95, 88 - (tempC - 8) * 3.2)));
+  let growth = 1, why = 'good growing weather';
+  if (tempC != null) {
+    if (tempC < 18) { growth = Math.max(0.4, 1 - 0.035 * (18 - tempC)); why = 'cool'; }
+    else if (tempC > 32) { growth = Math.max(0.5, 1 - 0.04 * (tempC - 32)); why = 'hot'; }
+    if (humidityPct < 30) { growth -= 0.1; why = why === 'good growing weather' ? 'dry air' : why + ' and dry'; }
+  }
+  growth = +growth.toFixed(2);
+  const conditionsText = tempC == null ? null : `${tempC.toFixed(0)} °C, ${humidityPct}% humidity: ${why}, crops growing at about ${Math.round(growth * 100)}% of their normal rate${humidityPct > 85 ? '; humid enough to watch for leaf disease' : ''}`;
+  const work = readTodaysWork();
+  return scenario.fields.map(f => {
+    const rec = fieldRecord[f.name], g = ground[f.name], crop = rec.crop, season = SEASON_DAYS[crop] || 100;
+    const queued = backlog.filter(b => b.field === f.name && stillToDo(b)).map(b => ({ till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' }[b.type] || b.type));
+    const todays = (work[f.name] || []).slice().sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
+    const last = todays[todays.length - 1];
+    const base = {
+      name: f.name, acres: f.acres, crop, ground: GROUND_WORD[g], tempC, humidityPct, growthFactor: growth, conditionsText,
+      queuedText: queued.length ? `${queued.join(', then ')} queued` : null,
+      todayText: last ? `${WORK_WORD[last.type] || last.type} today by ${last.tractor}${last.ha ? `, ${last.ha.toFixed(2)} ha so far` : ''} (AgOpenGPS job record)` : null,
+    };
+    const want = rec.nextCrop || rec.lastCrop;
+    if (g === 'tilled') { const d = daysSince(rec.plowedOn); return { ...base, crop: null, standing: false, cropChoice: rec.cropPicked ? rec.nextCrop : null, cropOptions: Object.keys(SEASON_DAYS), summaryText: queued.includes('Sow') ? `Tilled — sowing ${want || 'it'} is on the list` : rec.cropPicked ? `Tilled — needs sowing, ${rec.nextCrop} picked` : 'Tilled — needs sowing, pick a plant', statusText: `Bare soil, plowed ${d ? `${d} day${d > 1 ? 's' : ''} ago` : 'today'}`, stage: 'Plowed', nextText: queued.includes('Sow') ? 'Next: sowing is on the list' : `Next: sow${want ? ` ${want}` : ''}` }; }
+    if (g === 'stubble' && !rec.crop) { const d = daysSince(rec.harvestedOn); return { ...base, crop: null, standing: false, summaryText: queued.length ? `Empty — ${queued.join(', then ').toLowerCase()} is on the list` : 'Empty — needs tilling', statusText: `Stubble${rec.lastCrop ? `: ${rec.lastCrop} harvested${d != null ? ` ${d} days ago` : ''}` : ''}`, stage: 'Harvested', nextText: queued.length ? `Next: ${queued.join(', then ').toLowerCase()} is on the list` : `Next: plow, then sow${want ? ` ${want}` : ''}` }; }
+    if (g === 'sown') return { ...base, standing: true, plantedOn: new Date().toISOString().slice(0, 10), plantedDaysAgo: 0, plantedSource: 'AgOpenGPS job record, today', summaryText: `${crop ? crop[0].toUpperCase() + crop.slice(1) : 'Crop'} — sown today, estimated harvest in ${Math.round(season / growth)} days`, statusText: `Sown today${crop ? ` (${crop})` : ''}`,
+      maturityPct: 0, marginPct: 0, harvestInDays: Math.round(season / growth), harvestMarginDays: Math.round(season * 0.1), harvestText: `Ready in about ${Math.round(season / growth)} days`, confidence: 'high', confidenceText: 'Just sown', stage: 'Sown', nextText: 'Next: first drone survey once it has emerged, in about two weeks' };
+    const days = rec.plantedOn ? Math.max(0, Math.round((Date.now() - Date.parse(rec.plantedOn)) / 86400000)) : null;
+    const sc = lastScan[f.name]?.ground === g || (lastScan[f.name] && lastScan[f.name].ground == null) ? lastScan[f.name] : null;
+    let maturity, margin, confidence, confidenceText, scanAgeMin = null;
+    if (sc) {
+      scanAgeMin = Math.max(0, Math.round((Date.now() - sc.wall) / 1000 / SEC));      // in plan minutes, also across restarts
+      maturity = sc.maturityPct;
+      margin = Math.min(25, Math.round(2 + scanAgeMin / 20));                      // widens by a point every 20 plan minutes
+      confidence = scanAgeMin < 90 ? 'high' : scanAgeMin < 240 ? 'medium' : 'low';
+      confidenceText = `Drone scan ${scanAgeMin < 60 ? `${scanAgeMin} min` : `${(scanAgeMin / 60).toFixed(1)} h`} ago${confidence === 'low' ? ': scan again' : ''}`;
+    } else {
+      maturity = days == null ? null : Math.min(100, Math.round(days / season * 100));
+      margin = 20; confidence = 'low';
+      confidenceText = 'Never scanned: worked out from the planting date only';
+    }
+    const left = maturity == null ? null : Math.max(0, Math.round((100 - maturity) / 100 * season / growth));
+    const leftMargin = Math.max(1, Math.round(margin / 100 * season));
+    const when = left == null ? null : new Date(Date.now() + left * 86400000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const ready = maturity != null && maturity >= 95;
+    const cut = crop === 'hay' || crop === 'alfalfa' ? 'cut' : 'harvest';
+    const pests = sc?.pests || 0;
+    const nextText = !sc ? `Next: drone survey. ${days != null ? `Planted ${days} days ago and never` : 'Never'} surveyed`
+      : pests ? `Next: spot-spray ${pests} pest patch(es)${holds.has(WEATHER_HOLD) ? ' when spraying is allowed' : ''}`
+      : ready ? `Next: ${cut} now`
+      : confidence === 'low' ? 'Next: drone survey, the last one is out of date'
+      : `Next: ${cut} around ${when}; survey again before then`;
+    return { ...base, standing: true, plantedOn: rec.plantedOn, plantedDaysAgo: days, plantedSource: 'AgOpenGPS field record', stage: maturity == null ? null : stageOf(maturity), nextText,
+      summaryText: `${crop[0].toUpperCase()}${crop.slice(1)} — ${maturity == null ? 'needs a survey' : ready ? `ready to ${cut} now` : `estimated ${cut === 'cut' ? 'cut' : 'harvest'} in ${left} days`}`,
+      statusText: `${crop[0].toUpperCase()}${crop.slice(1)}${days != null ? `, planted ${days} days ago` : ''}`,
+      maturityPct: maturity, marginPct: margin, harvestInDays: ready ? 0 : left, harvestMarginDays: leftMargin, harvestDate: when,
+      harvestText: maturity == null ? null : ready ? `Ready to ${cut} now` : `Ready to ${cut} in about ${left} days (${when}, give or take ${leftMargin})`,
+      standPct: sc?.standPct ?? null, moisturePct: sc?.moisturePct ?? null, pests: sc?.pests ?? null,
+      lastScanClock: sc?.clock ?? null, scanAgeMin, confidence, confidenceText };
+  });
+}
+
+// ---- Crop manager. Every so often it goes through the fields: where is each crop in its life, when was it last
+// looked at, what needs doing. A standing crop that has never been surveyed, or not for a long while, gets the
+// drone; the survey says how far along it is and whether it needs spraying.
+const surveying = new Set();
+const SURVEY_STALE_MIN = 240;                      // plan minutes after which a survey is out of date
+let cropReviewAt = 4;
+function cropManager() {
+  if (mode !== 'running' || sim.time < cropReviewAt) return;
+  const d = drone.state();
+  if (d.mission || d.queue || d.batteryPct < 40) return;          // the drone is busy or low: look again next minute
+  cropReviewAt = sim.time + 20;
+  const due = fieldStatus().filter(f => f.standing && f.plantedDaysAgo !== 0 && !surveying.has(f.name) && (f.scanAgeMin == null || f.scanAgeMin > SURVEY_STALE_MIN))
+    .sort((a, b) => (b.scanAgeMin ?? 1e9) - (a.scanAgeMin ?? 1e9) || (b.maturityPct ?? 0) - (a.maturityPct ?? 0))[0];
+  if (!due) return;
+  surveying.add(due.name);
+  const seen = due.scanAgeMin == null ? 'has never been surveyed' : `was last surveyed ${(due.scanAgeMin / 60).toFixed(1)} h ago`;
+  trail('crop-manager', 'drone', 'survey', `Field review, ${due.name}: ${due.crop} planted ${due.plantedDaysAgo ?? '?'} days ago, about ${due.maturityPct}% along (give or take ${due.marginPct}), and it ${seen}. Sending the drone to see how far along it is and whether it needs spraying.`, { field: due.name });
+  droneScan(due.name);
+}
+
+// ---- "Let the AI drive". Off, the operator builds the job list. On, the crop manager reads every field's record,
+// puts the work each one needs on the list (stubble: plow then sow; plowed soil: sow), and starts the day. Surveys
+// and spot-spraying follow from the field reviews above. The operator can still add or remove jobs.
+const AI_FILE = path.join(here, 'out', 'ai-drive.json');
+let aiDrive = false, aiAt = 0;
+try { aiDrive = !!JSON.parse(fs.readFileSync(AI_FILE, 'utf8')).on; } catch { /* off */ }
+function setAiDrive(on) {
+  aiDrive = !!on;
+  try { fs.writeFileSync(AI_FILE, JSON.stringify({ on: aiDrive })); } catch { /* not fatal */ }
+  trail('operator', 'crop-manager', 'ai-drive', aiDrive ? 'Let the AI drive: on. The crop manager will queue the work each field needs.' : 'AI drive off. The operator builds the job list.');
+  aiAt = 0;
+  if (aiDrive) aiPlan();
+}
+function aiPlan() {
+  if (!aiDrive || (mode === 'running' && sim.time < aiAt)) return;
+  aiAt = sim.time + 10;
+  // Only as much as fits in the day: sowing the fields that are already plowed comes first, then the stubble
+  // fields nearest the yard, and no more than five jobs open at a time. The rest wait for the next review.
+  const added = [], waiting = [];
+  const need = scenario.fields.map(f => ({ f, rec: fieldRecord[f.name], g: ground[f.name] }))
+    .filter(x => !backlog.some(b => b.field === x.f.name && stillToDo(b)))
+    .map(x => ({ ...x, steps: x.g === 'tilled' ? ['seed'] : x.g === 'stubble' && !x.rec.crop ? ['till', 'seed'] : null }))
+    .filter(x => x.steps)
+    .sort((p, q) => p.steps.length - q.steps.length || laneLen('depot', p.f.id) - laneLen('depot', q.f.id));
+  let open = backlog.filter(stillToDo).length;
+  for (const { f, rec, steps } of need) {
+    if (open + steps.length > 5) { waiting.push(f.name); continue; }
+    try {
+      draftJobs({ fields: [f.name], steps, priority: 'medium', deadline: '17:00' });
+      open += steps.length;
+      added.push(steps.length === 2 ? `${f.name} is stubble after ${rec.lastCrop || 'the last crop'}: plow, then sow ${rec.nextCrop || rec.lastCrop || 'it'}` : `${f.name} is plowed and waiting: sow ${rec.nextCrop || rec.lastCrop || 'it'}`);
+    } catch (err) { /* the list rules refused it; leave it to the operator */ }
+  }
+  if (added.length) trail('crop-manager', 'planner', 'ai-plan', `Field review. ${added.join('. ')}.${waiting.length ? ` ${waiting.join(' and ')} also need${waiting.length === 1 ? 's' : ''} work; ${waiting.length === 1 ? 'it waits' : 'they wait'} until there is room in the day.` : ''} Growing fields are left alone and surveyed by drone.`, { added: added.length, waiting });
+  if (mode === 'building' && backlog.length) { try { startDay(); } catch { /* already running */ } }
+}
+
 function droneTick(dt) {
   escortSprayer();
   for (const ev of drone.tick(dt)) {
@@ -804,6 +989,11 @@ function droneTick(dt) {
         trail('drone', 'fault-manager', 'inspection', `Simulated drone view of ${r.subject}: ${r.assessment} Recommends: ${r.recommend}.`);
         discuss('fault', `Drone inspection of ${r.subject}`, { tractor: r.subject, kind: r.symptom, signal: 'drone inspection (simulated)', droneFindings: r.findings, droneAssessment: r.assessment, droneRecommends: r.recommend });
       } else if (r.kind === 'field-scan') {
+        lastScan[r.field] = { wall: Date.now(), clock: fmtTime(sim.time), ground: ground[r.field], maturityPct: r.maturityPct, standPct: r.standPct, moisturePct: r.moisturePct, pests: (r.pests || []).length };
+        remember();
+        surveying.delete(r.field);
+        const fs1 = fieldStatus().find(x => x.name === r.field);
+        if (fs1?.standing && fs1.maturityPct != null) trail('crop-manager', 'operator', 'field-review', `${r.field} after the survey: ${fs1.crop}, ${fs1.maturityPct}% along (${fs1.stage.toLowerCase()}), ${fs1.standPct}% stand, soil moisture ${fs1.moisturePct}%${fs1.pests ? `, ${fs1.pests} pest patch(es)` : ', no pests seen'}. ${fs1.nextText}.`, { field: r.field });
         trail('drone', 'operator', 'field-report', r.summary);
         discuss('replan', `Drone scan of ${r.field}`, { field: r.field, scan: { ground: r.ground, moisturePct: r.moisturePct, trafficable: r.trafficable, standPct: r.standPct, maturityPct: r.maturityPct, harvestReady: r.harvestReady, pestSpots: r.pests.length, weedsPct: r.weedsPct, recommend: r.recommend } });
         const wants = (r.recommend || []).find(x => x.action === 'spot-spray');
@@ -844,7 +1034,11 @@ function command(line) {
   else if (verb === 'repair') clear(u, 'cleared by operator');
   else if (verb === 'fault') { trail('test', u.id, 'inject', `fault ${mode}`); fetch(`${u.url}/fault/${mode}`, { method: 'POST' }).catch(() => {}); }
 }
-readline.createInterface({ input: process.stdin }).on('line', command);
+// Typed commands are a convenience. After Start over the fresh copy no longer owns the Terminal's keyboard and
+// reading it fails; that must not stop the coordinator, so the error is swallowed and typing simply stops working.
+process.stdin.on('error', () => {});
+try { readline.createInterface({ input: process.stdin }).on('line', command).on('error', () => {}); } catch { /* no keyboard: page and API only */ }
+process.on('uncaughtException', (err) => { if (err?.code === 'EIO' || err?.syscall === 'read') return; console.error(err); process.exit(1); });
 
 function status() {
   console.log('           ' + units.map(u => {
@@ -960,6 +1154,8 @@ function snapshot() {
       tel: truck.tel ? { ...truck.tel, rig: null } : null, heardAgoMs: Date.now() - truck.lastSeen, planGapM: null,
     }] : []),
     weather: (() => { const c = weather.current(); return c ? { day: weather.day, clock: c.reading.clock, low: c.reading.low, high: c.reading.high, status: c.assessment.status, reason: c.assessment.reason, groundOnly: c.assessment.groundOnly, caughtByTwoHeights: c.assessment.caughtByTwoHeights, log: weather.log().filter(x => x.note).slice(-6).reverse() } : null; })(),
+    fields: (() => { try { return fieldStatus(); } catch (err) { return []; } })(),
+    ai: { on: aiDrive },
     drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed, wind: droneWind },
     fuelPlan: fuelMission ? { tractor: fuelMission.u.id, phase: fuelMission.phase, ...fuelMission.numbers } : null, fuelScale: FUEL_SCALE,
     jobs: [...sim.jobs.values()].map(j => ({
@@ -1016,6 +1212,15 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/draft') return readBody((b) => ok({ added: draftJobs(b) }));
   if (req.method === 'POST' && req.url === '/jobs') return readBody((b) => ok({ added: draftJobs({ fields: b.fields, steps: [b.type], priority: b.priority, deadline: b.deadline }) }));
   if (req.method === 'DELETE' && req.url.startsWith('/draft/')) { try { removeDraft(decodeURIComponent(req.url.slice(7))); return ok(); } catch (err) { res.writeHead(409); return res.end(String(err.message)); } }
+  if (req.method === 'POST' && req.url === '/field/crop') return readBody((b) => {
+    const rec = fieldRecord[b.field], crop = String(b.crop || '').toLowerCase();
+    if (!rec) throw new Error(`Unknown field: ${b.field}`);
+    if (!SEASON_DAYS[crop]) throw new Error(`Unknown crop: ${b.crop}`);
+    rec.nextCrop = crop; rec.cropPicked = true; saveRecord(b.field);
+    trail('operator', 'crop-manager', 'crop-choice', `${b.field}: ${crop} picked as the next crop to sow.`);
+    ok({ field: b.field, crop });
+  });
+  if (req.method === 'POST' && req.url === '/ai') return readBody((b) => { setAiDrive(!!b.on); ok({ on: aiDrive }); });
   if (req.method === 'POST' && req.url === '/reset') { ok(); return startOver(); }
   if (req.method === 'POST' && req.url === '/drone/scan') return readBody((b) => { const done = (b.fields || []).filter(droneScan); if (!done.length) throw new Error('Pick at least one field on the map first.'); ok({ scanning: done }); });
   if (req.url === '/weather-log') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(weather.logText()); }
@@ -1075,6 +1280,7 @@ const missing = units.filter(u => !u.tel).map(u => `${u.id} (${u.url})`);
 if (missing.length) { console.log(`No telemetry from ${missing.join(', ')}. Start each with: node agopen/tractor-node.js <id> <agopen port>`); process.exit(1); }
 
 setInterval(() => { if (!stopped) { poll(); pollTruck(); } }, 250);
+setTimeout(() => { if (!stopped && aiDrive) { try { aiPlan(); } catch (err) { console.log('AI drive: ' + err.message); } } }, 4000);
 setInterval(() => { if (!stopped) { dispatch(); truckTick(); droneTick(0.25); } }, 250);
 setInterval(() => { if (!stopped) status(); }, 8000);
 setInterval(() => {
@@ -1088,6 +1294,7 @@ setInterval(() => {
   if (sim.finished) sim.finished = false;
   updateEtas();
   weatherTick();
+  try { cropManager(); aiPlan(); } catch (err) { console.log('crop manager: ' + err.message); }
   fuelPlanning();
   humanGate();
   syncProgress();
