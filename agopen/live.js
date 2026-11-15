@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
 import readline from 'node:readline';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { Simulator } from '../src/simulator.js';
 import { Coordinator } from '../src/coordinator.js';
@@ -156,6 +157,7 @@ async function call(u, method, pathname, body) {
 // apart along the field's guidance line, turning in the headland, then a lap round the boundary. The route
 // belongs to the job, not the tractor, so if another tractor takes the job over it carries on from the
 // same waypoint: nothing is repeated and nothing is missed.
+const RUN = new Date().toTimeString().slice(0, 8).replace(/:/g, '');
 const routes = new Map();
 function routeFor(job, u) {
   let r = routes.get(job.id);
@@ -211,6 +213,7 @@ function advanceRoute(r, u) {
   }
   const q = r.pts[r.i];
   const partial = !r.done && q.paint ? Math.max(0, Math.min(len(q), along(q))) : 0;
+  r.cur = partial > 0 ? { e: q.from.e + (q.e - q.from.e) * partial / len(q), n: q.from.n + (q.n - q.from.n) * partial / len(q) } : null;
   r.fraction = r.done ? 1 : Math.max(r.fraction, (r.painted + partial) / (r.paintLen || 1));
 }
 
@@ -260,7 +263,7 @@ function targetFor(u) {
       e: p.e, n: p.n, from: p.from || null, track: !!p.track, paint: !!p.paint,
       label: `${sim.label(job)}: ${what}, ${Math.round(r.fraction * 100)}% worked`,
       maxKph: p.paint ? Math.min(16, passKph(r.kind)) : p.track ? 7 : 9, field: f.name,
-      job: { task: `${job.id}-${job.type}`, workType: job.type, notes: `Assigned by fleet coordinator, priority ${job.priority}, due ${fmtTime(job.deadline)}` },
+      job: { task: `${RUN}-${job.id}-${job.type}`, workType: job.type, notes: `Assigned by fleet coordinator, priority ${job.priority}, due ${fmtTime(job.deadline)}` },
     };
   }
   // Travelling: follow the lanes to wherever the plan is sending this tractor.
@@ -390,6 +393,20 @@ function humanGate() {
 // earlier one is finished, then released.
 let mode = PRESET ? 'running' : 'building';
 const backlog = [];
+// What state each field's ground is in. An operation that makes no sense for that state is refused with
+// a plain reason, the way a foreman would refuse it: no sowing unplowed ground, no plowing up a fresh seedbed.
+const ground = Object.fromEntries(scenario.fields.map(f => [f.name, 'stubble']));
+const GROUND_WORD = { stubble: 'not plowed', tilled: 'plowed', sown: 'sown' };
+const groundAfter = (g, type) => (type === 'till' ? 'tilled' : type === 'seed' ? 'sown' : g);
+const stillToDo = (b) => { const j = sim.jobs.get(b.id); return !b.applied && j?.status !== 'cancelled'; };
+const groundOnceListDone = (fieldName) => backlog.filter(b => b.field === fieldName && stillToDo(b)).reduce((g, b) => groundAfter(g, b.type), ground[fieldName]);
+function whyNot(g, type, fieldName) {
+  if (type === 'seed' && g === 'stubble') return `${fieldName} has not been plowed. Add Plow before Sow.`;
+  if (type === 'seed' && g === 'sown') return `${fieldName} is already sown, or will be by a job on the list.`;
+  if (type === 'till' && g === 'sown') return `${fieldName} is sown, or will be by a job on the list. Plowing it would destroy the seedbed.`;
+  if (type === 'mow' && g !== 'stubble') return `${fieldName} is bare soil once plowed or sown. There is nothing to mow.`;
+  return null;
+}
 let jobSeq = 0;
 const labelOf = (b) => `${b.id} ${({ till: 'Till', seed: 'Seed', spray: 'Spray', mow: 'Mow' })[b.type]} ${b.field}`;
 function draftJobs({ fields = [], steps = [], priority = 'medium', deadline = '17:00' }) {
@@ -399,13 +416,23 @@ function draftJobs({ fields = [], steps = [], priority = 'medium', deadline = '1
   if (!steps.length) throw new Error('Pick at least one operation.');
   for (const st of steps) if (!IMPLEMENT_FOR[st]) throw new Error(`Unknown operation: ${st}`);
   if (!(due > sim.time)) throw new Error('The finish time has already passed.');
+  // Plowing always comes before sowing, whatever order they were clicked in.
+  steps = [...steps];
+  if (steps.includes('till') && steps.includes('seed') && steps.indexOf('seed') < steps.indexOf('till')) { steps.splice(steps.indexOf('till'), 1); steps.splice(steps.indexOf('seed'), 0, 'till'); }
+  // Check everything first, so a list is either added whole or not at all.
+  for (const name of fields) {
+    if (!scenario.fields.some(x => x.name === name)) throw new Error(`Unknown field: ${name}`);
+    let g = groundOnceListDone(name);
+    for (const type of steps) { const no = whyNot(g, type, name); if (no) throw new Error(no); g = groundAfter(g, type); }
+  }
   const added = [];
   for (const name of fields) {
     const f = scenario.fields.find(x => x.name === name);
-    if (!f) throw new Error(`Unknown field: ${name}`);
+    // A step waits for the one before it in this field. Sowing also waits for any plowing already listed.
     let prev = null;
     for (const type of steps) {
-      const b = { id: `N${++jobSeq}`, field: f.name, fieldId: f.id, type, priority, deadline: due, waitsFor: prev, status: 'draft' };
+      const earlierTill = type === 'seed' && !prev ? [...backlog].reverse().find(b => b.field === name && b.type === 'till' && stillToDo(b)) : null;
+      const b = { id: `N${++jobSeq}`, field: f.name, fieldId: f.id, type, priority, deadline: due, waitsFor: prev || earlierTill?.id || null, status: 'draft' };
       backlog.push(b); added.push(b.id); prev = b.id;
     }
   }
@@ -414,6 +441,8 @@ function draftJobs({ fields = [], steps = [], priority = 'medium', deadline = '1
   return added;
 }
 function releaseReady() {
+  // A finished job changes the state of its field's ground.
+  for (const b of backlog) if (!b.applied && sim.jobs.get(b.id)?.status === 'done') { b.applied = true; ground[b.field] = groundAfter(ground[b.field], b.type); }
   const ready = backlog.filter(b => b.status !== 'released' && (!b.waitsFor || sim.jobs.get(b.waitsFor)?.status === 'done'));
   for (const b of backlog) if (b.status === 'draft' && !ready.includes(b)) b.status = 'waiting';
   if (!ready.length) return;
@@ -536,6 +565,14 @@ function snapshot() {
     scenario: scenario.name, clock: fmtTime(sim.time), secPerMin: SEC, finished: stopped, mode,
     backlog: backlog.map(b => ({ id: b.id, field: b.field, type: b.type, label: labelOf(b), priority: b.priority, deadline: fmtTime(b.deadline), waitsFor: b.waitsFor ? labelOf(backlog.find(x => x.id === b.waitsFor) || { id: b.waitsFor, type: 'till', field: '' }) : null, status: b.status })),
     holds: [...holds.values()], recalls: [...recalls.values()],
+    // Strips of ground already worked, from the legs each job has really completed. Views draw from this.
+    coverage: [...routes.entries()].map(([id, r]) => {
+      const segs = r.pts.slice(0, r.done ? r.pts.length : r.i).filter(q => q.paint).map(q => [q.from.e, q.from.n, q.e, q.n].map(v => +v.toFixed(1)));
+      const q = r.pts[r.i];
+      if (!r.done && q?.paint && r.cur) segs.push([q.from.e, q.from.n, r.cur.e, r.cur.n].map(v => +v.toFixed(1)));
+      return { job: id, field: r.field, type: sim.jobs.get(id)?.type, widthM: r.width, segs };
+    }),
+    ground: Object.fromEntries(Object.keys(ground).map(k => [k, { now: GROUND_WORD[ground[k]], planned: GROUND_WORD[groundOnceListDone(k)] }])),
     roundtable: roundLines.slice(-30).reverse(), agents: rt.agents, roundtableStats: rt.stats(),
     tractors: units.map((u, i) => {
       const w = world(u.twin);
@@ -558,7 +595,7 @@ function snapshot() {
   };
 }
 const PAGE_PORT = Number(opt('page', 5190));
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   if (req.url === '/state') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(snapshot())); }
   const m = req.method === 'POST' && req.url.match(/^\/human\/(H\d+)\/go$/);
   if (m) {
@@ -593,6 +630,7 @@ http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/draft') return readBody((b) => ok({ added: draftJobs(b) }));
   if (req.method === 'POST' && req.url === '/jobs') return readBody((b) => ok({ added: draftJobs({ fields: b.fields, steps: [b.type], priority: b.priority, deadline: b.deadline }) }));
   if (req.method === 'DELETE' && req.url.startsWith('/draft/')) { try { removeDraft(decodeURIComponent(req.url.slice(7))); return ok(); } catch (err) { res.writeHead(409); return res.end(String(err.message)); } }
+  if (req.method === 'POST' && req.url === '/reset') { ok(); return startOver(); }
   if (req.method === 'POST' && req.url === '/start') { try { startDay(); return ok(); } catch (err) { res.writeHead(409); return res.end(String(err.message)); } }
   // For agents: place or lift a hold on a kind of work, and speak on the message trail.
   if (req.method === 'POST' && req.url === '/hold') return readBody((b) => {
@@ -622,8 +660,26 @@ http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/agent/say') return readBody((b) => { const text = String(b.text || '').slice(0, 400); trail(String(b.from || 'agent'), String(b.to || 'operator'), String(b.type || 'note'), text); roundLines.push({ id: `x${roundLines.length}`, topicId: 'outside', topic: 'From another agent', agent: String(b.from || 'agent'), role: '', text, kind: 'says', clock: fmtTime(sim.time) }); ok(); });
   if (req.method === 'POST' && req.url.startsWith('/cmd/')) { command(decodeURIComponent(req.url.slice(5))); res.writeHead(200); return res.end('ok'); }
   res.writeHead(200, { 'Content-Type': 'text/html' });
-  res.end(fs.readFileSync(path.join(here, 'live.html')));
-}).listen(PAGE_PORT, () => console.log(`Status page → http://localhost:${PAGE_PORT}/`));
+  const page = req.url.split('?')[0] === '/3d' && fs.existsSync(path.join(here, 'live3d.html')) ? 'live3d.html' : 'live.html';
+  res.end(fs.readFileSync(path.join(here, page)));
+});
+// When this process restarts itself (Start over), the old one may still hold the port for a moment.
+let listenTries = 0;
+server.on('error', (err) => { if (err.code === 'EADDRINUSE' && listenTries++ < 20) setTimeout(() => server.listen(PAGE_PORT), 300); else throw err; });
+server.listen(PAGE_PORT, () => console.log(`Status page → http://localhost:${PAGE_PORT}/`));
+
+// Start over: every tractor goes back to its bay, and this runner restarts itself with an empty job list
+// and the clock at the start of the day.
+function startOver() {
+  if (stopped) return;
+  stopped = true;
+  console.log('\nStarting over: tractors back to their bays, job list cleared.');
+  Promise.allSettled(units.map(u => call(u, 'POST', '/home', {}))).then(() => {
+    server.close();
+    spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit' });
+    setTimeout(() => process.exit(0), 250);
+  });
+}
 
 await poll();
 const missing = units.filter(u => !u.tel).map(u => `${u.id} (${u.url})`);

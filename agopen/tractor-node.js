@@ -24,6 +24,9 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const t = new Tractor(id, agPort);
 let fault = 'ok', cmd = null, seq = 0, acked = 0, lastCmdAt = 0;
+let bayHome = null;
+// This tractor's own parking bay: 10 m apart along the depot front, so three machines never share a spot.
+const bayLon = (home) => home.lon + ((Math.max(0, Number(id.replace(/\D/g, '')) - 1) - 1) * 10) / (111412.84 * Math.cos(home.lat * Math.PI / 180) - 93.5 * Math.cos(3 * home.lat * Math.PI / 180));
 
 await t.connect();
 await sleep(1200);
@@ -39,9 +42,8 @@ if (fs.existsSync(farmFile)) {
   const w = t.world();
   if (!w || Math.hypot(w.e, w.n) > 5000 || process.argv.includes('--depot')) { t.send('sim.stop');
     // Park in this tractor's own bay: 10 m apart along the depot front, so three machines never share a spot.
-    const idx = Math.max(0, Number(id.replace(/\D/g, '')) - 1), bayE = (idx - 1) * 10;
-    const lon = home.lon + bayE / (111412.84 * Math.cos(home.lat * Math.PI / 180) - 93.5 * Math.cos(3 * home.lat * Math.PI / 180));
-    t.send(`sim.setCoords|${home.lat},${lon}`); await sleep(1200); }
+    t.send(`sim.setCoords|${home.lat},${bayLon(home)}`); await sleep(1200); }
+  bayHome = home;
 } else t.world();
 
 // Drive towards the commanded target unless a fault says otherwise.
@@ -101,6 +103,14 @@ const server = http.createServer((req, res) => {
   // Test hook so a script can inject the same faults you can type into this terminal.
   if (req.method === 'POST' && req.url.startsWith('/fault/')) { setFault(req.url.slice(7), 'test script'); res.writeHead(200); return res.end('ok'); }
   if (fault === 'dead') { req.socket.destroy(); return; }            // a dead machine says nothing
+  // Start over: back to the bay, unlocked, no fault, nothing to do.
+  if (req.method === 'POST' && req.url === '/home') {
+    service = null; saveLock(); fault = 'ok'; cmd = null; t.held = null; t.started = {}; t.paint(false);
+    t.send('sim.stop'); t.send('sim.setSteer|0');
+    if (bayHome) t.send(`sim.setCoords|${bayHome.lat},${bayLon(bayHome)}`);
+    console.log(`\n${id} ── back in its bay for a fresh start ──`);
+    res.writeHead(200); return res.end('ok');
+  }
   if (req.method === 'POST' && (req.url === '/service' || req.url === '/release')) {
     let body = '';
     req.on('data', c => { body += c; });

@@ -49,6 +49,8 @@
   button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; font-size:13px; padding:5px 14px; }
   button.go:disabled { background:#c9d2cc; border-color:#c9d2cc; cursor:default; }
   header a { color:#bfe3cf; font-size:13px; }
+  #startover { font-size:12px; padding:3px 10px; border-radius:6px; border:1px solid #6b756e; background:#2c3a33; color:#fff; cursor:pointer; }
+  #startovermsg { opacity:.8; }
   .farm { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:12px; align-items:start; }
   #map { width:100%; height:auto; max-height:460px; background:#e9e3d2; border-radius:6px; }
   #map .field { fill:#cfe3b4; stroke:#5f7a45; stroke-width:1.2; cursor:pointer; }
@@ -82,7 +84,8 @@
 </head>
 <body>
 <header>
-  <h1>Fleet live status</h1><small id="scn"></small> <a href="/dashboard/?live=1" target="_blank">Open 3D view</a>
+  <h1>Fleet live status</h1><small id="scn"></small> <a href="/3d" target="_blank">Open 3D view</a>
+  <button id="startover" type="button">Start over</button><small id="startovermsg"></small>
   <span id="clock">--:--</span>
 </header>
 <main>
@@ -167,8 +170,13 @@ function drawFarm() {
     for (const t of f.tracks) h += `<polyline class="line" points="${t.line.map(([lon, lat]) => proj(lat, lon).map(v => v.toFixed(0)).join(',')).join(' ')}"></polyline>`;
     h += `<text x="${cx.toFixed(0)}" y="${(cy - 1).toFixed(0)}">${esc(f.name)}</text>`;
     const open = mine.filter(j => j.status !== 'done' && j.status !== 'cancelled').map(j => `${j.id} ${j.type} ${j.pct}%`).join(' · ');
-    if (open) h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open)}</text>`;
+    const gnd = lastState && lastState.ground && lastState.ground[f.name];
+    h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
   }
+  // Ground already worked, as strips one implement-width wide.
+  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#7b1fa2', mow: '#c99700' };
+  for (const c of (lastState && lastState.coverage) || []) for (const [e0, n0, e1, n1] of c.segs)
+    h += `<line x1="${e0}" y1="${-n0}" x2="${e1}" y2="${-n1}" stroke="${COVER[c.type] || '#555'}" stroke-opacity="0.55" stroke-width="${c.widthM}" stroke-linecap="butt" pointer-events="none"></line>`;
   h += `<rect x="-17" y="4" width="34" height="14" fill="#3d4a43"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
   if (lastState) lastState.tractors.forEach((t, i) => {
     if (!t.tel || t.tel.lat == null) return;
@@ -356,6 +364,15 @@ async function refresh() {
   document.getElementById('jobs').innerHTML = '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th></tr>' +
     s.jobs.map(j => `<tr><td>${esc(j.label)}</td><td>${esc(j.priority)}</td><td>${j.deadline}</td><td>${esc(j.tractor || '–')}</td><td>${j.pct}%</td><td>${esc(j.status)}</td></tr>`).join('');
 }
+// Start over needs two clicks, so it cannot be hit by accident.
+const so = document.getElementById('startover'), soMsg = document.getElementById('startovermsg');
+let soArmed = 0;
+so.addEventListener('click', async () => {
+  if (Date.now() - soArmed > 4000) { soArmed = Date.now(); so.textContent = 'Click again to confirm'; setTimeout(() => { so.textContent = 'Start over'; }, 4000); return; }
+  so.disabled = true; soMsg.textContent = ' Sending tractors home…';
+  try { await fetch('/reset', { method: 'POST' }); } catch { /* the runner restarts, so the reply may not arrive */ }
+  setTimeout(() => location.reload(), 3500);
+});
 refresh();
 setInterval(refresh, 1000);
 </script>

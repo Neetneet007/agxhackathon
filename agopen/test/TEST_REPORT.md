@@ -1,6 +1,6 @@
 # Fault test report
 
-Generated 2026-11-15 21:04 UTC from the live demo farm (3 tractors, 9 fields, 11 jobs). Times are clock times from a 06:00 start.
+Generated 2026-11-15 21:17 UTC from the live demo farm (3 tractors, 9 fields, 11 jobs). Times are clock times from a 06:00 start.
 
 | Case | What was injected | What the system did | Result |
 |---|---|---|---|
