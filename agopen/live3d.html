@@ -90,7 +90,7 @@ stage.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0xcfe6f5);
-scene.fog = new THREE.Fog(0xcfe6f5, 900, 2200);
+scene.fog = new THREE.Fog(0xcfe6f5, 2600, 6000);
 
 const camera = new THREE.PerspectiveCamera(50, 1, 1, 6000);
 camera.position.set(0, 400, 400);
@@ -185,7 +185,7 @@ function ribbonFromPolyline(pts, width, y, color) {
   }
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color, side: THREE.DoubleSide }));
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide }));
   m.receiveShadow = true;
   return m;
 }
@@ -255,7 +255,7 @@ function buildFarm() {
 
     // name label
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cn = pts.reduce((a, p) => a + p[1], 0) / pts.length;
-    const lab = makeLabel(0.03);
+    const lab = makeLabel(0.02);
     setLabel(lab, String(f.name ?? ''), null);
     lab.position.set(cx, 4, -cn);
     farmGroup.add(lab);
@@ -274,7 +274,7 @@ function buildFarm() {
     rect.rotation.x = -Math.PI / 2;
     rect.position.set(b.e, 0.08, -b.n);
     farmGroup.add(rect);
-    const lab = makeLabel(0.026);
+    const lab = makeLabel(0.017);
     setLabel(lab, String(b.id ?? ''), null);
     lab.position.set(b.e, 1.5, -b.n + 6);
     farmGroup.add(lab);
@@ -297,7 +297,7 @@ function buildFarm() {
   tank.position.set(bx + 16, 1.6, barnZ - 2); tank.castShadow = true;
   farmGroup.add(tank);
   grow(bx - 12, barnZ + 8); grow(bx + 20, barnZ - 8);
-  const dl = makeLabel(0.03);
+  const dl = makeLabel(0.02);
   setLabel(dl, String(farm.depot || 'Depot'), null);
   dl.position.set(bx, 12, barnZ);
   farmGroup.add(dl);
@@ -404,7 +404,7 @@ function buildTractor(color) {
   const lock = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.4), new THREE.MeshBasicMaterial({ color: 0xffd43b }));
   lock.position.set(0, 4.5, 1.0); lock.visible = false;
   model.add(lock);
-  const label = makeLabel(0.034);
+  const label = makeLabel(0.022);
   label.position.set(0, 8, 0);
   root.add(label);
   return { root, model, bar, barMat, beaconMat, ring, lock, label, bad: false, shown: false,
@@ -516,7 +516,9 @@ const tmp = new THREE.Vector3();
 function flyToFarm(instant) {
   followId = null; syncFollowButtons();
   const tgt = new THREE.Vector3(bounds.cx, 0, bounds.cz);
-  const pos = new THREE.Vector3(bounds.cx, bounds.r * 1.25, bounds.cz + bounds.r * 1.05);
+  const half = Math.tan(camera.fov * Math.PI / 360);
+  const dist = bounds.r * 1.08 / Math.min(half, half * camera.aspect);
+  const pos = new THREE.Vector3(bounds.cx, dist * 0.78, bounds.cz + dist * 0.62);
   if (instant) { camera.position.copy(pos); controls.target.copy(tgt); controls.update(); fly = null; }
   else fly = { pos, tgt };
 }
@@ -609,7 +611,7 @@ function frame() {
     camera.position.add(delta);
     if (blend > 0) {
       // ease the camera behind the tractor (opposite its heading), then leave orbiting to the user
-      const bx = o.pos.x + Math.sin(o.heading) * 38, bz = o.pos.z + Math.cos(o.heading) * 38;
+      const bx = o.pos.x - Math.sin(o.heading) * 38, bz = o.pos.z + Math.cos(o.heading) * 38;
       camera.position.lerp(new THREE.Vector3(bx, 22, bz), k * 0.8);
       blend -= dt;
     }
