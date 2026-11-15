@@ -178,3 +178,87 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .lbl.fd { text-shadow: 0 1px 3px rgba(0, 0, 0, .9); }
 }
+
+/* Real-world layer (dashboard/gis/): labels readable over the aerial photo, source credit. */
+.sat .lbl.fd { color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .95), 0 0 6px rgba(0, 0, 0, .7); }
+.sat .lbl.fd small { color: rgba(255, 255, 255, .85); }
+.lbl.gis { font-size: 9.5px; font-weight: 500; font-style: italic; opacity: .9; }
+.lbl.gis.water { color: #bfe6ff; }
+.btn.on#sat { outline: 2px solid var(--accent, #2f7fd6); outline-offset: -2px; }
+.giscredit { position: fixed; left: 50%; bottom: 38px; transform: translateX(-50%); z-index: 5; max-width: min(92vw, 900px); font-size: 10.5px; padding: 3px 10px; border-radius: 99px; background: rgba(0, 0, 0, .55); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none; }
+
+/* ---- Liquid glass: translucent, refractive panels; pill controls; no icons, no secondary notes. ---- */
+:root {
+  --glass: rgba(255, 255, 255, .34); --glass-strong: rgba(255, 255, 255, .5);
+  --edge: rgba(255, 255, 255, .7); --edge-low: rgba(255, 255, 255, .18); --line: rgba(20, 30, 25, .1);
+  --accent: #0a84ff; --accent-soft: rgba(10, 132, 255, .12); --good: #30a46c;
+  --shadow: 0 1px 1px rgba(0, 0, 0, .04), 0 12px 40px rgba(20, 40, 30, .16);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased; letter-spacing: -.01em;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --glass: rgba(40, 46, 44, .36); --glass-strong: rgba(60, 68, 64, .5);
+    --edge: rgba(255, 255, 255, .28); --edge-low: rgba(255, 255, 255, .06); --line: rgba(255, 255, 255, .1);
+    --accent-soft: rgba(10, 132, 255, .2); --shadow: 0 1px 1px rgba(0, 0, 0, .2), 0 16px 44px rgba(0, 0, 0, .5);
+  }
+}
+.glass, .toast, .decision, .modal .box {
+  background: linear-gradient(140deg, var(--glass-strong), var(--glass) 42%, var(--glass)) !important;
+  backdrop-filter: blur(30px) saturate(1.9) brightness(1.06); -webkit-backdrop-filter: blur(30px) saturate(1.9) brightness(1.06);
+  border: 1px solid var(--edge-low);
+  box-shadow: inset 0 1px 0 var(--edge), inset 1px 0 0 var(--edge-low), inset 0 -1px 0 var(--edge-low), var(--shadow);
+}
+.bar { border-radius: 99px; padding: 8px 18px; gap: 8px 18px; top: 14px; left: 14px; right: 14px; }
+.card, .toast, .popover, .ask, .timeline, .decision { border-radius: 24px; }
+.modal .box { border-radius: 30px; padding: 22px; }
+.modal { background: rgba(0, 0, 0, .22); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+.dock { top: 84px; left: 14px; gap: 10px; }
+.card > summary { padding: 13px 18px; font-weight: 600; }
+.card > div { padding: 0 14px 14px; }
+.brand { font-weight: 650; font-size: 15px; }
+.clock { font-weight: 600; }
+.btn, .seg, .chip, .chips button, .ops select, .ops input, .ask select, .askform input {
+  border-radius: 99px; background: var(--glass); border: 1px solid var(--edge-low); box-shadow: inset 0 1px 0 var(--edge);
+}
+.btn { padding: 6px 14px; font-weight: 500; transition: transform .15s, background .15s; }
+.btn:hover { border-color: var(--edge-low); background: var(--glass-strong); }
+.btn:active { transform: scale(.97); }
+.btn.primary, .msg.me { background: var(--accent); border-color: transparent; color: #fff; }
+.btn.on#sat { outline: 0; background: var(--ink); color: var(--bg); }
+.seg button { background: transparent; padding: 6px 14px; }
+.seg button.on { background: var(--ink); color: var(--bg); border-radius: 99px; }
+.toast { border-left: 1px solid var(--edge-low); padding: 14px 16px; }
+.toast.event .tt::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--bad); margin-right: 8px; vertical-align: middle; }
+.askfab { background: var(--accent); color: #fff; padding: 11px 20px; font-weight: 600; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), var(--shadow); }
+.trow, .jrow, .src { border-radius: 16px; }
+.lbl { background: var(--glass); border-color: var(--edge-low); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.lbl.fd { backdrop-filter: none; -webkit-backdrop-filter: none; }
+textarea { border-radius: 16px; background: var(--glass); }
+
+/* no icons */
+.src .ic, .logo { display: none; }
+.src { grid-template-columns: 1fr; }
+/* no secondary notes: field sub-labels, feed readings (unless alerting), hints, legends */
+.lbl small, .lbl.fd small, .src .rd, .toast .by .badge, .toast .by > span[title], #askMode, .count { display: none; }
+.src.alert .rd, .lbl.warn small { display: block; }
+.kpi { align-items: center; } .kpi b { font-size: 17px; font-weight: 600; }
+.pill { background: transparent; border: 0; color: var(--muted); padding: 0; }
+
+/* how the agents talk */
+.modal .box.talk { max-width: 860px; }
+.talk svg { width: 100%; height: auto; display: block; margin: 8px 0 4px; }
+.talk .n rect { fill: var(--glass-strong); stroke: var(--edge); stroke-width: 1; }
+.talk .n text { fill: var(--ink); font-size: 14px; font-weight: 600; text-anchor: middle; }
+.talk .n.chair rect { fill: var(--accent); stroke: transparent; } .talk .n.chair text { fill: #fff; }
+.talk .n.op rect { fill: var(--ink); stroke: transparent; } .talk .n.op text { fill: var(--bg); font-size: 15px; }
+.talk .e path { fill: none; stroke: var(--muted); stroke-width: 1.4; marker-end: url(#ah); stroke-dasharray: 5 7; animation: flow 1.2s linear infinite; }
+.talk .e path.back { stroke-dasharray: 2 5; }
+.talk marker path { fill: var(--muted); }
+.talk .t text { fill: var(--muted); font-size: 10.5px; text-anchor: middle; } .talk .t text.l { text-anchor: start; }
+@keyframes flow { to { stroke-dashoffset: -12; } }
+@media (prefers-reduced-motion: reduce) { .talk .e path { animation: none; } }
+.steps { display: flex; gap: 8px; list-style: none; padding: 0; margin: 10px 0 0; counter-reset: s; justify-content: center; flex-wrap: wrap; }
+.steps li { counter-increment: s; padding: 7px 16px; border-radius: 99px; background: var(--glass); border: 1px solid var(--edge-low); box-shadow: inset 0 1px 0 var(--edge); }
+.steps li::before { content: counter(s); color: var(--muted); margin-right: 8px; font-variant-numeric: tabular-nums; }
+.steps li + li { position: relative; }

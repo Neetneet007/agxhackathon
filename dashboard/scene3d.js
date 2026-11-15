@@ -60,6 +60,62 @@ export class FarmScene {
   wx(x) { return x - this.W / 2 + 0.5; }
   wz(y) { return y - this.H / 2 + 0.5; }
 
+  // Real-world layer: aerial photo under the farm, plus canals and roads from OpenStreetMap.
+  // Written by `node gis/fetch.js` into dashboard/gis/. Returns null (and changes nothing) when it is absent.
+  async loadGis(base = './gis/') {
+    let gis;
+    try { const r = await fetch(`${base}gis.json`, { cache: 'no-store' }); if (!r.ok) return null; gis = await r.json(); } catch { return null; }
+    const e = gis.extentCells, w = e.x1 - e.x0, h = e.y1 - e.y0;
+    const X = x => x - this.W / 2, Z = y => y - this.H / 2;          // grid edge coordinates -> world
+    const g = new THREE.Group();
+    if (gis.sources?.imagery) {
+      try {
+        const tex = await new THREE.TextureLoader().loadAsync(`${base}${gis.sources.imagery.file}`);
+        tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+        const photo = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex }));   // unlit: the photo keeps its own daylight
+        photo.rotation.x = -Math.PI / 2; photo.position.set(X((e.x0 + e.x1) / 2), 0.02, Z((e.y0 + e.y1) / 2)); photo.receiveShadow = true;
+        g.add(photo);
+      } catch { /* no photo: the vectors still draw */ }
+    }
+    if (gis.sources?.osm) {
+      try {
+        const { ways } = await (await fetch(`${base}${gis.sources.osm.file}`, { cache: 'no-store' })).json();
+        const mats = { water: new THREE.LineBasicMaterial({ color: 0x6cc4ff, transparent: true, opacity: 0.95 }), road: new THREE.LineBasicMaterial({ color: 0xfff3d6, transparent: true, opacity: 0.55 }) };
+        const inside = ([x, y]) => x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1;
+        const named = new Set();
+        for (const wy of ways) {
+          const pts = wy.cells.filter(inside);
+          if (pts.length < 2) continue;
+          g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(([x, y]) => new THREE.Vector3(X(x), wy.kind === 'water' ? 0.06 : 0.045, Z(y)))), mats[wy.kind]));
+          if (wy.name && !named.has(wy.name) && (wy.kind === 'water' || wy.type === 'tertiary') && named.size < 8) {
+            named.add(wy.name);
+            const [x, y] = pts[Math.floor(pts.length / 2)];
+            const lab = this._label(`fd gis ${wy.kind}`, wy.name); lab.position.set(X(x), 0.25, Z(y)); g.add(lab);
+          }
+        }
+      } catch { /* no vectors */ }
+    }
+    this.gis = gis; this.gisGroup = g; this.scene.add(g);
+    this.setSatellite(false);          // the clean drawn farm is the default; the Satellite button shows the photo
+    return gis;
+  }
+
+  // on: real aerial photo, see-through fields. off: the original drawn farm.
+  setSatellite(on) {
+    if (!this.gisGroup) return false;
+    this.satellite = on;
+    this.gisGroup.visible = on;
+    this.gisGroup.traverse(o => { if (o.isCSS2DObject) o.visible = on; });
+    for (const o of this._plain || []) o.visible = !on;
+    for (const b of this._banks || []) b.visible = !on;
+    if (this._water) { this._water.material.opacity = on ? 0.5 : 0.92; this._water.scale.z = on ? this.H / (this.H + 40) : 1; }
+    if (this._riverLab) this._riverLab.element.innerHTML = on ? `${this._riverName}<small>simulated</small>` : this._riverName;
+    for (const F of this.fields.values()) { const m = F.base.material; m.transparent = on; m.opacity = on ? 0.5 : 1; m.depthWrite = !on; m.needsUpdate = true; }
+    this.scene.fog.near = on ? 60 : 45; this.scene.fog.far = on ? 130 : 95;
+    this.el.classList.toggle('sat', on);
+    return on;
+  }
+
   resetView() {
     this.camera.position.set(-2, 25, 25);
     this.controls.target.set(1.5, 0, 1.5);
@@ -94,23 +150,23 @@ export class FarmScene {
     // ground + margin
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(W + 40, H + 40), new THREE.MeshStandardMaterial({ color: this.dark ? 0x37462f : 0xb9c99a, roughness: 1 }));
     ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true;
-    this.scene.add(ground);
+    this.scene.add(ground); this._plain = [ground];
     const farm = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ color: this.dark ? 0x435438 : 0xc9d6a9, roughness: 1 }));
     farm.rotation.x = -Math.PI / 2; farm.position.y = 0.005; farm.receiveShadow = true;
-    this.scene.add(farm);
+    this.scene.add(farm); this._plain.push(farm);
 
     // creek
     const river = this.sc.map.features?.river;
     if (river) {
       const water = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.06, H + 40), new THREE.MeshStandardMaterial({ color: 0x4f93c6, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92 }));
       water.position.set(this.wx(river.x), 0.01, 0);
-      this.scene.add(water);
+      this.scene.add(water); this._water = water; this._banks = [];
       const bankMat = new THREE.MeshStandardMaterial({ color: this.dark ? 0x3d4a33 : 0x9fb27a });
       for (const dx of [-0.62, 0.62]) {
         const bank = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, H + 40), bankMat);
-        bank.position.set(this.wx(river.x) + dx, 0.04, 0); this.scene.add(bank);
+        bank.position.set(this.wx(river.x) + dx, 0.04, 0); this.scene.add(bank); this._banks.push(bank);
       }
-      const lab = this._label('fd', `${river.label}`); lab.position.set(this.wx(river.x), 0.3, this.wz(9.5)); this.scene.add(lab);
+      const lab = this._label('fd', `${river.label}`); lab.position.set(this.wx(river.x), 0.3, this.wz(9.5)); this.scene.add(lab); this._riverLab = lab; this._riverName = river.label;
     }
     for (const b of this.sc.map.features?.bridges || []) {
       const [x, y] = b.cells[0];
@@ -178,7 +234,7 @@ export class FarmScene {
       const s = 0.6 + rnd() * 0.7;
       const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.09, 0.5, 6), trunk); tr.position.y = 0.25; t.add(tr);
       const cone = new THREE.Mesh(new THREE.ConeGeometry(0.45, 1.2, 7), leaf); cone.position.y = 1.0; cone.castShadow = true; t.add(cone);
-      t.scale.setScalar(s); t.position.set(x, 0, z); this.scene.add(t);
+      t.scale.setScalar(s); t.position.set(x, 0, z); this.scene.add(t); this._plain.push(t);
     }
 
     // tractors

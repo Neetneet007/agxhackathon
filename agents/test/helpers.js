@@ -24,8 +24,9 @@ export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', 
       const url = req.url.split('?')[0];
       let json = null;
       try { json = body ? JSON.parse(body) : null; } catch { /* not JSON */ }
-      fake.calls.push({ method: req.method, url, body: json });
-      const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj ?? { ok: code < 300 })); };
+      const call = { method: req.method, url, body: json, status: null };
+      fake.calls.push(call);
+      const send = (code, obj) => { call.status = code; res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj ?? { ok: code < 300 })); };
       if (FORBIDDEN.some(([m, re]) => m === req.method && re.test(url)) || (req.method === 'POST' && url === '/event' && ['breakdown', 'repair'].includes(json?.type))) {
         fake.forbidden.push(`${req.method} ${url}${json?.type ? ` (${json.type})` : ''}`);
         return send(403, { error: 'forbidden' });

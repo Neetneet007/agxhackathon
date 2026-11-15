@@ -1,5 +1,7 @@
 // Read-only HTTP API for the runtime (default port 5200). The only write is POST /agents/<name>/wake.
+// POST /ask (or GET /ask?q=) puts a question to the team; it reads and answers, and never acts.
 import http from 'node:http';
+import { ask } from './ask.js';
 
 export function startApi(rt, { port = 5200, host = '127.0.0.1' } = {}) {
   const json = (res, code, obj) => {
@@ -12,6 +14,19 @@ export function startApi(rt, { port = 5200, host = '127.0.0.1' } = {}) {
     const agent = name => rt.agents.find(a => a.name === name);
     try {
       if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST' }); return res.end(); }
+      if (p === '/ask' && (req.method === 'POST' || req.method === 'GET')) {
+        // Ask the team a question. Read-only: an answer never places a hold, recall, event or message.
+        const reply = async q => { const r = await ask(rt, q); json(res, r.ok ? 200 : 400, r); };
+        if (req.method === 'GET') { reply({ question: url.searchParams.get('q') ?? url.searchParams.get('question'), agent: url.searchParams.get('agent') || undefined }).catch(e => json(res, 500, { error: e.message })); return; }
+        let body = '';
+        req.on('data', c => { body += c; if (body.length > 10_000) req.destroy(); });
+        req.on('end', () => {
+          let b = {};
+          try { b = body ? JSON.parse(body) : {}; } catch { return json(res, 400, { error: 'bad JSON' }); }
+          reply({ question: b.question, agent: b.agent || undefined }).catch(e => json(res, 500, { error: e.message }));
+        });
+        return;
+      }
       if (req.method === 'POST') {
         // A person reports something done (e.g. an inspection). No agent tool can call this.
         const pm = p.match(/^\/people\/([^/]+)\/([^/]+)$/);
@@ -64,7 +79,7 @@ export function startApi(rt, { port = 5200, host = '127.0.0.1' } = {}) {
         return json(res, 200, { memory: Object.fromEntries([...rt.memory.entries()].map(([k, v]) => [k, { value: v.value, by: v.by, ts: v.ts, revisions: v.history.length }])) });
       }
       if (p === '/effects') return json(res, 200, { effects: [...rt.effects.values()].map(({ nextTry, ...f }) => f) });
-      return json(res, 404, { error: 'not found', endpoints: ['/health', '/agents', '/agents/<name>', '/agents/<name>/runs', '/messages?since=<n>', '/memory', '/memory?key=<k>', '/effects', 'POST /agents/<name>/wake'] });
+      return json(res, 404, { error: 'not found', endpoints: ['/ask?q=<question>', 'POST /ask', '/health', '/agents', '/agents/<name>', '/agents/<name>/runs', '/messages?since=<n>', '/memory', '/memory?key=<k>', '/effects', 'POST /agents/<name>/wake'] });
     } catch (err) {
       return json(res, 500, { error: err.message });
     }

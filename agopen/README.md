@@ -128,6 +128,18 @@ Extra coordinator options go in the environment variable `LIVE_ARGS`, which `sta
 
 macOS only: the launcher uses `osascript`, Terminal and `open`. On another system, start `node agopen/tractor-node.js T1 5175 --depot` (and the same for T2 5176 and T3 5177, and `node agopen/tractor-node.js FUEL 5178 --depot --bay 3` for the fuel truck) in separate shells and then `node agopen/live.js` in another.
 
+### Windows, without AgOpenWeb (UI work and rehearsals)
+
+`agopen/mock-node.js` stands in for `tractor-node.js`. It has the same command line and the same HTTP API on agPort+1000, and it accepts the same `dead`, `stuck` and `ok` faults. It simulates the vehicle itself instead of driving an AgOpenWeb copy, and it shows a placeholder where the status page embeds AgOpenWeb's view. `live.js` and the pages on 5190 run unchanged.
+
+```bat
+agopen\start-demo-windows.cmd
+agopen\start-demo-windows.cmd -Speed 3
+agopen\start-demo-windows.cmd -Stop
+```
+
+`-Speed 3` makes the vehicles move 3x faster. The launcher opens a window per vehicle and one for the coordinator, then opens http://localhost:5190/. Positions and worked area come from the stand-in, not from AgOpenWeb.
+
 ## What you see
 
 The status page at http://localhost:5190 shows, from top to bottom:

@@ -6,7 +6,9 @@ Eight agents on one durable runtime. Each agent is a language model plus an inst
 node agents/server.js                                   # all eight agents, rule-only, API on http://127.0.0.1:5200
 WEATHER_DAY=monsoon node agents/server.js               # or hurricane; default calm
 ANTHROPIC_API_KEY=sk-ant-... node agents/server.js      # model in the loop (needs npm install in the repo root for @anthropic-ai/sdk)
-node --test agents/test/                                # 28 tests against a fake live runner; no demo needed
+node --test agents/test/                                # all tests against a fake live runner; no demo needed
+FUZZ_RUNS=100 node --test agents/test/fuzz.test.js      # 100 random days, eight invariants each (default 12)
+curl 'http://127.0.0.1:5200/ask?q=What+soil+is+Bottomland+on'   # ask the team a question
 ```
 
 | Variable | Default | |
@@ -32,6 +34,7 @@ node --test agents/test/                                # 28 tests against a fak
 | `depot` | Depot Manager | People's work: fuel, implements, inspections | a request arrives; a task waits 10+ plan minutes | releases a locked tractor; marks an inspection done |
 | `weather` | Weather Manager | What the weather allows, now / today and tomorrow / days ahead | the playbook's decision changes; hourly | lifts a stop it did not place |
 | `safety` | Safety Officer | Checks plans and recalls; watches spacing | two tractors under 15 m apart for 2 checks; a tractor working against a stop | is overruled by another agent |
+| `agronomy` | Agronomy Advisor | What the field and crop mean for a job, from the farm plan and the real soil survey and elevation in `dashboard/gis/` | a job starts | acts at all: it has no acting tool, and its notes are advice only until a person adds and checks a source |
 | `records` | Record Keeper | The day's record | each job done, each stop, end of day (18:00) | changes a record after the fact |
 
 The live runner has its own model voices for some roles on the same roundtable. These agents speak only when they hold new facts for the role, so the two don't say the same thing twice.
@@ -45,6 +48,30 @@ Weather Manager → Depot Manager: Nobody works at the depot until further notic
 Depot Manager → operator:        Nobody should work at the depot now; fuelling, re-fitting and inspections wait until it is safe.
 Plan Manager → operator:         Decision: the plan pauses while the fleet is recalled; jobs resume in priority order when the recall ends.
 ```
+
+## Ask the team
+
+`GET /ask?q=<question>&agent=<name>` or `POST /ask {"question": "...", "agent": "weather"}`. Leave `agent` out and the question goes to the one or two agents whose job it is, by topic: weather, tractors and fuel, faults, routes, the depot and its people, safety and stops, the plan and deadlines, the day's record, and soil, crops and field work.
+
+- **No key:** plain code answers from the live state and that agent's shared memory (`runtime/ask.js`; an agent can export its own `answer(ctx, question)`, as `agronomy` does).
+- **With a key:** the agent's own `AGENT.md`, the same facts and only its `kind: 'reads'` tools go to the model, which writes the answer. A model error leaves the plain-code answer in place.
+- **Asking never acts.** No hold, recall, event or message is sent. The randomised test checks this on every question.
+- **What it will not do.** It does not invent rates, products or dates. For irrigation, fertiliser, pests, harvest timing, planting and livestock it says what the team knows, what it does not, and who decides (`agronomy/guide.json`, `topics`).
+
+## Randomised days
+
+`agents/test/fuzz.test.js` builds a different day from each seed: weather with missing and impossible readings and alerts nobody has heard of, tractors that crowd each other, run low on fuel, go silent or report nothing, jobs starting and finishing, a runner that answers 404 for a while, restarts from the durable log, people clearing inspections, and questions to the team. After each day:
+
+1. nothing outside the allowlist was called;
+2. only the four allowed event types were sent;
+3. a hold and a recall placed by a person are still in force, and every lift is of something an agent placed;
+4. the Agronomy Advisor only advised;
+5. every weather stop or recall names rules that exist, are verified and have a source;
+6. every spoken line fits the runner's 400 characters;
+7. no side effect was sent twice: one successful call per finished effect, across 404s and restarts;
+8. each agent wrote only its own keys in shared memory.
+
+A failure prints its seed; `FUZZ_RUNS=1 FUZZ_SEED=<seed>` replays that day exactly.
 
 ## How every agent works
 
