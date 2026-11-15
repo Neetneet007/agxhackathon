@@ -342,7 +342,7 @@ function build(s) {
         <button class="bad" onclick="cmd('fault ${t.id} dead')">Inject: stop responding</button>
         <button onclick="cmd('fault ${t.id} ok').then(() => setTimeout(() => cmd('repair ${t.id}'), 1500))">Clear fault</button>
       </div>
-      <iframe src="http://localhost:${t.agopenPort}/" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
+      <iframe src="http://localhost:${t.agopenPort}/?embed=1" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
       <div class="muted" style="font-size:11px">AgOpenWeb on port ${t.agopenPort} (view only; this tractor is driven by its own process)</div>
     </div>`).join('');
   built = true;

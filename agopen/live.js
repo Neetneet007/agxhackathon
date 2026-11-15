@@ -578,7 +578,12 @@ function fuelPlanning() {
         const wait = planMin(laneLen('depot', u.place) + 60, TRUCK_KPH);
         const next = (assign[t.id] || []).map(x => sim.jobs.get(x?.id ?? x)).find(j => j && j.status !== 'done');
         const o = { ...fuelOptions(u, u.place, next?.fieldId, wait), fuelPctNow: Math.round(100 * t.fuel / t.fuelCapacity) };
-        if (o.choice === 'depot') continue;
+        if (o.choice === 'depot') {
+          if (t.action.fuelNoted) continue;
+          t.action.fuelNoted = true;                                                                   // say why, once per trip
+          trail('fuel-planner', 'planner', 'fuel', `${u.id} needs fuel now, at ${o.fuelPctNow}%. ` + optionText(o) + ` The truck figure includes ${o.waitMin} min of the tractor waiting for it.`, { tractor: u.id, ...o });
+          continue;
+        }
         fuelMission = { u, job: null, field: u.place, phase: 'to-field', numbers: o, startedAt: fmtTime(sim.time) };
         const text = `${u.id} needs fuel now, at ${o.fuelPctNow}%. ` + optionText(o) + ` That includes ${o.waitMin} min waiting for the truck. Sending it.`;
         trail('fuel-planner', 'fuel truck', 'fuel', text, { tractor: u.id, ...o });

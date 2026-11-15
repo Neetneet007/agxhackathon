@@ -43,3 +43,22 @@ index 0ffaefd..c21a493 100644
          Port = port;
  
          // Direct construction — no ASP.NET DI container. (The old Kestrel host
+diff --git a/Shared/AgOpenWeb.RemoteServer/wwwroot/index.html b/Shared/AgOpenWeb.RemoteServer/wwwroot/index.html
+index 714b0f4..b23fa0d 100644
+--- a/Shared/AgOpenWeb.RemoteServer/wwwroot/index.html
++++ b/Shared/AgOpenWeb.RemoteServer/wwwroot/index.html
+@@ -20,6 +20,14 @@
+   <link rel="stylesheet" href="/css/tool-panels.css">
+ </head>
+ <body class="fs-no-vt fs-no-webcards fs-no-agshare"><!-- features switched off (FeatureSwitches): cleared by the Hello frame (onHello) for those the host runs -->
++<!-- Team5 hackathon patch (team5-embed): with ?embed=1 the page shows the map only. Used when a fleet
++     dashboard shows this tractor's view in a small frame, where the controls would cover the map and
++     could not be used anyway (the frame is view-only). -->
++<style>
++  html.embed body > *:not(#ck):not(script):not(style) { display: none !important; }
++  html.embed #ck { position: fixed; inset: 0; width: 100vw; height: 100vh; }
++</style>
++<script>if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embed');</script>
+   <!-- Contents, top to bottom (each panel's look is in css/, its code in js/):
+        - the map (#ck) and what sits on it: status bar, light bar (#hud-top), Ref Nudge,
+          map-tap hints, draw toolbar, on-screen buttons, U-turn indicator;
