@@ -772,11 +772,11 @@ function weatherTick() {
 // maps a field and reports on ground and crop, and can spot-spray small patches when the weather allows.
 const drone = createDrone({ home: { e: 34, n: -6 } });
 const droneReports = [], droneSprayed = [];
-function droneScan(name) {
+function droneScan(name, quiet = false) {
   const g = geom[name], f = scenario.fields.find(x => x.name === name);
   if (!g || !f) return false;
   drone.assign({ type: 'scan', field: { name, boundary: g.boundary, ground: GROUND_WORD[ground[name]], crop: ground[name] === 'stubble' ? (fieldRecord[name]?.crop || undefined) : undefined } });
-  trail('drone', 'operator', 'scan', `Drone sent to map ${name}.`);
+  if (!quiet) trail('drone', 'operator', 'scan', `Drone sent to map ${name}.`);
   return true;
 }
 // While a tractor is spraying, the drone flies just behind it and steps through three heights, reading the wind
@@ -814,7 +814,8 @@ const dayStr = (daysAgo = 0) => new Date(Date.now() - daysAgo * 86400000).toISOS
 const daysSince = (d) => (d ? Math.max(0, Math.round((Date.now() - Date.parse(d)) / 86400000)) : null);
 const recordFile = (name) => path.join(FIELDS_DIR, name, 'crop-record.json');
 const saveRecord = (name) => { try { fs.writeFileSync(recordFile(name), JSON.stringify(fieldRecord[name], null, 1)); } catch { /* field folder missing */ } };
-const START_MIX = ['growing', 'harvested', 'plowed', 'growing', 'harvested', 'growing', 'plowed', 'harvested', 'growing'];
+const START_MIX = ['growing', 'growing', 'growing', 'growing', 'harvested', 'harvested', 'harvested', 'plowed', 'plowed'];
+for (let i = START_MIX.length - 1; i > 0; i--) { const k = Math.floor(Math.random() * (i + 1)); [START_MIX[i], START_MIX[k]] = [START_MIX[k], START_MIX[i]]; }   // shuffled: used only for fields with no record yet
 scenario.fields.forEach((f, i) => {
   let rec = null;
   try { rec = JSON.parse(fs.readFileSync(recordFile(f.name), 'utf8')); } catch { /* none yet */ }
@@ -834,8 +835,10 @@ scenario.fields.forEach((f, i) => {
 function recordWork(name, type) {
   const rec = fieldRecord[name]; if (!rec) return;
   if (type === 'till') Object.assign(rec, { state: 'plowed', lastCrop: rec.crop || rec.lastCrop || null, nextCrop: rec.nextCrop || rec.crop || rec.lastCrop || null, crop: null, plowedOn: dayStr() });
+  else if (type === 'mow') Object.assign(rec, { mowedOn: dayStr() });
   else if (type === 'seed') Object.assign(rec, { state: 'growing', crop: rec.nextCrop || rec.lastCrop || 'corn', plantedOn: dayStr(), cropPicked: false });
   else return;
+  if (type === 'mow') delete lastScan[name];
   saveRecord(name);
 }
 let todaysWork = {}, todaysWorkAt = 0;
@@ -921,6 +924,7 @@ function fieldStatusOf(f, work, { tempC, humidityPct, growth, conditionsText }) 
     const nextText = !sc ? `Next: drone survey. ${days != null ? `Planted ${days} days ago and never` : 'Never'} surveyed`
       : pests ? `Next: spot-spray ${pests} pest patch(es)${holds.has(WEATHER_HOLD) ? ' when spraying is allowed' : ''}`
       : ready ? `Next: ${cut} now`
+      : sc.waterStress ? 'Next: irrigate, the thermal camera shows water stress'
       : confidence === 'low' ? 'Next: drone survey, the last one is out of date'
       : `Next: ${cut} around ${when}; survey again before then`;
     return { ...base, standing: true, plantedOn: rec.plantedOn, plantedDaysAgo: days, plantedSource: 'AgOpenGPS field record', stage: maturity == null ? null : stageOf(maturity), nextText,
@@ -928,7 +932,9 @@ function fieldStatusOf(f, work, { tempC, humidityPct, growth, conditionsText }) 
       statusText: `${crop[0].toUpperCase()}${crop.slice(1)}${days != null ? `, planted ${days} days ago` : ''}`,
       maturityPct: maturity, marginPct: margin, harvestInDays: ready ? 0 : left, harvestMarginDays: leftMargin, harvestDate: when,
       harvestText: maturity == null ? null : ready ? `Ready to ${cut} now` : `Ready to ${cut} in about ${left} days (${when}, give or take ${leftMargin})`,
-      standPct: sc?.standPct ?? null, moisturePct: sc?.moisturePct ?? null, pests: sc?.pests ?? null,
+      problems: sc?.problems || [], problemsText: sc?.problems?.length ? sc.problems.map(p => p.text).join('; ') : null,
+      standPct: sc?.standPct ?? null, moisturePct: sc?.moisturePct ?? null, pests: sc?.pests ?? null, canopyM: sc?.canopyM ?? null, canopyDeltaC: sc?.canopyDeltaC ?? null, waterStress: sc?.waterStress ?? null,
+      sensorsText: sc && sc.canopyM != null ? `LiDAR canopy ${sc.canopyM} m · thermal ${Math.abs(sc.canopyDeltaC)} °C ${sc.canopyDeltaC > 0 ? 'warmer' : 'cooler'} than air${sc.waterStress ? ' (water stress)' : ''} · soil moisture ${sc.moisturePct}%` : null,
       lastScanClock: sc?.clock ?? null, scanAgeMin, confidence, confidenceText };
   }
 }
@@ -964,7 +970,12 @@ function setAiDrive(on) {
   try { fs.writeFileSync(AI_FILE, JSON.stringify({ on: aiDrive })); } catch { /* not fatal */ }
   trail('operator', 'crop-manager', 'ai-drive', aiDrive ? 'Let the AI drive: on. The crop manager will queue the work each field needs.' : 'AI drive off. The operator builds the job list.');
   aiAt = 0;
-  if (aiDrive) aiPlan();
+  if (aiDrive) {
+    const order = scenario.fields.slice().sort((p, q) => laneLen('depot', p.id) - laneLen('depot', q.id)).filter(f => !surveying.has(f.name));
+    for (const f of order) { surveying.add(f.name); droneScan(f.name, true); }
+    if (order.length) trail('crop-manager', 'drone', 'survey', `First, a fresh look at every field. Drone surveying all ${order.length}, nearest first: ${order.map(f => f.name).join(', ')}. The plan is updated as each survey comes in.`, { fields: order.map(f => f.name) });
+    aiPlan();
+  }
 }
 function aiPlan() {
   if (!aiDrive || (mode === 'running' && sim.time < aiAt)) return;
@@ -974,7 +985,7 @@ function aiPlan() {
   const added = [], waiting = [];
   const need = scenario.fields.map(f => ({ f, rec: fieldRecord[f.name], g: ground[f.name] }))
     .filter(x => !backlog.some(b => b.field === x.f.name && stillToDo(b)))
-    .map(x => ({ ...x, steps: x.g === 'tilled' ? ['seed'] : x.g === 'stubble' && !x.rec.crop ? ['till', 'seed'] : null }))
+    .map(x => ({ ...x, steps: x.g === 'tilled' ? ['seed'] : x.g === 'stubble' && !x.rec.crop ? ['till', 'seed'] : x.g === 'stubble' && (x.rec.crop === 'hay' || x.rec.crop === 'alfalfa') && x.rec.mowedOn !== dayStr() && lastScan[x.f.name]?.ground === 'stubble' && lastScan[x.f.name].maturityPct >= 60 ? ['mow'] : null }))
     .filter(x => x.steps)
     .sort((p, q) => p.steps.length - q.steps.length || laneLen('depot', p.f.id) - laneLen('depot', q.f.id));
   let open = backlog.filter(stillToDo).length;
@@ -983,7 +994,7 @@ function aiPlan() {
     try {
       draftJobs({ fields: [f.name], steps, priority: 'medium', deadline: '17:00' });
       open += steps.length;
-      added.push(steps.length === 2 ? `${f.name} is stubble after ${rec.lastCrop || 'the last crop'}: plow, then sow ${rec.nextCrop || rec.lastCrop || 'it'}` : `${f.name} is plowed and waiting: sow ${rec.nextCrop || rec.lastCrop || 'it'}`);
+      added.push(steps[0] === 'mow' ? `${f.name}: the survey shows the ${rec.crop} ${lastScan[f.name].maturityPct}% along, ready for a cut: mow` : steps.length === 2 ? `${f.name} is stubble after ${rec.lastCrop || 'the last crop'}: plow, then sow ${rec.nextCrop || rec.lastCrop || 'it'}` : `${f.name} is plowed and waiting: sow ${rec.nextCrop || rec.lastCrop || 'it'}`);
     } catch (err) { /* the list rules refused it; leave it to the operator */ }
   }
   if (added.length) trail('crop-manager', 'planner', 'ai-plan', `Field review. ${added.join('. ')}.${waiting.length ? ` ${waiting.join(' and ')} also need${waiting.length === 1 ? 's' : ''} work; ${waiting.length === 1 ? 'it waits' : 'they wait'} until there is room in the day.` : ''} Growing fields are left alone and surveyed by drone.`, { added: added.length, waiting });
@@ -1096,11 +1107,33 @@ function droneTick(dt) {
         trail('drone', 'fault-manager', 'inspection', `Simulated drone view of ${r.subject}: ${r.assessment} Recommends: ${r.recommend}.`);
         discuss('fault', `Drone inspection of ${r.subject}`, { tractor: r.subject, kind: r.symptom, signal: 'drone inspection (simulated)', droneFindings: r.findings, droneAssessment: r.assessment, droneRecommends: r.recommend });
       } else if (r.kind === 'field-scan') {
-        lastScan[r.field] = { wall: Date.now(), clock: fmtTime(sim.time), ground: ground[r.field], maturityPct: r.maturityPct, standPct: r.standPct, moisturePct: r.moisturePct, pests: (r.pests || []).length };
+        const cropNow = fieldRecord[r.field]?.crop, topM = { corn: 2.2, soybeans: 0.6, wheat: 0.9, hay: 0.4, alfalfa: 0.4, orchard: 3.5 }[cropNow] || 0;
+        const airC = weather.current()?.reading.low.tempC ?? 15;
+        // LiDAR gives the canopy height; the thermal camera gives the canopy temperature against the air. A canopy
+        // warmer than the air is short of water (it has stopped cooling itself); dry soil pushes it that way.
+        const canopyM = ground[r.field] === 'stubble' && cropNow ? +(topM * Math.min(1, 0.25 + r.maturityPct / 100 * 0.8)).toFixed(2) : 0;
+        const canopyDeltaC = canopyM ? +(((22 - r.moisturePct) / 6) - 1.2).toFixed(1) : null;
+        // Problem areas for the heatmap: the pest patches the camera found, plus patches where the crop is behind
+        // (shorter in the LiDAR, warmer in the thermal picture), each with a likely cause. Simulated, and fixed per field.
+        const problems = (r.pests || []).map(p => ({ e: +p.e.toFixed(1), n: +p.n.toFixed(1), radiusM: p.radiusM, kind: 'pests', severity: p.severity || 'medium', text: `Pests, ${p.severity || 'medium'}` }));
+        if (canopyM) {
+          const gb = geom[r.field]?.boundary || [];
+          const e0 = Math.min(...gb.map(p => p.e)), e1 = Math.max(...gb.map(p => p.e)), n0 = Math.min(...gb.map(p => p.n)), n1 = Math.max(...gb.map(p => p.n));
+          let hsh = 7; for (const ch of r.field) hsh = (hsh * 33 + ch.charCodeAt(0)) % 100003;
+          const rnd = () => { hsh = (hsh * 1103515245 + 12345) % 2147483648; return hsh / 2147483648; };
+          const causes = ['waterlogged low spot', 'compacted ground', 'short of nitrogen', 'thin stand after a planter skip'];
+          for (let k = 0, nP = 1 + Math.floor(rnd() * 2); k < nP && gb.length; k++) {
+            const behind = Math.round(15 + rnd() * 25), cause = causes[Math.floor(rnd() * causes.length)];
+            problems.push({ e: +(e0 + (0.2 + rnd() * 0.6) * (e1 - e0)).toFixed(1), n: +(n0 + (0.2 + rnd() * 0.6) * (n1 - n0)).toFixed(1), radiusM: Math.round(9 + rnd() * 9), kind: 'poor growth', severity: behind > 28 ? 'high' : 'medium', text: `Crop ${behind}% behind the rest of the field: likely ${cause}` });
+          }
+        }
+        lastScan[r.field] = { problems, wall: Date.now(), clock: fmtTime(sim.time), ground: ground[r.field], maturityPct: r.maturityPct, standPct: r.standPct, moisturePct: r.moisturePct, pests: (r.pests || []).length, weedsPct: r.weedsPct ?? null, canopyM, canopyDeltaC, canopyC: canopyDeltaC == null ? null : +(airC + canopyDeltaC).toFixed(1), waterStress: canopyDeltaC != null && canopyDeltaC > 0.8 };
         remember();
         surveying.delete(r.field);
         const fs1 = fieldStatus().find(x => x.name === r.field);
-        if (fs1?.standing && fs1.maturityPct != null) trail('crop-manager', 'operator', 'field-review', `${r.field} after the survey: ${fs1.crop}, ${fs1.maturityPct}% along (${fs1.stage.toLowerCase()}), ${fs1.standPct}% stand, soil moisture ${fs1.moisturePct}%${fs1.pests ? `, ${fs1.pests} pest patch(es)` : ', no pests seen'}. ${fs1.nextText}.`, { field: r.field });
+        const ls = lastScan[r.field];
+        if (fs1?.standing && fs1.maturityPct != null) trail('crop-manager', 'operator', 'field-review', `${r.field} after the survey. Camera: ${fs1.crop}, ${fs1.maturityPct}% along (${fs1.stage.toLowerCase()}), ${fs1.standPct}% stand${fs1.pests ? `, ${fs1.pests} pest patch(es)` : ', no pests seen'}. LiDAR: canopy ${ls.canopyM} m. Thermal: canopy ${Math.abs(ls.canopyDeltaC)} °C ${ls.canopyDeltaC > 0 ? 'warmer' : 'cooler'} than the air${ls.waterStress ? ', a sign of water stress' : ', no water stress'}; soil moisture ${fs1.moisturePct}%.${ls.problems.filter(p => p.kind === 'poor growth').length ? ` Problem areas on the heatmap: ${ls.problems.filter(p => p.kind === 'poor growth').map(p => p.text.toLowerCase()).join('; ')}.` : ''} ${fs1.nextText}.`, { field: r.field });
+        else if (fs1) trail('crop-manager', 'operator', 'field-review', `${r.field} after the survey: ${fs1.summaryText.toLowerCase()}; soil moisture ${ls.moisturePct}%${ls.weedsPct ? `, weeds on ${ls.weedsPct}% of it` : ''}, ${ls.moisturePct < 32 ? 'firm enough for machines' : 'too wet for machines today'}. ${fs1.nextText || ''}`, { field: r.field });
         trail('drone', 'operator', 'field-report', r.summary);
         discuss('replan', `Drone scan of ${r.field}`, { field: r.field, scan: { ground: r.ground, moisturePct: r.moisturePct, trafficable: r.trafficable, standPct: r.standPct, maturityPct: r.maturityPct, harvestReady: r.harvestReady, pestSpots: r.pests.length, weedsPct: r.weedsPct, recommend: r.recommend } });
         const wants = (r.recommend || []).find(x => x.action === 'spot-spray');

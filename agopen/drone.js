@@ -469,6 +469,7 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
     state() {
       let alt = mode === 'docked' ? 0 : altitudeM * Math.min(1, dist(pos, HOME) / CLIMB_M);
       let focus = null;
+      if (mode === 'mission' && cur?.type === 'scan' && cur.phase === 'path') alt = 18;      // survey lines are flown low
       if (mode === 'mission' && cur?.type === 'investigate') { focus = { ...cur.spec.target }; if (cur.phase === 'hover') alt = ORBIT_ALT_M; }
       if (mode === 'mission' && cur?.type === 'escort' && cur.phase === 'follow') { focus = cur.focus || null; alt = ESCORT_ALTS_M[cur.step % ESCORT_ALTS_M.length]; }
       return {
