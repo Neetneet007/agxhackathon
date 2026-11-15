@@ -44,6 +44,7 @@ const script = String(opt('script', '')).split(';').filter(Boolean).map(s => ({ 
 const STALE_MS = 3000;      // no telemetry for this long → NO_RESPONSE
 const STUCK_MS = 8000;      // told to go, far from target, not moving for this long → GO_NOT_MOVING
 const FAR_M = 40, MOVED_M = 5;
+const NEAR_STUCK_MS = 12000; // the same, close to its target (turning, lining up): under 1.5 m in this long
 
 // ---- The farm comes from AgOpenWeb's own field folders (one folder per field, field.geojson inside).
 const FIELDS_DIR = opt('fields', path.resolve(here, '../../agopen-multi/data-5175/AgOpenWeb/Fields'));
@@ -196,11 +197,10 @@ function routeFor(job, u) {
     g = { boundary: [{ e: a.e, n: a.n }, { e: b.e, n: a.n }, { e: b.e, n: b.n }, { e: a.e, n: b.n }], abLine: null };
   }
   const abLine = g.abLine || { a: g.boundary[0], b: g.boundary[1] };
-  // Work the field the way a farmer does: every pass runs the full length, edge to edge, and the tractor
-  // turns outside the boundary. Planning against an outline half a width larger than the field means the
-  // outermost passes and the pass ends overlap the edge instead of stopping short of it, so the whole field
-  // is covered and no lap round the inside is needed.
-  const plan = planCoverage({ boundary: growConvex(g.boundary, width / 2), abLine, width, headlandPasses: 0, start: u.tel ? { e: u.tel.e, n: u.tel.n } : null });
+  // Work the field the way a farmer does: every pass runs the full length, edge to edge, with the implement
+  // inside the boundary (the outer passes have their edge on it), and the tractor drives out past the
+  // boundary to turn round. Nothing outside the field is worked, and no lap round the inside is needed.
+  const plan = planCoverage({ boundary: g.boundary, abLine, width, headlandPasses: 0, edgeToEdge: true, overrun: 3, start: u.tel ? { e: u.tel.e, n: u.tel.n } : null });
   // Legs to drive. Before each pass there is a straight run-up in the headland so the tractor is lined up
   // before the implement goes on. Every working leg is driven as a line (from → to), not as a point to aim at.
   const pts = [];
@@ -376,9 +376,12 @@ async function poll() {
     if (u.fault === 'NO_RESPONSE' && u.wasSilent && now - u.lastSeen < 500) { u.wasSilent = false; clear(u, 'is answering again'); }
     const c = u.cmd;
     if (c?.type === 'goto' && u.twin.status === 'ok' && !u.tel.busy && c.maxKph !== 0) {
-      const far = Math.hypot(c.e - u.tel.e, c.n - u.tel.n) > FAR_M;
-      if (!u.anchor || Math.hypot(u.tel.e - u.anchor.e, u.tel.n - u.anchor.n) > MOVED_M || !far) { u.anchor = { e: u.tel.e, n: u.tel.n }; u.stuckSince = now; }
-      else if (now - u.stuckSince > STUCK_MS) raise(u, 'GO_NOT_MOVING', `GO acknowledged (ack ${u.tel.ack}), ${Math.round(Math.hypot(c.e - u.tel.e, c.n - u.tel.n))} m from target, moved under ${MOVED_M} m in ${(STUCK_MS / 1000)} s`);
+      // Far from its target a tractor should cover ground quickly; close to it (turning between passes, lining
+      // up) it moves slowly, so the test there is stricter on distance and waits longer. Within 5 m it has arrived.
+      const d = Math.hypot(c.e - u.tel.e, c.n - u.tel.n), far = d > FAR_M;
+      const mustMove = far ? MOVED_M : 1.5, within = far ? STUCK_MS : NEAR_STUCK_MS;
+      if (!u.anchor || d < 5 || Math.hypot(u.tel.e - u.anchor.e, u.tel.n - u.anchor.n) > mustMove) { u.anchor = { e: u.tel.e, n: u.tel.n }; u.stuckSince = now; }
+      else if (now - u.stuckSince > within) raise(u, 'GO_NOT_MOVING', `GO acknowledged (ack ${u.tel.ack}), ${Math.round(d)} m from target, moved under ${mustMove} m in ${within / 1000} s`);
     } else { u.anchor = null; u.stuckSince = now; }
   }));
 }
@@ -546,6 +549,24 @@ function fuelPlanning() {
     // 1. Look ahead: will this tractor need fuel when its current job ends?
     if (!fuelMission && t.action?.kind === 'work' && t.jobId && u.place === sim.jobs.get(t.jobId).fieldId) {
       const job = sim.jobs.get(t.jobId), r = routes.get(job.id);
+      const e = u.eta;
+      if (r && e?.burnPerMin > 0 && e.out?.jobDoneInMin != null) {
+        // Minutes until the planner pulls it off the job for fuel: down to the reserve plus the drive home.
+        const leaveIn = Math.max(0, (t.fuel - reserve - sim.nav.distance(sim.jobField(job), sim.depot) * t.burnPerCell) / e.burnPerMin);
+        if (leaveIn < e.out.jobDoneInMin) {
+          const o = { ...fuelOptions(u, job.fieldId, job.fieldId), fuelPctNow: Math.round(100 * t.fuel / t.fuelCapacity), fuelLastsMin: Math.round(leaveIn), jobNeedsMin: e.out.jobDoneInMin };
+          const lead = `${u.id} has fuel for about ${o.fuelLastsMin} more min of ${sim.label(job)}, and the job needs about ${o.jobNeedsMin}. `;
+          if (o.choice === 'depot') {
+            if (u.fuelNote !== job.id + ':mid') { u.fuelNote = job.id + ':mid'; trail('fuel-planner', 'planner', 'fuel', lead + optionText(o), { tractor: u.id, ...o }); }
+          } else if (leaveIn <= o.truckMin / 2 + 2) {
+            fuelMission = { u, job: job.id, field: job.fieldId, phase: 'to-field', numbers: o, startedAt: fmtTime(sim.time) };
+            const text = lead + optionText(o) + ` Sending it to ${sim.fields.get(job.fieldId).name} now so it is there when ${u.id} gets down to its reserve.`;
+            trail('fuel-planner', 'fuel truck', 'fuel', text, { tractor: u.id, ...o });
+            discuss('service-request', `Fuel truck to ${u.id}`, { tractor: u.id, work: `refuel ${u.id} in the field from the fuel truck`, state: text, options: o });
+          }
+          continue;
+        }
+      }
       const next = (assign[t.id] || []).map(x => sim.jobs.get(x?.id ?? x)).find(j => j && j.id !== job.id && j.status !== 'done');
       if (!r || !next) continue;
       const left = job.acres * (1 - r.fraction);
@@ -555,8 +576,8 @@ function fuelPlanning() {
       const o = { ...fuelOptions(u, job.fieldId, next.fieldId), fuelPctNow: Math.round(100 * t.fuel / t.fuelCapacity), fuelPctAtJobEnd: Math.round(100 * fuelAtEnd / t.fuelCapacity) };
       const lead = `${u.id} will be at ${o.fuelPctAtJobEnd}% fuel when ${sim.label(job)} finishes, not enough for ${sim.label(next)}. `;
       if (o.choice === 'depot') {
-        if (fuelNote !== job.id) {
-          fuelNote = job.id;
+        if (u.fuelNote !== job.id) {
+          u.fuelNote = job.id;
           trail('fuel-planner', 'planner', 'fuel', lead + optionText(o), { tractor: u.id, ...o });
           discuss('service-request', `Fuel for ${u.id}: depot`, { tractor: u.id, work: `refuel ${u.id} at the depot on its way to the next field`, state: lead + optionText(o), options: o });
         }
@@ -578,7 +599,12 @@ function fuelPlanning() {
         const wait = planMin(laneLen('depot', u.place) + 60, TRUCK_KPH);
         const next = (assign[t.id] || []).map(x => sim.jobs.get(x?.id ?? x)).find(j => j && j.status !== 'done');
         const o = { ...fuelOptions(u, u.place, next?.fieldId, wait), fuelPctNow: Math.round(100 * t.fuel / t.fuelCapacity) };
-        if (o.choice === 'depot') continue;
+        if (o.choice === 'depot') {
+          if (t.action.fuelNoted) continue;
+          t.action.fuelNoted = true;                                                                   // say why, once per trip
+          trail('fuel-planner', 'planner', 'fuel', `${u.id} needs fuel now, at ${o.fuelPctNow}%. ` + optionText(o) + ` The truck figure includes ${o.waitMin} min of the tractor waiting for it.`, { tractor: u.id, ...o });
+          continue;
+        }
         fuelMission = { u, job: null, field: u.place, phase: 'to-field', numbers: o, startedAt: fmtTime(sim.time) };
         const text = `${u.id} needs fuel now, at ${o.fuelPctNow}%. ` + optionText(o) + ` That includes ${o.waitMin} min waiting for the truck. Sending it.`;
         trail('fuel-planner', 'fuel truck', 'fuel', text, { tractor: u.id, ...o });
@@ -597,6 +623,32 @@ function fuelPlanning() {
 
 // ---- Forecasts shown to the operator. Both come from what the tractor is actually achieving, smoothed over
 // the last few plan minutes: how fast the job's worked share is rising, and how fast the gauge is falling.
+// How far the tractor is from where the plan expects it. On the lanes that is the plan's own position. In a
+// field the plan only knows "in this field", so the gap is measured from the pass line the tractor is on;
+// turning between passes, outside the boundary, counts as on plan.
+function planGap(u, w) {
+  if (!u.tel) return null;
+  const c = u.cmd;
+  if (c?.type === 'goto' && c.field) {
+    if (!c.from) return 0;
+    const ax = c.from.e, ay = c.from.n, dx = c.e - ax, dy = c.n - ay, L2 = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((u.tel.e - ax) * dx + (u.tel.n - ay) * dy) / L2));
+    return Math.round(Math.hypot(u.tel.e - (ax + dx * k), u.tel.n - (ay + dy * k)));
+  }
+  // On a lane trip: distance off the lane, once the tractor has joined it. The plan's own position moves a
+  // grid cell at a time and runs ahead or behind by a field's length, which is timing, not a tractor off course.
+  const tr = u.trip;
+  if (c?.type === 'goto' && c.maxKph > 0 && tr?.pts?.length && u.place !== tr.dest) {
+    const a = tr.pts[Math.max(0, tr.i - 1)], b = tr.pts[tr.i], dx = b.e - a.e, dy = b.n - a.n, L2 = dx * dx + dy * dy || 1;
+    const k = Math.max(0, Math.min(1, ((u.tel.e - a.e) * dx + (u.tel.n - a.n) * dy) / L2));
+    const d = Math.hypot(u.tel.e - (a.e + dx * k), u.tel.n - (a.n + dy * k));
+    if (d < 10) tr.joined = true;
+    return tr.joined ? Math.round(d) : 0;
+  }
+  if (c?.type === 'goto' && c.maxKph === 0 && u.place !== 'depot') return 0;      // told to wait where it stands
+  return Math.round(Math.hypot(w.e - u.tel.e, w.n - u.tel.n));
+}
+
 function updateEtas() {
   const assign = sim.dispatcher.plan?.assign || {};
   for (const u of units) {
@@ -624,6 +676,10 @@ function updateEtas() {
       const needs = fuelAtEnd < reserve + cellsOn * t.burnPerCell + next.acres * t.burnPerAcre;
       const o = truckReady() ? fuelOptions(u, job.fieldId, next.fieldId) : null;
       fuelPlan = { next: sim.label(next), needsFuelFirst: needs, ...(needs && o ? { choice: o.choice, depotCost: o.depotCost, depotExtraM: o.extraM, truckCost: o.truckCost, truckRoundTripM: o.truckM } : {}) };
+    }
+    if (fuelMin != null && fuelMin < jobMin && truckReady()) {
+      const o = fuelOptions(u, job.fieldId, job.fieldId);
+      fuelPlan = { next: `the rest of ${sim.label(job)}`, needsFuelFirst: true, choice: o.choice, depotCost: o.depotCost, depotExtraM: o.extraM, truckCost: o.truckCost, truckRoundTripM: o.truckM };
     }
     e.out = {
       fuelPct: Math.round(100 * t.fuel / t.fuelCapacity),
@@ -655,7 +711,7 @@ function truckTick() {
         const d = Math.hypot(u.tel.e - truck.tel.e, u.tel.n - truck.tel.n) || 1;
         // Pull up 7 m short of the tractor, on the line between them.
         tg = { e: u.tel.e + (truck.tel.e - u.tel.e) / d * 7, n: u.tel.n + (truck.tel.n - u.tel.n) / d * 7, label: `driving to ${u.id} to refuel it`, maxKph: 12 };
-        if (d < 10 && truck.tel.speedKph < 1) {
+        if (d < 14 && truck.tel.speedKph < 1) {                // alongside: the truck stops a few metres from the point it is sent to
           m.phase = 'fuelling';
           m.task = { id: `H${tasks.length + 1}`, tractor: u.id, kind: 'field-refuel', text: `Refuel ${u.id} from the fuel truck in ${sim.fields.get(m.field)?.name}`, state: 'waiting', clock: fmtTime(sim.time), go: false, waitingSince: Date.now() };
           tasks.push(m.task);
@@ -721,7 +777,23 @@ function droneScan(name) {
   trail('drone', 'operator', 'scan', `Drone sent to map ${name}.`);
   return true;
 }
+// While a tractor is spraying, the drone flies just behind it and steps through three heights, reading the wind
+// at each. It leaves as soon as the pass stops (job done, hold, fault) or another drone mission is waiting.
+let escort = null, droneWind = [];
+const LIMITS_WIND_MAX = 10;
+function escortSprayer() {
+  if (escort) return;
+  const u = units.find(x => { const t = x.twin, j = t.jobId && sim.jobs.get(t.jobId); return x.tel && !x.fault && t.status === 'ok' && t.action?.kind === 'work' && j?.type === 'spray' && x.place === j.fieldId && !heldBy(j); });
+  if (!u) return;
+  const jobId = u.twin.jobId;
+  const still = () => { const t = u.twin, j = sim.jobs.get(jobId); return !u.fault && t.status === 'ok' && t.jobId === jobId && t.action?.kind === 'work' && j.status !== 'done' && !heldBy(j); };
+  const id = drone.assign({ type: 'escort', subject: u.id, follow: () => (u.tel ? { e: u.tel.e, n: u.tel.n } : null), until: () => !still() });
+  escort = { id, unit: u.id };
+  trail('drone', 'weather', 'wind-watch', `${u.id} is spraying ${sim.label(sim.jobs.get(jobId))}: drone sent to fly above it and read the wind at 10, 30 and 50 m.`);
+}
+
 function droneTick(dt) {
+  escortSprayer();
   for (const ev of drone.tick(dt)) {
     if (ev.type === 'report') {
       const r = ev.report;
@@ -731,12 +803,29 @@ function droneTick(dt) {
         trail('drone', 'fault-manager', 'inspection', `Simulated drone view of ${r.subject}: ${r.assessment} Recommends: ${r.recommend}.`);
         discuss('fault', `Drone inspection of ${r.subject}`, { tractor: r.subject, kind: r.symptom, signal: 'drone inspection (simulated)', droneFindings: r.findings, droneAssessment: r.assessment, droneRecommends: r.recommend });
       } else if (r.kind === 'field-scan') {
-        trail('drone', 'operator', 'field-report', `Simulated scan of ${r.field}: ${r.summary}`);
+        trail('drone', 'operator', 'field-report', r.summary);
         discuss('replan', `Drone scan of ${r.field}`, { field: r.field, scan: { ground: r.ground, moisturePct: r.moisturePct, trafficable: r.trafficable, standPct: r.standPct, maturityPct: r.maturityPct, harvestReady: r.harvestReady, pestSpots: r.pests.length, weedsPct: r.weedsPct, recommend: r.recommend } });
         const wants = (r.recommend || []).find(x => x.action === 'spot-spray');
         if (wants && r.pests.length) {
           if (holds.has(WEATHER_HOLD)) trail('drone', 'operator', 'waiting', `${r.field} has ${r.pests.length} pest patch(es) to spot-spray, but spraying is on hold for weather. The drone will not spray now.`);
           else { drone.assign({ type: 'spot-spray', field: r.field, spots: r.pests.map(p => ({ e: p.e, n: p.n, radiusM: p.radiusM })) }); trail('drone', 'operator', 'spot-spray', `Drone spot-spraying ${r.pests.length} pest patch(es) in ${r.field} instead of sending the 24 m sprayer.`); }
+        }
+      }
+    } else if (ev.type === 'escort-ended') {
+      if (escort?.id === ev.missionId) escort = null;
+    } else if (ev.type === 'wind-sample') {
+      // Wind at the drone's height, from the same simulated air as the mast readings at 2 m and 10 m
+      // (a power-law profile through those two), with a little gust noise.
+      const c = weather.current();
+      if (c) {
+        const lo = c.reading.low, hi = c.reading.high;
+        const alpha = lo.windMph > 0.2 && hi.windMph > 0.2 ? Math.log(hi.windMph / lo.windMph) / Math.log(hi.heightM / lo.heightM) : 0.15;
+        const mph = Math.max(0, lo.windMph * Math.pow(ev.altM / lo.heightM, Math.max(-0.2, Math.min(0.5, alpha))) + (Math.random() - 0.5) * 0.6);
+        droneWind = droneWind.filter(w => w.altM !== ev.altM).concat({ altM: ev.altM, mph: +mph.toFixed(1), clock: fmtTime(sim.time), over: ev.subject }).sort((a, b) => a.altM - b.altM);
+        if (ev.lastOfCycle && sim.time - (escort?.said ?? -99) >= 20) {
+          if (escort) escort.said = sim.time;
+          const top = droneWind[droneWind.length - 1];
+          trail('drone', 'weather', 'wind-profile', `Drone above ${ev.subject} while it sprays: wind ${droneWind.map(w => `${w.mph} mph at ${w.altM} m`).join(', ')} (mast: ${lo.windMph} mph at ${lo.heightM} m).${top.mph > LIMITS_WIND_MAX ? ` Above the ${LIMITS_WIND_MAX} mph limit aloft: watch for drift if it mixes down.` : ''}`, { profile: droneWind });
         }
       }
     } else if (ev.type === 'sprayed') {
@@ -832,6 +921,7 @@ function stateOf(u) {
   if (u.fault === 'NO_RESPONSE') return { code: 'NO_RESPONSE', text: 'Not responding' };
   if (u.fault === 'GO_NOT_MOVING') return { code: 'GO_NOT_MOVING', text: 'GO acknowledged, GPS not moving' };
   if (t.status !== 'ok') return { code: 'DOWN', text: 'Out of service' };
+  if (k === 'work' && t.jobId && u.place === sim.jobs.get(t.jobId)?.fieldId && heldBy(sim.jobs.get(t.jobId))) return { code: 'HOLD', text: 'Stopped: job on hold' };
   if (k === 'work') return { code: 'WORKING', text: 'Working' };
   if (k === 'goto') return { code: 'DRIVING', text: 'Driving' };
   if (k === 'swap') return { code: 'SWAP', text: 'Changing implement' };
@@ -860,7 +950,7 @@ function snapshot() {
         mounted: u.twin.mounted, fuelPct: Math.round(100 * u.twin.fuel / u.twin.fuelCapacity),
         queue: (assign[u.id] || []).map(x => x?.id ?? x),
         tel: u.tel, heardAgoMs: u.lastSeen ? Date.now() - u.lastSeen : null, eta: u.eta?.out || null,
-        planGapM: u.tel ? Math.round(Math.hypot(w.e - u.tel.e, w.n - u.tel.n)) : null,
+        planGapM: planGap(u, w),
       };
     }).concat(truckReady() ? [{
       id: truck.id, name: truck.name, kind: 'fuel-truck', agopenPort: Number(opt('truck', 6178)) - 1000,
@@ -869,7 +959,7 @@ function snapshot() {
       tel: truck.tel ? { ...truck.tel, rig: null } : null, heardAgoMs: Date.now() - truck.lastSeen, planGapM: null,
     }] : []),
     weather: (() => { const c = weather.current(); return c ? { day: weather.day, clock: c.reading.clock, low: c.reading.low, high: c.reading.high, status: c.assessment.status, reason: c.assessment.reason, groundOnly: c.assessment.groundOnly, caughtByTwoHeights: c.assessment.caughtByTwoHeights, log: weather.log().filter(x => x.note).slice(-6).reverse() } : null; })(),
-    drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed },
+    drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed, wind: droneWind },
     fuelPlan: fuelMission ? { tractor: fuelMission.u.id, phase: fuelMission.phase, ...fuelMission.numbers } : null, fuelScale: FUEL_SCALE,
     jobs: [...sim.jobs.values()].map(j => ({
       id: j.id, label: sim.label(j), field: sim.fields.get(j.fieldId)?.name, type: j.type, status: j.status, priority: j.priority, deadline: fmtTime(j.deadline),

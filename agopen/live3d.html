@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Farm, live</title>
+<script>if (/[?&]drone=1/.test(location.search)) document.documentElement.classList.add('drone');</script>
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
@@ -43,6 +44,7 @@
   button { font:inherit; font-weight:600; padding:7px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); cursor:pointer; }
   button:hover { border-color:#9fb3a3; }
   button.on { background:var(--ink); color:#fff; border-color:var(--ink); }
+  html.drone .bar, html.drone .banners, html.drone .panel, html.drone .tools { display:none !important; }
   @media (max-width:640px) { .panel { top:auto; bottom:64px; width:calc(100vw - 32px); max-height:35vh; overflow:auto; } }
 </style>
 </head>
@@ -61,6 +63,9 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const DRONE_CAM = new URLSearchParams(location.search).get('drone') === '1';
+if (DRONE_CAM) document.documentElement.classList.add('drone');
 
 // ---------- constants shared with live.html ----------
 const TR_COLOR = ['#d9480f', '#1c7ed6', '#862e9c', '#0b7285'];
@@ -99,6 +104,7 @@ controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2.05;
 controls.screenSpacePanning = false;
+if (DRONE_CAM) { controls.enabled = false; camera.fov = 70; camera.updateProjectionMatrix(); }
 
 scene.add(new THREE.HemisphereLight(0xffffff, 0xb9a98a, 0.75));
 const sun = new THREE.DirectionalLight(0xfff3dc, 1.6);
@@ -142,6 +148,7 @@ function makeLabel(heightFrac) {
   tex.minFilter = THREE.LinearFilter;
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, sizeAttenuation: false });
   const sp = new THREE.Sprite(mat);
+  sp.visible = !DRONE_CAM;
   sp.renderOrder = 20;
   sp.userData = { canvas, tex, heightFrac, text: null, color: null };
   return sp;
@@ -411,6 +418,47 @@ function buildTractor(color) {
            pos: new THREE.Vector3(), target: new THREE.Vector3(), heading: 0, targetHeading: 0, has: false, color };
 }
 
+function buildFuelTruck(color) {
+  const root = new THREE.Group();
+  const model = new THREE.Group();     // forward = -z (cab at the front)
+  root.add(model);
+  const dark = lamb(0x23272b);
+  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; model.add(mesh); return mesh; };
+  const cabMat = lamb(0xc92a2a), silver = new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), band = lamb(0xf59f00);
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 7.6), lamb(0x33383d)), 0, 0.95, 0);          // chassis
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.9, 2.0), cabMat), 0, 2.2, -2.7);                 // cab
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 0.08), new THREE.MeshLambertMaterial({ color: 0x9ed0f0 })), 0, 2.65, -3.72); // windscreen
+  for (const s of [-1, 1]) add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 1.2), new THREE.MeshLambertMaterial({ color: 0x9ed0f0 })), s * 1.22, 2.65, -2.7); // side glass
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.25, 0.3), lamb(0x33383d)), 0, 1.15, -3.85);      // bumper
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.15, 2.0), lamb(0x8f1d1d)), 0, 3.22, -2.7);       // cab roof
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 4.6, 24), silver);
+  tank.rotation.x = Math.PI / 2; add(tank, 0, 2.35, 1.2);
+  for (const z of [-1.1, 3.5]) {                                                                    // rounded end caps
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1, 20, 12), silver);
+    cap.scale.z = 0.3; add(cap, 0, 2.35, z < 0 ? -1.1 : 3.5);
+  }
+  for (const z of [0.4, 2.0]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.13, 1.13, 0.5, 24), band); b.rotation.x = Math.PI / 2; add(b, 0, 2.35, z); }
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12), dark), 0, 3.55, 1.2);          // top hatch
+  add(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 0.7), lamb(0x495057)), 0, 1.6, 3.55);          // pump box
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 14), lamb(0xf59f00)); reel.rotation.z = Math.PI / 2;
+  add(reel, 0, 1.6, 3.95);                                                                          // hose reel
+  const wheel = (r, wd) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, wd, 16), dark); m.rotation.z = Math.PI / 2; return m; };
+  for (const s of [-1, 1]) for (const z of [-2.7, 1.6, 3.0]) add(wheel(0.62, 0.55), s * 1.05, 0.62, z);
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf59f00 });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), beaconMat);
+  beacon.position.set(0, 3.6, -2.7); model.add(beacon);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffd43b }));
+  ring.rotation.x = Math.PI / 2; ring.position.set(0, 4.8, 0); ring.visible = false; model.add(ring);
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.4), new THREE.MeshBasicMaterial({ color: 0xffd43b }));
+  lock.position.set(0, 4.8, 0); lock.visible = false; model.add(lock);
+  const label = makeLabel(0.022);
+  label.position.set(0, 8, 0);
+  root.add(label);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)); // dummy, not added to the scene
+  return { root, model, bar, barMat: new THREE.MeshLambertMaterial(), beaconMat, ring, lock, label, bad: false, shown: false, fuel: true,
+           pos: new THREE.Vector3(), target: new THREE.Vector3(), heading: 0, targetHeading: 0, has: false, color };
+}
+
 function angleDiff(a, b) { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
 const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
@@ -421,7 +469,7 @@ function updateTractors(list) {
     seen.add(id);
     let o = tractors.get(id);
     if (!o) {
-      o = buildTractor(TR_COLOR[i % 4]);
+      o = (t.kind === 'fuel-truck' || id === 'FUEL') ? buildFuelTruck(0xe03131) : buildTractor(TR_COLOR[i % 4]);
       o.index = i;
       tractors.set(id, o);
       tractorGroup.add(o.root);
@@ -452,6 +500,52 @@ function updateTractors(list) {
     setLabel(o.label, trunc(id + (t.task ? ': ' + t.task : ''), 34), o.color);
   });
   for (const [id, o] of tractors) if (!seen.has(id)) { tractorGroup.remove(o.root); disposeTree(o.root); tractors.delete(id); }
+}
+
+// ---------- drone ----------
+function buildDrone() {
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.5, 1.6), lamb(0x222629));
+  g.add(body);
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(5, 0.2, 0.3), lamb(0x444a4f));
+  const arm2 = arm.clone(); arm.rotation.y = Math.PI / 4; arm2.rotation.y = -Math.PI / 4;
+  g.add(arm, arm2);
+  const rotorMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45, side: THREE.DoubleSide });
+  const d = 1.75;
+  for (const [x, z] of [[d, d], [-d, d], [d, -d], [-d, -d]]) {
+    const r = new THREE.Mesh(new THREE.CircleGeometry(1.1, 16), rotorMat);
+    r.rotation.x = -Math.PI / 2; r.position.set(x, 0.25, z);
+    g.add(r);
+  }
+  const led = new THREE.Mesh(new THREE.SphereGeometry(0.3, 8, 6), new THREE.MeshBasicMaterial({ color: 0xff3b30 }));
+  led.position.set(0, 0.1, -0.9); // front
+  g.add(led);
+  g.scale.setScalar(1.6);
+  g.visible = false;
+  return g;
+}
+const droneObj = buildDrone();
+scene.add(droneObj);
+const dr = { pos: new THREE.Vector3(), target: new THREE.Vector3(), has: false, heading: 0, lastE: null, lastN: null, tgtAlt: 12 };
+function updateDrone(d) {
+  if (!d || typeof d.e !== 'number' || typeof d.n !== 'number') return;
+  const docked = d.status === 'docked';
+  const alt = Number(d.altM);
+  dr.tgtAlt = docked ? 12 : (alt > 1 ? alt : (isFinite(alt) && d.altM != null ? 40 : 40));
+  if (!docked && !(alt > 1)) dr.tgtAlt = 40;
+  dr.target.set(d.e, dr.tgtAlt, -d.n);
+  dr.focus = (d.focus && typeof d.focus.e === 'number' && typeof d.focus.n === 'number') ? { e: d.focus.e, n: d.focus.n } : null;
+  dr.status = d.status; dr.mission = d.mission;
+  if (!dr.has) {
+    dr.pos.copy(dr.target); dr.has = true;
+    dr.heading = (Number(d.headingDeg) || 0) * Math.PI / 180;
+  } else {
+    const dx = d.e - dr.lastE, dz = -(d.n - dr.lastN);
+    if (Math.hypot(dx, dz) > 0.3) dr.targetHeading = Math.atan2(dx, -dz); // 0 = north (-z), clockwise
+    else if (dr.targetHeading == null) dr.targetHeading = dr.heading;
+  }
+  if (dr.targetHeading == null) dr.targetHeading = dr.heading;
+  dr.lastE = d.e; dr.lastN = d.n;
 }
 
 // ---------- overlay ----------
@@ -563,6 +657,7 @@ async function poll() {
     }
     updateCoverage(s.coverage);
     updateTractors(tl);
+    updateDrone(s.drone);
     renderPanel(tl);
     renderFollowButtons(tl);
     renderBanners(s);
@@ -598,6 +693,35 @@ function frame() {
     const flashOn = !o.bad || Math.floor(t * 3) % 2 === 0;
     o.beaconMat.color.set(flashOn ? (o.beaconColor ?? 0x4dabf7) : 0x3a1010);
     if (o.ring.visible) o.ring.rotation.z += dt * 2;
+  }
+  // drone
+  if (dr.has) {
+    dr.pos.lerp(dr.target, 1 - Math.exp(-dt * 3));
+    if (dr.targetHeading != null) dr.heading += angleDiff(dr.heading, dr.targetHeading) * (1 - Math.exp(-dt * 2.5));
+    droneObj.position.copy(dr.pos);
+    droneObj.rotation.y = -dr.heading;
+    droneObj.visible = !DRONE_CAM;
+    if (!DRONE_CAM) droneObj.children[droneObj.children.length - 1].material.color.set(Math.floor(t * 2) % 2 ? 0xff3b30 : 0x550000);
+  }
+  if (DRONE_CAM) {
+    if (dr.has) {
+      const h = Math.max(dr.pos.y, 4);
+      // Over a field on a job (scanning, hovering over a tractor, spraying) the camera looks steeply down at
+      // the ground it is checking; travelling to or from the job it looks further ahead to see where it is going.
+      const onJob = !!dr.mission && !['returning', 'docked', 'charging'].includes(dr.status);
+      const approaching = onJob && dr.status === 'flying' && !(dr.mission.progressPct > 0);     // still on its way to the job
+      const want = (approaching ? 42 : onJob ? 60 : 38) * Math.PI / 180;
+      dr.tilt = dr.tilt == null ? want : dr.tilt + (want - dr.tilt) * (1 - Math.exp(-dt * 1.5));
+      const ahead = h / Math.tan(dr.tilt);
+      camera.position.copy(dr.pos);
+      const lk = dr.look || (dr.look = new THREE.Vector3());
+      const goal = dr.focus ? new THREE.Vector3(dr.focus.e, 1.5, -dr.focus.n)
+        : new THREE.Vector3(dr.pos.x + Math.sin(dr.heading) * ahead, 0, dr.pos.z - Math.cos(dr.heading) * ahead);
+      if (!dr.lookInit) { lk.copy(goal); dr.lookInit = true; } else lk.lerp(goal, 1 - Math.exp(-dt * 3));
+      camera.lookAt(lk);
+    }
+    renderer.render(scene, camera);
+    return;
   }
   // camera
   if (fly) {

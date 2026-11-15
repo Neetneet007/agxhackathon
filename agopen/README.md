@@ -1,18 +1,26 @@
 # Live run on AgOpenWeb tractors
 
-This is the live mode of the "Run the Fleet" project. The project's coordinator plans a day of field jobs for three tractors, and each tractor is a separate process driving its own AgOpenWeb instance. When a tractor stalls, the coordinator notices from the telemetry, hands the unfinished work to another tractor and explains the new plan.
+This is the live mode of the "Run the Fleet" project. The project's coordinator plans a day of field jobs for three tractors and a fuel truck, and each vehicle is a separate process driving its own AgOpenWeb instance. When a tractor stalls, the coordinator notices from the telemetry, hands the unfinished work to another tractor and explains the new plan. The planner also works out whether a low tractor should drive to the depot or be met by the fuel truck, checks the weather before any spray job, and can send a simulated scout drone to look at a field or a stalled tractor.
 
-**Does it use AgOpenWeb? Yes.** Each tractor is a real, running AgOpenWeb instance (a headless desktop build, one per tractor, on ports 5175 to 5177). Our process for that tractor connects to its WebSocket, takes the operator seat and drives it with the same simulator commands the AgOpenWeb web page uses. The fields, the guidance lines and the implements are read from AgOpenWeb's own files. We had to patch AgOpenWeb in three small places so several copies can run on one computer (see [Set up once](#set-up-once)).
+**Does it use AgOpenWeb? Yes.** Each vehicle is a real, running AgOpenWeb instance (a headless desktop build, one per vehicle: tractors T1, T2 and T3 on ports 5175, 5176 and 5177, and the fuel truck "FUEL" on port 5178). Our process for that tractor connects to its WebSocket, takes the operator seat and drives it with the same simulator commands the AgOpenWeb web page uses. The fields, the guidance lines and the implements are read from AgOpenWeb's own files. We had to patch AgOpenWeb in four small places so several copies can run on one computer (see [Set up once](#set-up-once)).
 
 **What is still simulated.** The GPS is AgOpenWeb's built-in simulator, not hardware. The plan's clock, fuel, job ordering and the planner's idea of time belong to the project's own planner simulator (`src/simulator.js`). Details are in [What is simulated, and known limits](#what-is-simulated-and-known-limits).
 
 ```
- coordinator (live.js)  ── commands ──►  tractor-node.js T1  ── WebSocket ──►  AgOpenWeb :5175
-        ▲                               tractor-node.js T2  ── WebSocket ──►  AgOpenWeb :5176
-        └────── telemetry, 4×/s ◄────── tractor-node.js T3  ── WebSocket ──►  AgOpenWeb :5177
+ coordinator (live.js)  ── commands ──►  tractor-node.js T1    ── WebSocket ──►  AgOpenWeb :5175
+        ▲                               tractor-node.js T2    ── WebSocket ──►  AgOpenWeb :5176
+        │                               tractor-node.js T3    ── WebSocket ──►  AgOpenWeb :5177
+        └────── telemetry, 4×/s ◄────── tractor-node.js FUEL  ── WebSocket ──►  AgOpenWeb :5178
 ```
 
-The coordinator polls each tractor process four times a second. Each tractor process listens on its AgOpenWeb port plus 1000 (6175 to 6177).
+| Vehicle | AgOpenWeb port | Telemetry node port |
+| --- | --- | --- |
+| T1 (tractor) | 5175 | 6175 |
+| T2 (tractor) | 5176 | 6176 |
+| T3 (tractor) | 5177 | 6177 |
+| FUEL (fuel truck) | 5178 | 6178 |
+
+Each node listens on its AgOpenWeb port plus 1000. The coordinator polls each node four times a second. The status page and the API are on port 5190, and the 3D view is at http://localhost:5190/3d. The drone, the weather feed and the roundtable run inside the coordinator and have no ports of their own.
 
 A demo script for judges is in [DEMO.md](DEMO.md). The original planner, CLI and dashboard in the repo root are unchanged by the live mode and need none of this. See the [root README](../README.md).
 
@@ -25,6 +33,9 @@ A demo script for judges is in [DEMO.md](DEMO.md). The original planner, CLI and
 - [Faults and how they are detected](#faults-and-how-they-are-detected)
 - [People in the loop](#people-in-the-loop)
 - [Fuel truck](#fuel-truck)
+- [Spray conditions](#spray-conditions)
+- [Scout drone](#scout-drone-simulated)
+- [Forecasts on each tractor card](#forecasts-on-each-tractor-card)
 - [The roundtable of AI managers](#the-roundtable-of-ai-managers)
 - [HTTP API on port 5190](#http-api-on-port-5190)
 - [Tests](#tests)
@@ -33,13 +44,14 @@ A demo script for judges is in [DEMO.md](DEMO.md). The original planner, CLI and
 
 ## Set up once
 
-AgOpenWeb allows one copy per computer. The patch in `agopen/agopenweb/agopenweb-multi-instance.patch` changes three things:
+AgOpenWeb allows one copy per computer. The patch in `agopen/agopenweb/agopenweb-multi-instance.patch` makes four changes:
 
 | File patched in AgOpenWeb | Change |
 | --- | --- |
 | `RemoteServerHost.cs` | The environment variable `AGOPENWEB_PORT` sets the web port. |
 | `SingleInstance.cs` | The single-copy lock gets the port in its name when `AGOPENWEB_PORT` is set, so one copy per port can run. |
-| `ControlAuthority.cs` | When `AGOPENWEB_OPERATOR` is set, only a client whose name starts with that text can take control. Our tractor process connects as `Fleet-T1` and so on. Browser pages can then only watch, so an open page cannot take the seat. |
+| `ControlAuthority.cs` | When `AGOPENWEB_OPERATOR` is set (`start-fleet.sh` sets it to `Fleet`), only a client whose name starts with that text can take control. Our node processes connect as `Fleet-T1` and so on. Browser pages can then only watch, so an open page cannot take the seat. |
+| `wwwroot/index.html` | With `?embed=1` in the address, the page shows only the map. The small AgOpenWeb windows on the status page use this (for example `http://localhost:5175/?embed=1`). |
 
 Each copy also gets its own data folder through `AGOPENWEB_DATA`, which AgOpenWeb already supports. `agopenweb/start-fleet.sh` sets all of this.
 
@@ -59,10 +71,10 @@ DesktopOnly=true dotnet build Platforms/AgOpenWeb.Desktop -o ../agopen-multi/bin
 4. Copy `agopen/agopenweb/start-fleet.sh` into `../agopen-multi/`, run it once so each copy creates its data folder, then stop it:
 
 ```bash
-../agopen-multi/start-fleet.sh 3 && sleep 8 && ../agopen-multi/start-fleet.sh stop
+../agopen-multi/start-fleet.sh 4 && sleep 8 && ../agopen-multi/start-fleet.sh stop
 ```
 
-5. In this repo, install the dependencies and write the farm and implement profiles into the three copies:
+5. In this repo, install the dependencies and write the farm and implement profiles into the three tractor copies (the fuel truck's copy gets no fields or implements):
 
 ```bash
 npm install && node agopen/build-farm.js
@@ -81,31 +93,52 @@ agopen/start-demo.sh
 The script does five things, in this order:
 
 1. Stops anything left from an earlier run.
-2. Runs `build-farm.js`, which rewrites the nine fields and the implement profiles in all three AgOpenWeb copies. Work sessions and coverage from earlier runs are deleted.
-3. Starts three AgOpenWeb copies and waits for ports 5175 to 5177.
-4. Opens one Terminal window per tractor (telemetry once a second) and one for the coordinator.
+2. Runs `build-farm.js`, which rewrites the nine fields and the implement profiles in the three tractor copies of AgOpenWeb. Work sessions and coverage from earlier runs are deleted.
+3. Starts four AgOpenWeb copies (three tractors and the fuel truck) and waits for ports 5175 to 5178.
+4. Opens one Terminal window per vehicle (T1, T2, T3 and the fuel truck, telemetry once a second) and one for the coordinator.
 5. Opens the status page at http://localhost:5190 and runs the preflight check.
 
-The preflight (`node agopen/preflight.js`) prints one PASS or FAIL line per check and ends with `All checks passed. Ready to demo.` It checks Node 18 or later, the `ws` package, the patched build, each AgOpenWeb and tractor process, GPS at the farm, implement profiles, no leftover service lock, the coordinator, the fields, and that no tractor is in a fault state. You can run it again at any time.
+The preflight (`node agopen/preflight.js`) prints one PASS or FAIL line per check and ends with `All checks passed. Ready to demo.` It checks Node 18 or later, the `ws` package, the patched build, each tractor's and the fuel truck's AgOpenWeb and node process, GPS at the farm, implement profiles, no leftover service lock, the coordinator, the fields, and that no tractor is in a fault state. You can run it again at any time.
 
 ```bash
 agopen/start-demo.sh stop
 ```
 
-This stops the tractor processes, the coordinator and the three AgOpenWeb copies, and removes the service locks.
+This stops the node processes, the coordinator and the AgOpenWeb copies, and removes the service locks.
 
-Extra coordinator options go in `LIVE_ARGS`. For example, `LIVE_ARGS="--preset" agopen/start-demo.sh` starts with the 11 jobs from `scenario.live.json` already submitted instead of an empty list.
+Extra coordinator options go in the environment variable `LIVE_ARGS`, which `start-demo.sh` passes to `live.js`. For example, `LIVE_ARGS="--preset" agopen/start-demo.sh` starts with the 11 jobs from `scenario.live.json` already submitted instead of an empty list.
 
-| Option | Where | Meaning |
+`WITH_AGENTS=1 agopen/start-demo.sh` also opens a window for the durable agent team in [`agents/`](../agents/README.md) (port 5200). It reads this coordinator's `/state` and speaks at the same roundtable through `/agent/say`, `/hold` and `/recall`. Its own weather agent is left out, because the coordinator already reads the weather and two sources contradict each other, and each run gets a fresh memory folder. It is off by default: in a live run next to this coordinator its Fault Manager called working tractors out of service (it read the gap-to-plan figure, since corrected here, and it treats a tractor stopped on a weather hold as a symptom). It has not been re-run since that correction.
+
+| Option | Default | Meaning |
 | --- | --- | --- |
-| `--preset` | `live.js` | Start with the scenario's job list already submitted and the day running. |
-| `--auto-humans 6` | `live.js` | Press Good to go after 6 seconds. For unattended test runs only. |
-| `--chaos 90` | `tractor-node.js` | Inject a random fault (`dead` or `stuck`) about every 90 seconds. |
-| `--until 240` | `live.js` | End the run when the plan clock reaches that minute and write `out/live_metrics.json`. |
-| `--script "30:fault T1 stuck;75:fault T1 ok;78:repair T1"` | `live.js` | Run commands at plan minutes. Plan minute 0 is 06:00. |
-| `--sec`, `--cell`, `--nodes`, `--page`, `--fields` | `live.js` | Real seconds per plan minute, metres per plan cell, tractor process ports, status page port, AgOpenWeb fields folder. |
+| `--cell` | 20 (from `farm.json`) | Metres per plan cell. Must match the farm that was built. |
+| `--sec` | cell x 0.09, so 1.8 | Real seconds per plan minute. |
+| `--until` | none | End the run when the plan clock reaches that minute and write `out/live_metrics.json`. Plan minute 0 is 06:00. |
+| `--preset` | off | Start with the scenario's job list already submitted and the day running. |
+| `--auto-humans` | 0 (off) | Press Good to go after this many real seconds. For unattended test runs only. |
+| `--fuel-scale` | 25 | Multiplies each tractor's fuel use, so that refuel decisions come up within a short demo. `--fuel-scale 1` uses the scenario's own rates. `start-demo.sh` passes `--fuel-scale 70` when `LIVE_ARGS` is not set, so that a tractor in a far field runs short part-way through a job and the fuel truck goes out. |
+| `--weather` | `demo` | The scripted weather day: `calm`, `windy`, `still` or `demo`. See [Spray conditions](#spray-conditions). |
+| `--truck` | 6178 | Telemetry port of the fuel truck's node. If no truck answers, the truck option is not offered. |
+| `--script` | none | Run commands at plan minutes, for example `"30:fault T1 stuck;75:fault T1 ok;78:repair T1"`. |
+| `--page` | 5190 | Port of the status page and the API. |
+| `--nodes`, `--fields` | 6175,6176,6177; tractor 1's AgOpenWeb fields folder | Tractor node ports, and the AgOpenWeb fields folder to read. |
 
-macOS only: the launcher uses `osascript`, Terminal and `open`. On another system, start `node agopen/tractor-node.js T1 5175 --depot` (and the same for T2 5176 and T3 5177) in three shells and then `node agopen/live.js` in a fourth.
+`--chaos 90` is an option of `tractor-node.js`, not of `live.js`: it injects a random fault (`dead` or `stuck`) about every 90 seconds in that node.
+
+macOS only: the launcher uses `osascript`, Terminal and `open`. On another system, start `node agopen/tractor-node.js T1 5175 --depot` (and the same for T2 5176 and T3 5177, and `node agopen/tractor-node.js FUEL 5178 --depot --bay 3` for the fuel truck) in separate shells and then `node agopen/live.js` in another.
+
+### Windows, without AgOpenWeb (UI work and rehearsals)
+
+`agopen/mock-node.js` stands in for `tractor-node.js`. It has the same command line and the same HTTP API on agPort+1000, and it accepts the same `dead`, `stuck` and `ok` faults. It simulates the vehicle itself instead of driving an AgOpenWeb copy, and it shows a placeholder where the status page embeds AgOpenWeb's view. `live.js` and the pages on 5190 run unchanged.
+
+```bat
+agopen\start-demo-windows.cmd
+agopen\start-demo-windows.cmd -Speed 3
+agopen\start-demo-windows.cmd -Stop
+```
+
+`-Speed 3` makes the vehicles move 3x faster. The launcher opens a window per vehicle and one for the coordinator, then opens http://localhost:5190/. Positions and worked area come from the stand-in, not from AgOpenWeb.
 
 ## What you see
 
@@ -115,7 +148,8 @@ The status page at http://localhost:5190 shows, from top to bottom:
 - The job-list builder next to the map.
 - The roundtable card: what the AI managers say about each event.
 - A "Needs a person at the depot" card, which appears only when a tractor needs fuel or an implement change.
-- One card per tractor: state, current task, fuel, mounted implement, a link to that tractor's own AgOpenWeb page (http://localhost:5175 and so on) and the fault buttons.
+- One card per vehicle (T1, T2, T3 and the fuel truck): state, current task, fuel, mounted implement, the forecasts described [below](#forecasts-on-each-tractor-card), a small live AgOpenWeb window (the map-only `?embed=1` page of that vehicle's own AgOpenWeb, for example http://localhost:5175) and the fault buttons.
+- The "Spray conditions" card and the "Scout drone" card, with its camera view of the 3D farm.
 - "Messages between agents" (the trail, newest first) and the jobs table.
 
 A **Start over** button (two clicks) and the plan clock are at the top, and a link opens the 3D view.
@@ -123,7 +157,7 @@ A **Start over** button (two clicks) and the plan clock are at the top, and a li
 - `/3d` is a 3D view of the farm that draws the tractors from the same telemetry as the map. It needs the internet, because it loads three.js from a CDN.
 - `/dashboard/?live=1` is the original Command Center, which keeps its own copy of the planner's world and replays the live run's log into it. It shows the planner's picture of the day, not the tractors' GPS positions. It is not linked from the status page.
 
-Each tractor's own AgOpenWeb page is read-only for a browser, because of the patch. The detailed list of what the planner changed and why (one line per moved job) is printed in the coordinator's Terminal window. The status page shows the headline of each re-plan.
+Each vehicle's own AgOpenWeb page is read-only for a browser, because of the patch. The detailed list of what the planner changed and why (one line per moved job) is printed in the coordinator's Terminal window. The status page shows the headline of each re-plan.
 
 ## Build a job list and start the day
 
@@ -150,7 +184,8 @@ Under the hood, the plan clock starts at 06:00, and "Finish by" becomes a deadli
 ### How a field is worked
 
 - The field's outline and guidance (AB) line are read from its folder in AgOpenWeb (`field.geojson`).
-- `coverage.js` plans parallel passes one implement width apart along that line, a lap round the boundary, and a straight run-up before each pass. The route belongs to the job, not to the tractor.
+- `coverage.js` plans parallel passes one implement width apart along that line, with a straight run-up before each pass. The route belongs to the job, not to the tractor.
+- Every pass runs the full length of the field, edge to edge, and the tractor turns outside the field boundary, as a farmer would. Only ground inside the boundary is worked: the two outer passes run with the implement's edge on the boundary, and the passes between them are spaced evenly, so a field that is not a whole number of widths across gets a small overlap on each pass rather than a strip worked outside the field. Each pass starts at the field edge and continues 3 m past the far edge so the implement, which trails the tractor, clears it; the turn and a 9 m straight run-up happen out there. `live.js` asks `coverage.js` for this with `edgeToEdge: true` and no headland lap (`headlandPasses: 0`). Planned coverage is 100% for all four implement widths on rectangular and slanted test fields. The status label then reads, for example, "pass 3 of 8 (turning outside the field)" during a turn.
 - The tractor opens the field in AgOpenWeb, starts an AgOpenWeb work session, selects the guidance line and turns section control on only while it is on a pass. AgOpenWeb therefore paints the worked ground.
 - Progress is measured from the tractor's real position along its route. A job finishes when the route is complete, not when a timer runs out.
 - Between fields, tractors follow a lane network that runs between the fields, crosses the creek only at the bridges and reaches each field at a gate (`lanes.js`).
@@ -163,7 +198,7 @@ The coordinator detects faults from telemetry. It does not trust a status flag.
 | Type into a tractor's Terminal window | What the tractor does | What the coordinator sees |
 | --- | --- | --- |
 | `dead` | Stops answering and halts. | `NO_RESPONSE`: no telemetry for 3 seconds. |
-| `stuck` | Keeps acknowledging GO, but the wheels stop. | `GO_NOT_MOVING`: told to go, more than 40 m from its target, moved less than 5 m for 8 seconds. |
+| `stuck` | Keeps acknowledging GO, but the wheels stop. | `GO_NOT_MOVING`: told to go and, more than 40 m from its target, moved less than 5 m in 8 seconds; or, closer than that (turning, lining up), moved less than 1.5 m in 12 seconds. |
 | `ok` | Clears the fault. | `NO_RESPONSE` clears by itself once telemetry returns. For `stuck`, press **Clear fault** or type `repair T1` in the coordinator window. |
 
 The status page has the same faults as buttons on each tractor card: **Inject: GO but not moving**, **Inject: stop responding** and **Clear fault**. You can also type into the coordinator window: `break T1`, `repair T1`, `fault T2 stuck|dead|ok` or `quit`.
@@ -184,22 +219,93 @@ Without `--preset`, the job list starts empty and the script has nothing to disr
 
 ## People in the loop
 
-Fuelling and implement changes are done by a person at the depot.
+Fuelling and implement changes are done by a person. The tractor does not move while it is being fuelled or changed, until that person presses **Good to go** on the status page.
 
 1. When the plan sends a tractor to refuel or change implement, a task appears under "Needs a person at the depot" (for example "Change T2's implement to Tiller 8m").
 2. When the tractor is parked in its bay, its own process locks it. It will not move, whatever it is sent. The lock is saved in `agopen/out/lock-<id>.json`, so a restarted process is still locked.
 3. The fuel gauge and the mounted implement do not change until someone presses **Good to go**. The button is disabled until the tractor is parked.
-4. For an implement change, Good to go also loads that tool profile in the tractor's AgOpenWeb, so the farmer's own record matches.
+4. For an implement change, Good to go also loads that tool profile in the tractor's AgOpenWeb (the node sends `profile.load`), so the farmer's own record matches.
+
+Job order is also a rule: nothing is sown before it is plowed (see [Build a job list](#build-a-job-list-and-start-the-day)).
 
 ## Fuel truck
 
-TO BE COMPLETED
+The fuel truck "FUEL" is a fourth AgOpenWeb vehicle, on port 5178. It carries fuel to a tractor that is working in a field, when that is cheaper than the tractor driving to the depot and back. If no truck node is running, the option is not offered and every refuel is at the depot.
+
+**How the planner decides.** For each tractor that is working, the planner forecasts two things from what the tractor is really burning: whether the tank will last the job it is on, and whether what is left afterwards is enough for the next job on its list, with the 10% reserve kept. In either case it compares two options in US dollars:
+
+1. **Depot on the way.** The extra distance the tractor drives to pass the depot on its way to the next field, priced as the tractor's time plus the fuel burnt on that detour.
+2. **Fuel truck.** The truck's round trip to the field (out, a 60 m allowance, and back, at 25 km/h), priced as the truck's time plus its diesel, plus any minutes the tractor would wait for the truck.
+
+On this farm every lane leads back to the yard, so a tractor moving between fields usually passes the depot anyway and refuels there at no extra distance. The truck earns its trip in the other case: a tractor that will run down to its reserve part-way through a job in a far field. Going to the depot then costs it the drive there and back; the truck is sent early enough to be at the field when the tractor gets down to its reserve.
+
+Both options pay the same time at the pump, so that is left out. The cheaper option is chosen and the reason is written to the trail, with both costs and both distances. The rates are assumptions that you can change in `scenario.live.json` under `costs`:
+
+| Rate | Value | Used for |
+| --- | --- | --- |
+| `dieselPerGal` | 4 | Price of diesel, USD per gallon. |
+| `tractorPerHour` | 120 | Cost of a tractor's time, USD per hour. |
+| `truckPerHour` | 45 | Cost of the truck's time, USD per hour. |
+| `tankGal` | 60 | Size of a tractor's tank, used to turn a percentage of a tank into gallons. |
+| `truckGalPerKm` | 0.1 | Diesel the truck burns, gallons per km. |
+
+**If the depot is cheaper**, the tractor refuels there as part of the plan and a depot task appears for a person. **If the truck is cheaper**, the planner waits until the job has about half the truck's round-trip time left (plus 2 plan minutes), then sends it, so that it arrives at the field gate as the tractor's job ends. When the tractor has parked, the truck drives up and stops 7 m short of it. Both machines are then locked, and a task "Refuel T2 from the fuel truck in <field>" appears. The fuel level changes only when a person presses **Good to go**. Then both are released and the truck drives back to the depot. If the tractor breaks down meanwhile, the truck returns to the depot. A tractor that the planner has already sent to the depot for fuel is also met in the field by the truck when the truck is the cheaper option and is not busy.
+
+The rates for fuel use are scaled up by `--fuel-scale` (25 by default, 70 from `start-demo.sh`), because on this miniature farm a field burns only about 2% of a tank. Without that, no refuel decision would come up in a demo.
+
+**What has been seen.** Both branches have been seen in a live run: a refuel at the depot when it is on the tractor's way, and the fuel truck driving out to a tractor that would not finish its job (Ridge 80), stopping alongside, both locked until Good to go, then the tractor carrying on with a full tank and the truck returning.
+
+## Spray conditions
+
+This also answers the "Spray or Wait?" track. Before and during any spray job, the coordinator reads a simulated weather feed at two heights, 2 m and 10 m, once per plan minute (`weather.js`). It checks:
+
+- **Inversion.** The air at 10 m is warmer than the air at 2 m. Spray would hang in the air and drift.
+- **Wind at 2 m.** Too light or too strong.
+- **Shear.** The wind at 10 m differs too much from the wind at 2 m.
+
+| Limit (`LIMITS` in `weather.js`) | Value |
+| --- | --- |
+| Wind at 2 m, minimum | 3 mph |
+| Wind at 2 m, maximum | 10 mph |
+| Wind difference between 2 m and 10 m | 5 mph |
+| Inversion | 10 m warmer than 2 m by more than 0 degrees C |
+| Caution band | within 1 mph of a wind or shear limit |
+
+The result is **Go**, **Caution** or **Stop**, always with a reason in plain words and the numbers behind it. Stop is any limit broken. Caution is all limits kept, but one is within 1 mph. The status page also shows what a single ground station would have said, and marks the cases where the second height caught a risk that a ground station would have missed.
+
+- **Log.** Every status change is written with a time stamp. The status page shows the last six, and the whole log is at `GET /weather-log` (plain text).
+- **Hold.** A Stop places a hold with id `weather-spray` on all spray jobs: a tractor on a spray job stops where it is with the implement off, and the drone does not spot-spray. When conditions come back to Go or Caution, the hold is lifted and the jobs go on. Each change starts a roundtable discussion (Weather Manager).
+- **Days.** `--weather` picks a scripted day: `calm`, `windy`, `still` or `demo`. The default `demo` repeats a 49-minute cycle (inversion, Go, Caution, wind too high, Caution, Go) so a judge sees a Stop and a release within the demo.
+
+The feed is simulated, not a real station.
+
+## Scout drone (simulated)
+
+A simulated drone, labelled as simulated on the status page and in every report, does three things:
+
+1. **Scans a field.** Pick fields on the map and press **Map the picked fields** (`POST /drone/scan`, body `{"fields": ["Ridge 80"]}`). It flies a sweep and reports ground state, moisture, whether the ground can carry a tractor, crop stand and maturity, pest patches, weeds and what it recommends. The report goes to the trail and the roundtable.
+2. **Looks at a faulted tractor.** When a fault is detected, the drone is sent to the tractor's position, hovers, and reports what it sees with a recommendation.
+3. **Spot-sprays.** If a scan finds pest patches and recommends spot-spraying, the drone sprays those patches instead of sending the 24 m sprayer. It does not do this while the weather hold is on.
+
+The card shows the drone's camera: the 3D farm seen from the drone's position, looking down at the field while it works over it (a rendering of the simulation, not a real camera; it needs internet for the 3D library), the drone's state, battery and the latest report. The drone flies at 12 m/s at 40 m, has a 25-minute battery, does not start a flight below 30% and turns back below 20%. All readings are simulated and fixed by the field's name, so the same field gives the same report.
+
+**Looking at a faulted tractor.** When a fault is raised the drone flies out and makes one slow circle round the tractor at 22 m, 24 m up, with the camera kept on the tractor so it stays in the middle of the picture. Then it reports what it saw.
+
+**Reading the wind above a sprayer.** While a tractor is spraying, the drone flies just behind it and steps through 10 m, 30 m and 50 m, reading the wind at each height. The readings appear on the Spray conditions card and in the trail (`wind-profile`). They come from the same simulated air as the mast readings at 2 m and 10 m (a power-law profile through those two, with a little gust noise). The drone leaves when the pass stops (job done, weather hold, fault) or when another drone job is waiting, such as a fault to look at. The Go / Caution / Stop decision itself still uses the two mast heights.
+
+## Forecasts on each tractor card
+
+While a tractor works, its card shows three forecasts, all from what the tractor is actually achieving (smoothed over the last few plan minutes), not from the plan:
+
+- **Job finishes**: minutes left and clock time, from the measured rate of progress (the card says "measured" or "rated" if it has no measurement yet), and the rate in percent a minute.
+- **Fuel to reserve**: when the tank would reach the 10% reserve at the measured burn, the fuel left when the job ends, and a warning if it runs short before the job ends.
+- **Next refuel**: whether the next job needs fuel first, and if so the planner's choice (depot or fuel truck) with both costs in USD and both distances.
 
 ## The roundtable of AI managers
 
 On each significant event, a few managers hold a short, visible discussion. The planner has already acted by then. The managers never delay a tractor. Full details are in [roundtable/README.md](roundtable/README.md).
 
-Each manager is a language model plus one instructions file in `roundtable/agents/`. Each file gives one job and one thing the manager must never do.
+Each manager is a language model plus one instructions file in `roundtable/agents/` (`fleet-manager.md`, `fault-manager.md` and so on), and there is one manager per task for the whole fleet, not one per tractor. Each file gives one job and one thing the manager must never do.
 
 | Manager | Its one job |
 | --- | --- |
@@ -217,7 +323,7 @@ How a discussion runs:
 2. The Plan Manager speaks last. It sees the others' lines and may call at most two tools. Three tools exist in the live run: `change_priority`, `approve_late` and `defer_job`. Each sends an event to the planner.
 3. Discussions run one at a time. If more than three are waiting, the oldest waiting ones are dropped.
 
-Discussions start when the day starts or new jobs arrive, when a detected fault becomes a breakdown, when a tractor is back in service, when a job finishes, when a tractor is locked at the depot, and when a hold or recall is placed or lifted. A breakdown you type as `break T1` (not detected from telemetry) starts a fault discussion only if a fault was detected earlier in the run, because the discussion uses the last detected fault's facts.
+Discussions start when the day starts or new jobs arrive, when the drone reports, when the weather changes a spray hold, when a detected fault becomes a breakdown, when a tractor is back in service, when a job finishes, when a tractor is locked at the depot, and when a hold or recall is placed or lifted. A breakdown you type as `break T1` (not detected from telemetry) starts a fault discussion only if a fault was detected earlier in the run, because the discussion uses the last detected fault's facts.
 
 ### With no key or no internet
 
@@ -225,7 +331,7 @@ Discussions start when the day starts or new jobs arrive, when a detected fault 
 - **A key but no internet, or a slow model.** Each model call stops after 6 seconds and the line falls back to the rule-written one. The code is written this way. I did not test it with the network off.
 - **Where the key must be.** The launcher opens new Terminal windows, which start their own shells. Put the variable where a new shell reads it, such as your shell profile. I did not test whether a variable exported only in the shell that ran `start-demo.sh` reaches the coordinator window.
 - **How to tell.** The roundtable card header counts lines, model calls, tool calls and rule-written lines. Zero model calls with some lines means the fallback is in use.
-- **Model.** `claude-haiku-5-5` by default. Set `ROUNDTABLE_MODEL` to change it. With a key, the facts (tractor states, job names, times) go to the Anthropic API.
+- **Model.** `claude-haiku-5-5` by default, with the rule-written lines above as the fallback when the model cannot be reached. Set `ROUNDTABLE_MODEL` to change it. With a key, the facts (tractor states, job names, times) go to the Anthropic API.
 
 Outside agents can take part too. `POST /hold` and `POST /recall` let an agent stop a kind of work or call the fleet home, and `POST /agent/say` puts a message on the trail and in the roundtable card. A hold stops a tractor on a held job where it is, with the implement off, and the job makes no progress until the hold is lifted.
 
@@ -237,14 +343,16 @@ The coordinator serves everything on port 5190. There is no authentication, and 
 | --- | --- | --- |
 | GET | `/` | The status page. Any GET that matches no other route also returns it. |
 | GET | `/3d` | The 3D view of the farm (loads three.js from a CDN). |
-| GET | `/state` | A JSON snapshot: plan clock, mode (`building` or `running`), job list, tractors with telemetry and state codes, jobs with percent done, ground states, worked-ground strips, holds, recalls, depot tasks, the trail and the roundtable lines and counts. |
+| GET | `/state` | A JSON snapshot: plan clock, mode (`building` or `running`), job list, tractors with telemetry and state codes, jobs with percent done, ground states, worked-ground strips, holds, recalls, depot tasks, the weather reading and log, the drone's state and reports, the fuel plan, the trail and the roundtable lines and counts. |
 | GET | `/farm` | The farm as read from AgOpenWeb's field folders: home point, depot, fields (boundary and guidance lines), lanes, gates and bays. |
 | GET | `/replay` | The planner's log of events, holds and progress, which `/dashboard/?live=1` replays. |
+| GET | `/weather-log` | The time-stamped weather and spray-status log, as plain text. |
 | GET | `/scenario.json` | The scenario in use, with no scripted events. |
 | GET | `/dashboard/...`, `/src/...` | Static files from the repo for the original dashboard. |
 | POST | `/draft` | Add jobs to the list. Body: `{"fields": ["Ridge 80"], "steps": ["till", "seed"], "priority": "high", "deadline": "17:00"}`. Steps are `till`, `seed`, `spray` or `mow`. Returns `{"added": [ids]}`, or 409 with the reason in plain text. |
 | POST | `/jobs` | The same for one step. Body: `{"fields": [...], "type": "spray", "priority": "medium", "deadline": "17:00"}`. |
 | DELETE | `/draft/<job id>` | Remove a job that has not been sent to the planner, and any job that waits for it. |
+| POST | `/drone/scan` | Send the drone to map fields. Body: `{"fields": ["Ridge 80"]}`. 409 with a reason if no field is given. |
 | POST | `/start` | Start the day. 409 if it is already running or the list is empty. |
 | POST | `/reset` | Start over: tractors go back to their bays and unlock, and the coordinator restarts with an empty list, the clock at 06:00 and an empty trail. |
 | POST | `/human/<task id>/go` | Press Good to go for a depot task such as `H1`. 409 if the tractor is not parked yet. |
@@ -258,7 +366,7 @@ The coordinator serves everything on port 5190. There is no authentication, and 
 
 Invalid JSON in a body returns 400. A request to an unknown path other than a GET still returns the status page with status 200.
 
-Each tractor process has its own small API on its port (6175 to 6177):
+Each vehicle's node has its own small API on its port (6175 to 6178):
 
 | Method | Path | What it does |
 | --- | --- | --- |
@@ -274,12 +382,12 @@ Each tractor process has its own small API on its port (6175 to 6177):
 npm test
 ```
 
-This runs `node --test agopen/test/` from the repo root. It needs no AgOpenWeb and does not touch a running demo. On 2026-11-15 it printed:
+This runs `node --test agopen/test/` from the repo root. It needs no AgOpenWeb and does not touch a running demo. On 2026-11-15 (after the weather and drone modules landed) it printed:
 
 ```
-# tests 44
+# tests 73
 # suites 0
-# pass 43
+# pass 72
 # fail 0
 # cancelled 0
 # skipped 0
@@ -290,48 +398,64 @@ It takes about 0.3 seconds.
 
 | File | Tests | What it checks |
 | --- | --- | --- |
-| `coverage.test.js` | 14 | Field coverage routes: rectangles at four implement widths, a rotated field, a trapezoid, passes parallel to the guidance line and one width apart, alternating direction, the nearest start, progress and winding order. At least 99.5% planned coverage for rectangles, 98% for the trapezoid. |
+| `coverage.test.js` | 14 | Field coverage routes: rectangles at four implement widths, a rotated field, a trapezoid, passes parallel to the guidance line and one width apart, alternating direction, the nearest start, progress and winding order. |
 | `faults.test.js` | 13 (12 pass, 1 todo) | Injected faults against the planner's simulator on the live scenario: a tractor breaks mid-job and another finishes it with no lost or repeated acres; each tractor in turn breaking early; a job nobody can do is flagged, not dropped; an urgent job fitted in; implement changes planned; fuel never below the reserve; no job held by two tractors; a tractor held at the depot does not move or gain fuel; more on-time jobs than first come, first served; the same faults give the same result twice. |
 | `lanes.test.js` | 8 | Every field has a gate, routes stay out of fields, the creek is crossed only at the bridges, routes are deterministic. |
 | `roundtable.test.js` | 7 | Rule-written lines with no model, managers get no tools, the chair's tool calls (a third is refused), timeouts and errors fall back, the queue drops the oldest beyond three, seven managers are loaded. |
+| `weather.test.js` | 17 | Go, Caution and Stop cases for inversion, low wind, high wind and shear; the caution band; every reason quotes a number; the scripted days; the log. |
+| `drone.test.js` | 12 | Drone state machine: inspection and scan missions, deterministic findings, spot-spraying, battery, speed. |
 
-`agopen/test/TEST_REPORT.md` is a table of the fault cases with the numbers from one run, including a comparison against first come, first served on a breakdown day. `node agopen/test/report.js` regenerates it. `npm test` does not, so it can fall behind the code. The copy in the repo was generated on 2026-11-15 at 21:17 UTC.
+`agopen/test/TEST_REPORT.md` is a table of the fault cases with the numbers from one run, including a comparison against first come, first served on a breakdown day. `node agopen/test/report.js` regenerates it. `npm test` does not, so it can fall behind the code. The copy in the repo was generated on 2026-11-15 at 21:51 UTC. It is the baseline comparison for the hand-in (see below); its headline numbers are repeated there.
 
 **The one known gap (marked `todo`).** When the only tractor that can do a job breaks down, the planner says the job was "re-assigned" and says nothing about the job at that moment. The only warning comes at the end of the day, as "not completed". The test for a plain warning at the time of the breakdown is marked `todo` and does not fail the run. In practice an operator would not hear about the stranded job until the day ends.
 
-**What the tests do not cover.** They test the planner and simulator, the coverage geometry, the lanes and the roundtable. They do not test `live.js`, `tractor-node.js`, the fault-detection thresholds, the link to AgOpenWeb or the web pages. Those are checked by `preflight.js` and by running the scripted case above by hand.
+**What the tests do not cover.** They test the planner and simulator, the coverage geometry, the lanes, the roundtable, the weather rules and the drone. They do not test `live.js` (so not the fuel-truck cost comparison or the truck's hand-over), `tractor-node.js`, the fault-detection thresholds, the link to AgOpenWeb or the web pages. Those are checked by `preflight.js` and by running the scripted case above by hand.
 
 ## Files
 
 | Path | What it is |
 | --- | --- |
-| `live.js` | The runner. Plans with the coordinator, sends commands to the tractors, detects faults, serves the status page and the API on port 5190. |
-| `tractor-node.js` | One process per tractor. Wraps one AgOpenWeb, takes commands, reports telemetry, accepts the service lock and injected faults. |
+| `live.js` | The runner. Plans with the coordinator, sends commands to the vehicles, detects faults, compares fuel options, runs the weather check and the drone, serves the status page and the API on port 5190. |
+| `tractor-node.js` | One process per vehicle (tractors and the fuel truck). Wraps one AgOpenWeb, takes commands, reports telemetry, accepts the service lock and injected faults. |
 | `tractor.js` | The client for one AgOpenWeb's WebSocket: takes the operator seat, decodes state frames, steers, sets speed, switches section control and opens fields. |
-| `coverage.js` | Plans the passes, run-ups and headland lap for a field, and measures how much of it a route covers. Convex fields only. |
+| `coverage.js` | Plans the passes and run-ups for a field (and optional headland laps, which the live mode does not use), and measures how much of it a route covers. Convex fields only. |
 | `lanes.js` | Builds the farm's lane network: lanes between fields, creek crossings at bridges, a gate per field. |
-| `rig.js` | The four implements (profile name and width), the work-rate formula and the pass speed. |
+| `rig.js` | The four implements (profile name and width: Sprayer 24 m, Mower 9 m, Tiller 8 m, Seeder 12 m), the work-rate formula and the pass speed. |
+| `weather.js` | The spray-conditions rules: limits, Go, Caution or Stop with a reason, the scripted weather days and the log. |
+| `drone.js` | The simulated scout drone: scan, inspect and spot-spray missions, battery, reports. |
 | `build-farm.js` | Writes the scenario's fields and the implement profiles into every AgOpenWeb copy, and `farm.json`. Stands in for drawing fields in AgOpenGPS. |
 | `preflight.js` | The readiness check. |
 | `start-demo.sh` | The one-command launcher and stopper (macOS). |
 | `live.html` | The status page. |
 | `live3d.html` | The 3D view, served at `/3d`. |
-| `scenario.live.json` | `scenario.json` with every implement on two tractors, so any single breakdown can be covered, and no scripted events. |
+| `scenario.live.json` | `scenario.json` with every implement on two tractors, so any single breakdown can be covered, no scripted events, and a `costs` block with the rates used to compare a depot refuel with the fuel truck. |
 | `farm.json` | Written by `build-farm.js`: the depot's latitude and longitude, metres per plan cell (20) and the fields. |
-| `agopenweb/` | The patch to AgOpenWeb and `start-fleet.sh`. |
+| `agopenweb/` | The patch to AgOpenWeb (four changes) and `start-fleet.sh`. |
 | `roundtable/` | The roundtable engine, a smoke script and the seven instructions files in `agents/`. |
 | `test/` | The tests, `report.js` and `TEST_REPORT.md`. |
-| `out/` | Written while running: `trail.jsonl` (the event log of the run), `live_metrics.json` (written when a run ends), `lock-<id>.json` and the logs. |
+| `out/` | Written while running: `trail.jsonl` (the event log of the run, emptied at each start), `live_metrics.json` (written when a run ends), `lock-<id>.json` and the logs. |
 
 ### Hand-in items for the live mode
 
 | Item | Where |
 | --- | --- |
 | Code | This repo. |
-| How to run, and whether AgOpenWeb was used | This file. AgOpenWeb is used. |
-| Scenario and configuration | `scenario.live.json`, `farm.json` |
-| Event log of the demo run | `agopen/out/trail.jsonl` (emptied each time the coordinator starts) |
-| Comparison with first come, first served | `out/comparison.md` and `out/stress_200.txt` in the repo root (from the planner's own simulator), and the breakdown-day table in `agopen/test/TEST_REPORT.md`. The live run does not run a baseline. |
+| How to run, and whether AgOpenWeb was used | This file and the root README section "Live mode on AgOpenWeb". AgOpenWeb is used, patched in four places. |
+| Scenario and configuration | `agopen/scenario.live.json` (including the `costs` block), `agopen/farm.json` |
+| Event log of the live run | `agopen/handin/event-log.jsonl`, a copy of `agopen/out/trail.jsonl` taken after the demo run. `out/trail.jsonl` itself is emptied each time the coordinator starts. |
+| Comparison with first come, first served | `agopen/test/TEST_REPORT.md` (breakdown day, table below), and `out/comparison.md` and `out/stress_200.txt` in the repo root (from the planner's own simulator). The live run does not run a baseline. |
+
+The breakdown-day comparison in `agopen/test/TEST_REPORT.md`: T1 breaks at 07:00 and is repaired at 09:00, same farm, same jobs, same fault.
+
+| | Coordinator | First come, first served |
+|---|---:|---:|
+| Jobs completed (of 11) | 11 | 11 |
+| Jobs finished on time | 11 | 7 |
+| Travel (tractor-minutes) | 698 | 758 |
+| Idle (tractor-minutes) | 0 | 22 |
+| Day ended at | 15:56 | 17:16 |
+
+The same file lists ten injected-fault cases, all passing in the copy generated on 2026-11-15 at 21:51 UTC.
 
 ## What is simulated, and known limits
 
@@ -353,14 +477,16 @@ It takes about 0.3 seconds.
 | Fuel and time are the planner's | Work rates (acres per hour) come from implement width and speed with the usual field-capacity formula. The planner uses them for its time and fuel estimates. A job still finishes when the route is complete. |
 | The plan clock runs fast | One plan minute is 1.8 real seconds, so the plan clock runs about 33 times faster than a wall clock. Tractors move at real speed (lanes up to 20 km/h) and the fields are only about 100 m across. |
 | Opening a field moves the simulated tractor | AgOpenWeb's simulator jumps the tractor to the middle of a field when it is opened. The tractor process remembers the position and sets it straight back. This is a workaround. |
-| Headland corners can leave small wedges | The planner's own coverage measure counts the implement as extending half a width past each end of a leg. A real tractor turning at a corner may not sweep that. On the nine farm fields the planner reports 100% coverage at all four widths (my own run of `planCoverage`, not part of `npm test`). That measures the plan, not AgOpenWeb's painted area. I did not compare the two. |
+| Planned coverage is not compared with AgOpenWeb's painted area | Passes now run edge to edge and turn outside the field, so there is no headland lap. The planner's own coverage measure counts the implement as extending half a width past each end of a leg. That measures the plan, not AgOpenWeb's painted area, and I did not compare the two or re-measure coverage after the change to full-length passes. |
 | A hand-over restarts the interrupted pass | A job's route is kept when another tractor takes over, but the new tractor drives the interrupted pass again from its start. The code comment says nothing is repeated. By my reading of `live.js`, one pass can be driven twice. I did not watch it. |
-| Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go, is more than 40 m from its target, and is not opening a field. A tractor that stalls within 40 m of its target is not caught by this check. There is no check for a tractor that leaves its lane or drives slowly. |
-| Lanes do not change | The lane network is built once. A `block_route` event changes the planner's travel times but not where the tractors drive. I did not test this. |
+| Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go and is not opening a field. Within 5 m of its target a tractor counts as arrived, so one that stalls there is not caught until its next leg. |
+| Lanes do not react to `block_route` | The lane network is built once. A `block_route` event changes the planner's travel times but not where the tractors drive. I did not test this. |
+| The status page shows only the re-plan headline | The line for each moved job and its reason is printed in the coordinator's Terminal window, not on the status page. |
+| Weather and drone are simulated | The weather feed is a scripted day and the drone's readings are generated from the field's name. Neither reads a real sensor. |
 | Give-way is simple | It stops one tractor when two moving tractors come within 9 m. It does not plan around a tractor that is standing still in the lane. |
 | No persistence | The job list, the trail and the roundtable lines live in memory. Start over, or a restart, loses them. `out/trail.jsonl` is emptied at each start. |
 | No authentication | Anyone on the network can call the API. |
 | macOS only for the launcher | `start-demo.sh` uses `osascript`, Terminal and `open`. The window positions assume a screen about 1920 pixels wide. |
 | Paths are fixed | `build-farm.js`, `tractor-node.js` and `live.js` look for `../agopen-multi` next to the repo. Only `start-demo.sh` honours `AGOPEN_MULTI`. The status page and the fields are read from tractor 1's AgOpenWeb folder, so a field added by hand must be copied into all three. |
-| The 3D view and the roundtable need the internet | The 3D view loads three.js from a CDN. The roundtable calls the Anthropic API. Without the internet the status page, the planner and the tractors still work. |
+| The 3D view and the roundtable model lines need the internet | The 3D view loads three.js from a CDN. The roundtable calls the Anthropic API (rule-written lines are used without it). Without the internet the status page, the planner and the tractors still work. |
 | Tests do not cover the live runner | See [Tests](#tests). |

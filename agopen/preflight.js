@@ -28,6 +28,13 @@ for (let i = 0; i < scenario.tractors.length; i++) {
   check(`${id}: implement profiles in AgOpenWeb`, tools.length > 0, tools.map(t => t.profile).join(', ') || 'none found: run node agopen/build-farm.js');
   check(`${id}: not locked or faulted from an earlier run`, !m.service, m.service ? `locked for ${m.service.kind}` : '');
 }
+// The fuel truck is the fourth AgOpenWeb copy. Without it the day still runs; refuelling is then always at the depot.
+try {
+  await get('http://127.0.0.1:5178/');
+  const m = await (await get('http://127.0.0.1:6178/telemetry')).json();
+  check('FUEL: fuel truck answering on :5178 and :6178', m.link === 'ok', m.link === 'ok' ? '' : `link ${m.link}`);
+  check('FUEL: not locked from an earlier run', !m.service, m.service ? `locked for ${m.service.kind}` : '');
+} catch (e) { check('FUEL: fuel truck answering on :5178 and :6178', false, `${e.message} (refuelling will be at the depot only)`); }
 let state = null;
 try { state = await (await get('http://127.0.0.1:5190/state')).json(); check('Coordinator and status page on :5190', true, `plan clock ${state.clock}`); }
 catch (e) { check('Coordinator and status page on :5190', false, e.message); }

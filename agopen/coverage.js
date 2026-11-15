@@ -111,6 +111,8 @@ export function planCoverage({
   width,
   headlandPasses = 1,
   start = null,
+  edgeToEdge = false,   // no headland lap: every pass runs the full length of the field and the tractor turns outside it
+  overrun = 0,          // metres each pass continues past its far edge, so an implement trailing the tractor clears it
 }) {
   if (!(width > 0)) throw new Error('width must be positive');
   const poly = normalisePolygon(boundary);
@@ -139,8 +141,30 @@ export function planCoverage({
   for (const p of inner) { const t = across(p); tMin = Math.min(tMin, t); tMax = Math.max(tMax, t); }
   const kLo = Math.floor(tMin / width) - 1, kHi = Math.ceil(tMax / width) + 1;
 
-  const passes = []; // { k, sLo, sHi }
-  for (let k = kLo; k <= kHi; k++) {
+  const passes = []; // { k, t, sLo, sHi }
+  if (edgeToEdge) {
+    // The outer passes run with the implement's edge on the boundary, so nothing outside the field is worked,
+    // and the passes between them are spaced evenly. When the field is not a whole number of widths across,
+    // each pass overlaps its neighbour a little instead of leaving one thin strip for a last, awkward pass:
+    // every turn is then the same shape. Each pass is as long as the field is under the implement, plus the overrun.
+    let lo = Infinity, hi = -Infinity;
+    for (const p of poly) { const t = across(p); lo = Math.min(lo, t); hi = Math.max(hi, t); }
+    const span = hi - lo, n = Math.max(1, Math.ceil((span - 0.05) / width));
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? (lo + hi) / 2 : lo + width / 2 + i * (span - width) / (n - 1);
+      const a0 = t - width / 2, a1 = t + width / 2;
+      let sLo = Infinity, sHi = -Infinity;
+      const take = (x) => { sLo = Math.min(sLo, x); sHi = Math.max(sHi, x); };
+      for (let j = 0; j < poly.length; j++) {
+        const p = poly[j], q = poly[(j + 1) % poly.length], ap = across(p), aq = across(q);
+        if (ap >= a0 - 1e-6 && ap <= a1 + 1e-6) take(along(p));
+        for (const c of [a0, a1]) if ((ap - c) * (aq - c) < 0) { const f = (c - ap) / (aq - ap); take(along(p) + (along(q) - along(p)) * f); }
+      }
+      if (!(sHi - sLo >= MIN_PASS_M)) continue;
+      passes.push({ k: i, t, sLo, sHi });
+    }
+  }
+  for (let k = kLo; k <= kHi && !edgeToEdge; k++) {
     const t = k * width;
     if (t + width / 2 <= tMin + EPS || t - width / 2 >= tMax - EPS) continue; // strip misses inner field
     const p0 = { e: A.e + v.e * t, n: A.n + v.n * t };
@@ -158,7 +182,8 @@ export function planCoverage({
 
   // Order: start from whichever outermost pass has an end nearest the tractor.
   const ends = ps => {
-    const p = { e: A.e + v.e * ps.k * width, n: A.n + v.n * ps.k * width };
+    const t = ps.t ?? ps.k * width;
+    const p = { e: A.e + v.e * t, n: A.n + v.n * t };
     return [
       { e: p.e + u.e * ps.sLo, n: p.n + u.n * ps.sLo },
       { e: p.e + u.e * ps.sHi, n: p.n + u.n * ps.sHi },
@@ -185,6 +210,11 @@ export function planCoverage({
   const swaths = passes.map((ps, i) => {
     const lowFirst = (i % 2 === 0) ? firstLow : !firstLow; // direction alternates
     const [lo, hi] = ends(ps);
+    // The implement trails the tractor: start the pass at the field edge and carry on past the far edge.
+    if (edgeToEdge && overrun > 0) {
+      const far = lowFirst ? hi : lo, sgn = lowFirst ? 1 : -1;
+      far.e += u.e * overrun * sgn; far.n += u.n * overrun * sgn;
+    }
     return {
       index: i,
       k: ps.k,

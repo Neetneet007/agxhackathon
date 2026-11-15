@@ -5,10 +5,12 @@
 #   - one Terminal window running the coordinator
 #   - the status page in your browser, then a preflight check
 # Usage: agopen/start-demo.sh        agopen/start-demo.sh stop
+# LIVE_ARGS passes options to the coordinator. Unset, fuel use is scaled up (--fuel-scale 70) so that refuelling,
+# and the fuel truck's trip to a tractor in a far field, come up within a short demo.
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
 MULTI="${AGOPEN_MULTI:-$REPO/../agopen-multi}"
 stop_all() {
-  pkill -f "agopen/tractor-node.js" 2>/dev/null; pkill -f "agopen/live.js" 2>/dev/null
+  pkill -f "agopen/tractor-node.js" 2>/dev/null; pkill -f "agopen/live.js" 2>/dev/null; pkill -f "agents/server.js" 2>/dev/null
   "$MULTI/start-fleet.sh" stop >/dev/null 2>&1
   rm -f "$REPO"/agopen/out/lock-*.json
 }
@@ -43,8 +45,16 @@ win "Tractor T2 telemetry" 640  560 640 300 "node agopen/tractor-node.js T2 5176
 win "Tractor T3 telemetry" 1280 560 640 300 "node agopen/tractor-node.js T3 5177 --depot"
 win "Fuel truck telemetry" 960 40 640 300 "node agopen/tractor-node.js FUEL 5178 --depot --bay 3"
 for P in 6175 6176 6177 6178; do for k in $(seq 1 40); do curl -s -m 1 -o /dev/null "http://127.0.0.1:$P/telemetry" && break; sleep 0.5; done; done
-win "Fleet coordinator" 0 40 960 500 "node agopen/live.js ${LIVE_ARGS:-}"
+win "Fleet coordinator" 0 40 960 500 "node agopen/live.js ${LIVE_ARGS---fuel-scale 70}"
 for k in $(seq 1 30); do curl -s -m 1 -o /dev/null http://127.0.0.1:5190/state && break; sleep 0.5; done
+# Optional: the durable agent team in agents/ on port 5200, speaking at the same roundtable. Its own weather
+# agent is left out because the coordinator already reads the weather; two sources would contradict each other.
+# Each run gets a fresh memory folder, so it does not open with yesterday's faults.
+# Usage: WITH_AGENTS=1 agopen/start-demo.sh
+if [ -n "${WITH_AGENTS:-}" ]; then
+  pkill -f "agents/server.js" 2>/dev/null
+  win "Agent team" 960 360 640 200 "AGENTS=plan,fleet,fault,route,depot,safety,records AGENTS_DATA=agents/data/run-$(date +%H%M%S) node agents/server.js"
+fi
 open "http://localhost:5190/"
 echo "5/5 Preflight:"
 (cd "$REPO" && node agopen/preflight.js)
