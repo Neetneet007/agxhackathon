@@ -23,6 +23,7 @@ import { buildLanes } from './lanes.js';
 import { createRoundtable } from './roundtable/roundtable.js';
 import { createWeather } from './weather.js';
 import { createDrone } from './drone.js';
+import { createChat } from './chat.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..');
@@ -871,7 +872,18 @@ function fieldStatus() {
   growth = +growth.toFixed(2);
   const conditionsText = tempC == null ? null : `${tempC.toFixed(0)} °C, ${humidityPct}% humidity: ${why}, crops growing at about ${Math.round(growth * 100)}% of their normal rate${humidityPct > 85 ? '; humid enough to watch for leaf disease' : ''}`;
   const work = readTodaysWork();
-  return scenario.fields.map(f => {
+  return scenario.fields.map(f => fieldStatusOf(f, work, { tempC, humidityPct, growth, conditionsText })).map(x => ({ ...x, suggest: suggestFor(x) }));
+}
+function suggestFor(x) {
+  if (x.queuedText) return null;
+  if (x.ground === 'plowed') return { label: `Sow ${fieldRecord[x.name].nextCrop || fieldRecord[x.name].lastCrop || 'it'}`, steps: ['seed'] };
+  if (!x.standing && x.ground === 'not plowed') return { label: 'Plow and sow', steps: ['till', 'seed'] };
+  if (x.standing && x.pests > 0) return { label: 'Spray', steps: ['spray'] };
+  if (x.standing && (x.crop === 'hay' || x.crop === 'alfalfa') && x.maturityPct >= 60) return { label: 'Mow', steps: ['mow'] };
+  return null;
+}
+function fieldStatusOf(f, work, { tempC, humidityPct, growth, conditionsText }) {
+  {
     const rec = fieldRecord[f.name], g = ground[f.name], crop = rec.crop, season = SEASON_DAYS[crop] || 100;
     const queued = backlog.filter(b => b.field === f.name && stillToDo(b)).map(b => ({ till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' }[b.type] || b.type));
     const todays = (work[f.name] || []).slice().sort((a, b) => String(a.startedAt).localeCompare(String(b.startedAt)));
@@ -918,7 +930,7 @@ function fieldStatus() {
       harvestText: maturity == null ? null : ready ? `Ready to ${cut} now` : `Ready to ${cut} in about ${left} days (${when}, give or take ${leftMargin})`,
       standPct: sc?.standPct ?? null, moisturePct: sc?.moisturePct ?? null, pests: sc?.pests ?? null,
       lastScanClock: sc?.clock ?? null, scanAgeMin, confidence, confidenceText };
-  });
+  }
 }
 
 // ---- Crop manager. Every so often it goes through the fields: where is each crop in its life, when was it last
@@ -977,6 +989,50 @@ function aiPlan() {
   if (added.length) trail('crop-manager', 'planner', 'ai-plan', `Field review. ${added.join('. ')}.${waiting.length ? ` ${waiting.join(' and ')} also need${waiting.length === 1 ? 's' : ''} work; ${waiting.length === 1 ? 'it waits' : 'they wait'} until there is room in the day.` : ''} Growing fields are left alone and surveyed by drone.`, { added: added.length, waiting });
   if (mode === 'building' && backlog.length) { try { startDay(); } catch { /* already running */ } }
 }
+
+// ---- The farm assistant (chat). Its tools are the same functions the dashboard's buttons call.
+const fieldByName = (name) => scenario.fields.find(f => f.name.toLowerCase() === String(name || '').toLowerCase().trim()) || scenario.fields.find(f => f.name.toLowerCase().includes(String(name || '').toLowerCase().trim()) && String(name || '').trim().length > 2);
+const STEP_WORD = { till: 'plow', seed: 'sow', spray: 'spray', mow: 'mow' };
+const chat = createChat({
+  clock: () => fmtTime(sim.time),
+  context: () => `plan clock ${fmtTime(sim.time)}; the day is ${mode === 'running' ? 'running' : 'not started (the job list is being built)'}; AI drive is ${aiDrive ? 'on' : 'off'}; fields: ${scenario.fields.map(f => f.name).join(', ')}; tractors: ${units.map(u => u.id).join(', ')}.`,
+  tools: [
+    { name: 'farm_overview', description: 'The whole farm now: clock, tractors (state, task, fuel, implement), jobs (id, what, status, tractor, progress, deadline), tasks waiting for a person at the depot, spray conditions, the latest plan change with its reasons, and a one-line status of every field.',
+      input_schema: { type: 'object', properties: {} },
+      handler: async () => { const st = snapshot(); const lp = st.trail.find(m => m.type === 'plan'); return { clock: st.clock, day: mode, aiDrive, tractors: st.tractors.map(t => ({ id: t.id, state: t.state.text, task: t.task, fuelPct: t.fuelPct, implement: t.mounted, eta: t.eta ? { jobFinishes: t.eta.jobDoneAt, fuelToReserveAt: t.eta.fuelToReserveAt } : undefined })), jobs: st.jobs, waitingForAPerson: st.tasks.filter(k => k.state !== 'done').map(k => k.text), spray: st.weather ? { status: st.weather.status, reason: st.weather.reason } : null, latestPlanChange: lp ? { at: lp.clock, text: lp.text, reasons: lp.lines || [] } : null, fields: st.fields.map(f => ({ name: f.name, status: f.summaryText, next: f.nextText, queued: f.queuedText })) }; } },
+    { name: 'field_report', description: 'Everything known about one field: what is on it, when it was planted, how far along it is and how sure that is, when it should be ready, stand, soil moisture, pests, weather effect, work queued. With send_drone true the drone also flies there for a fresh survey and its camera is shown to the operator.',
+      input_schema: { type: 'object', properties: { field: { type: 'string' }, send_drone: { type: 'boolean' } }, required: ['field'] },
+      handler: async ({ field, send_drone }) => { const f = fieldByName(field); if (!f) throw new Error(`No field called "${field}". Fields: ${scenario.fields.map(x => x.name).join(', ')}.`); const r = fieldStatus().find(x => x.name === f.name); const sent = send_drone ? droneScan(f.name) : false; return { ...r, droneSent: !!sent }; },
+      summary: ({ send_drone }, out) => (send_drone && out?.droneSent ? `Sent the drone to ${out.name} for a fresh look` : null),
+      drone: ({ send_drone }, out) => (send_drone && out?.droneSent ? { field: out.name } : null) },
+    { name: 'add_jobs', description: 'Put work on the job list for one or more fields. steps is an ordered list from: till (plow), seed (sow), spray, mow. The list rules may refuse (for example sowing before plowing); the reason is returned.',
+      input_schema: { type: 'object', properties: { fields: { type: 'array', items: { type: 'string' } }, steps: { type: 'array', items: { type: 'string', enum: ['till', 'seed', 'spray', 'mow'] } }, priority: { type: 'string', enum: ['high', 'medium', 'low'] }, deadline: { type: 'string', description: 'HH:MM today, default 17:00' } }, required: ['fields', 'steps'] },
+      handler: async ({ fields, steps, priority, deadline }) => { const names = fields.map(n => { const f = fieldByName(n); if (!f) throw new Error(`No field called "${n}".`); return f.name; }); const ids = draftJobs({ fields: names, steps, priority: priority || 'medium', deadline: deadline || '17:00' }); return { added: ids, dayRunning: mode === 'running', note: mode === 'running' ? 'The planner is fitting them in now.' : 'The day has not started; call start_day when the list is ready.' }; },
+      summary: ({ fields, steps }, out) => `Added ${out.added.length} job(s): ${steps.map(x => STEP_WORD[x] || x).join(' then ')} on ${fields.join(', ')}` },
+    { name: 'remove_job', description: 'Take a job off the list (only jobs not yet sent to the planner, and any job that waits for it).', input_schema: { type: 'object', properties: { job: { type: 'string' } }, required: ['job'] },
+      handler: async ({ job }) => { removeDraft(job); return `Removed ${job}.`; }, summary: ({ job }) => `Removed job ${job}` },
+    { name: 'start_day', description: 'Start the day: send the job list to the planner and the tractors.', input_schema: { type: 'object', properties: {} },
+      handler: async () => { startDay(); return 'The day has started.'; }, summary: () => 'Started the day' },
+    { name: 'why_job', description: 'Why a job is with its tractor and when it will finish, with the alternatives the planner rejected. Needs the job id (for example N3).', input_schema: { type: 'object', properties: { job: { type: 'string' } }, required: ['job'] },
+      handler: async ({ job }) => [].concat(sim.dispatcher.why(sim, job)) },
+    { name: 'change_priority', description: 'Change a job\'s priority so the planner brings it forward or pushes it back. The planner re-plans at once.', input_schema: { type: 'object', properties: { job: { type: 'string' }, priority: { type: 'string', enum: ['high', 'medium', 'low'] }, reason: { type: 'string' } }, required: ['job', 'priority'] },
+      handler: async ({ job, priority, reason }) => { if (!sim.jobs.get(job)) throw new Error(`No job ${job} with the planner.`); sim.inject({ type: 'priority_change', job, priority, note: reason || 'operator request', source: 'operator', signal: 'Operator, through the assistant' }); return `${job} is now ${priority} priority.`; },
+      summary: ({ job, priority }) => `Changed ${job} to ${priority} priority` },
+    { name: 'set_ai_drive', description: 'Switch "Let the AI drive" on or off. On: the crop manager queues the plowing and sowing each field needs and starts the day.', input_schema: { type: 'object', properties: { on: { type: 'boolean' } }, required: ['on'] },
+      handler: async ({ on }) => { setAiDrive(on); return `AI drive is ${aiDrive ? 'on' : 'off'}.`; }, summary: ({ on }) => `Switched AI drive ${on ? 'on' : 'off'}` },
+    { name: 'pick_crop', description: 'Choose the crop to sow next on a plowed field (corn, soybeans, wheat, hay, alfalfa, orchard).', input_schema: { type: 'object', properties: { field: { type: 'string' }, crop: { type: 'string' } }, required: ['field', 'crop'] },
+      handler: async ({ field, crop }) => { const f = fieldByName(field), c = String(crop).toLowerCase(); if (!f) throw new Error(`No field called "${field}".`); if (!SEASON_DAYS[c]) throw new Error(`Unknown crop: ${crop}.`); Object.assign(fieldRecord[f.name], { nextCrop: c, cropPicked: true }); saveRecord(f.name); return `${f.name} will be sown with ${c}.`; },
+      summary: ({ field, crop }) => `Picked ${crop} for ${field}` },
+  ],
+  // Without the model: a field named in the question still gets its report and the drone.
+  fallback: (text, actions, state) => {
+    const f = scenario.fields.find(x => text.toLowerCase().includes(x.name.toLowerCase()));
+    if (!f) return null;
+    const r = fieldStatus().find(x => x.name === f.name);
+    if (droneScan(f.name)) { actions.push({ tool: 'field_report', summary: `Sent the drone to ${f.name} for a fresh look` }); state.drone = { field: f.name }; }
+    return `${f.name}: ${r.summaryText}. ${r.confidenceText || ''} ${r.nextText || ''} The drone is on its way; its camera is below. (Answered from the records without the language model, which could not be reached.)`.replace(/\s+/g, ' ');
+  },
+});
 
 function droneTick(dt) {
   escortSprayer();
@@ -1170,6 +1226,21 @@ function snapshot() {
 }
 const PAGE_PORT = Number(opt('page', 5190));
 const server = http.createServer((req, res) => {
+  if (req.url === '/chat/history') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify({ messages: chat.history() })); }
+  if (req.method === 'POST' && req.url === '/chat/reset') { chat.reset(); res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end('{"ok":true}'); }
+  if (req.method === 'POST' && req.url === '/chat') {
+    let body = ''; req.on('data', c => { body += c; });
+    req.on('end', async () => {
+      try {
+        const text = JSON.parse(body || '{}').text;
+        trail('operator', 'assistant', 'chat', String(text || '').slice(0, 300));
+        const msg = await chat.send(text);
+        trail('assistant', 'operator', 'chat', msg.text.slice(0, 400), msg.actions.length ? { actions: msg.actions.map(a => a.summary) } : {});
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(msg));
+      } catch (err) { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ role: 'assistant', text: String(err.message), clock: fmtTime(sim.time), actions: [], drone: null })); }
+    });
+    return;
+  }
   // "Why?" for any job: the planner's own reasons for who has it and when it will finish.
   const why = req.method === 'GET' && req.url.match(/^\/why\/([\w-]+)$/);
   if (why) {
@@ -1253,7 +1324,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'POST' && req.url === '/agent/say') return readBody((b) => { const text = String(b.text || '').slice(0, 400); trail(String(b.from || 'agent'), String(b.to || 'operator'), String(b.type || 'note'), text); roundLines.push({ id: `x${roundLines.length}`, topicId: 'outside', topic: 'From another agent', agent: String(b.from || 'agent'), role: '', text, kind: 'says', clock: fmtTime(sim.time) }); ok(); });
   if (req.method === 'POST' && req.url.startsWith('/cmd/')) { command(decodeURIComponent(req.url.slice(5))); res.writeHead(200); return res.end('ok'); }
   res.writeHead(200, { 'Content-Type': 'text/html' });
-  const page = req.url.split('?')[0] === '/3d' && fs.existsSync(path.join(here, 'live3d.html')) ? 'live3d.html' : 'live.html';
+  const want = req.url.split('?')[0];
+  const page = want === '/3d' && fs.existsSync(path.join(here, 'live3d.html')) ? 'live3d.html' : want === '/chat' && fs.existsSync(path.join(here, 'chat.html')) ? 'chat.html' : 'live.html';
   res.end(fs.readFileSync(path.join(here, page)));
 });
 // When this process restarts itself (Start over), the old one may still hold the port for a moment.

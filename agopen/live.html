@@ -41,8 +41,8 @@
   .toplink:hover { border-color:var(--ink2); }
 
   /* ---- Grid ---- */
-  main { display:grid; grid-template-columns:320px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
-  .col { display:grid; gap:12px; min-width:0; align-content:start; }
+  main { display:grid; grid-template-columns:400px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
+  .col { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; min-width:0; align-content:start; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:3px; min-width:0; }
   .phead { display:flex; align-items:baseline; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
   .phead h2 { margin:0; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink); white-space:nowrap; }
@@ -63,19 +63,21 @@
   button.bad:hover:not(:disabled), #startover:hover:not(:disabled) { border-color:var(--fault); background:#fbf0ed; }
 
   /* ---- Add jobs ---- */
-  #builder { display:grid; gap:14px; padding:12px; font-size:13px; }
+  #builder { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding:12px; font-size:13px; }
   #builder .banner { border-left:3px solid var(--accent); background:#edf2ea; padding:7px 10px; font-size:13px; }
   .step { display:flex; align-items:center; gap:8px; font-weight:650; font-size:13px; margin-bottom:7px; }
   .step .n { display:inline-grid; place-items:center; width:18px; height:18px; border:1px solid var(--ink); border-radius:50%; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; flex:none; }
-  #chips, #fieldchips { display:flex; gap:5px; flex-wrap:wrap; }
-  #chips button, #fieldchips button { padding:6px 9px; font-size:13px; }
+  #chips, #fieldchips, #pickchips { display:flex; gap:5px; flex-wrap:wrap; }
+  #chips button, #fieldchips > button, #pickchips button { padding:6px 9px; font-size:13px; }
   #chips button { flex:1 1 0; min-width:60px; }
-  #chips button.on, #fieldchips button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600; }
-  #picked, #stepsum { margin-top:6px; font-size:12.5px; }
-  .pair { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+  #chips button.on, #fieldchips > button.on, #pickchips button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600; }
+  #picked { margin-top:6px; font-size:12.5px; }
+  #stepsum { margin-left:auto; font-size:12.5px; font-weight:400; white-space:nowrap; }
+  .pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:8px; align-items:end; }
   #builder label { display:grid; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
   #builder select, #builder input { font:inherit; font-size:13px; letter-spacing:0; text-transform:none; color:var(--ink); padding:5px 6px; border:1px solid #c4beb0; border-radius:3px; background:#fff; width:100%; min-width:0; height:31px; }
-  #jadd, #startbtn { width:100%; }
+  #startbtn { width:100%; }
+  #jadd { height:31px; padding:0 14px; white-space:nowrap; }
   #jmsg:empty, #startmsg:empty, #startovermsg:empty { display:none; }
   #jmsg, #startmsg { margin-top:6px; font-size:12.5px; }
   .listhead { display:flex; align-items:baseline; justify-content:space-between; border-top:1px solid var(--line); padding-top:12px; margin-bottom:4px; }
@@ -87,8 +89,100 @@
   #draftlist .jb .lbl { flex:1; min-width:0; }
   #draftlist .jb small { display:block; color:var(--muted); font-size:11.5px; }
   #draftlist .jb button { padding:2px 7px; font-size:12px; }
-  .resetrow { display:flex; align-items:center; gap:8px; border-top:1px solid var(--line); padding-top:10px; flex-wrap:wrap; }
+  .resetrow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:-4px; }
   .resetrow .note { flex:1; min-width:120px; }
+
+  /* ---- Let the AI drive ---- */
+  .aibox { border-bottom:1px solid var(--line); margin:-12px -12px 0; padding:10px 12px; background:#f6f4ec; }
+  #builder label.switch { display:flex; align-items:center; gap:10px; cursor:pointer; font-size:15px; font-weight:650; letter-spacing:0; text-transform:none; color:var(--ink); }
+  #builder #aidrive { position:absolute; opacity:0; width:1px; height:1px; padding:0; border:0; }
+  .switch .track { position:relative; flex:none; width:38px; height:20px; border:1.5px solid var(--ink2); border-radius:10px; background:#fff; }
+  .switch .track::after { content:""; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--ink2); }
+  #aidrive:checked + .track { background:var(--accent); border-color:var(--accent); }
+  #aidrive:checked + .track::after { left:20px; background:#fff; }
+  #aidrive:focus-visible + .track { outline:2px solid var(--accent); outline-offset:2px; }
+  #aihelp { margin-top:5px; color:var(--ink2); font-size:12.5px; }
+  .dayrow { display:flex; align-items:center; gap:6px; }
+  #aimark { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:var(--accent); padding:1px 5px; border-radius:2px; }
+
+  /* ---- Field list (step 1): what is on each field, and the picker ---- */
+  .step button { margin-left:auto; font-weight:400; }
+  #fieldcap, #fieldcond, #fscanmsg { margin-bottom:6px; }
+  #fieldcond { color:var(--ink2); }
+  #fscanmsg:empty { display:none; }
+  #fieldchips.flist { display:block; max-height:clamp(300px, calc(100vh - 470px), 640px); overflow-y:auto; border:1px solid var(--line); border-radius:3px; background:#fff; }
+  .fhead { display:flex; justify-content:space-between; position:sticky; top:0; z-index:1; background:#f3f0e7; border-bottom:1px solid var(--line); padding:4px 8px 4px 30px; }
+  #fieldchips .frow { display:block; width:100%; text-align:left; cursor:pointer; border:0; border-bottom:1px solid var(--line2); border-radius:0; background:transparent; padding:7px 8px; font-size:13px; font-weight:400; color:var(--ink); }
+  #fieldchips .frow:last-child { border-bottom:0; }
+  #fieldchips .frow:hover { background:#f6f4ec; }
+  #fieldchips .frow.on { background:#e7eee2; color:var(--ink); font-weight:400; }
+  .frow > span { display:flex; align-items:baseline; gap:7px; min-width:0; }
+  .frow .pick { flex:none; align-self:center; width:14px; height:14px; border:1.5px solid var(--ink2); border-radius:2px; background:#fff; margin-right:1px; }
+  .frow.on .pick { background:var(--ink); border-color:var(--ink); box-shadow:inset 0 0 0 2px #fff; }
+  .fnm { font-weight:650; font-size:14px; white-space:nowrap; }
+  .fst { flex:1; min-width:0; color:var(--muted); font-size:12px; text-align:right; }
+  .fhv { margin-left:auto; white-space:nowrap; font-variant-numeric:tabular-nums; font-size:13px; }
+  .fhv .pm, .mpct .pm { color:var(--muted); font-size:11.5px; }
+  .fhv .ready { color:var(--working); }
+  .frow .fl2, .frow .fl3 { padding-left:22px; margin-top:4px; }
+  .frow .fl2 { align-items:center; }
+  .mat { position:relative; flex:none; width:76px; height:8px; background:#e1ddd0; }
+  .mat i { position:absolute; top:0; height:100%; }
+  .mat .solid { left:0; background:var(--accent); }
+  .mat .band { background:repeating-linear-gradient(135deg, rgba(30,90,61,.5) 0 2px, rgba(30,90,61,.18) 2px 4px); }
+  .mat .tick { top:-2px; height:12px; width:2px; margin-left:-1px; background:var(--ink); }
+  .mpct { flex:none; font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .fstage { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
+  .frow .fnext { display:block; padding-left:22px; margin-top:4px; font-size:13px; font-weight:600; color:var(--ink); }
+  #fieldchips .fsum { display:flex; align-items:baseline; gap:8px; width:calc(100% - 22px); margin:4px 0 0 22px; padding:4px 7px; text-align:left; font-size:14.5px; font-weight:650; line-height:1.25; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:3px; }
+  #fieldchips .fsum:hover { border-color:var(--accent); }
+  .fsumt { flex:1; min-width:0; }
+  .frf { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+  .frf.sent { color:var(--person); }
+  .fhm { margin-left:auto; font-size:11.5px; color:var(--muted); white-space:nowrap; }
+  .frow > .fconf { display:block; padding-left:22px; margin-top:3px; }
+  #builder label.fsow { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink); }
+  #builder .fsow select { width:auto; height:24px; padding:1px 4px; font-size:12.5px; }
+  #map text.scan { pointer-events:auto; cursor:pointer; }
+  #map text.scan:hover { text-decoration:underline; fill:#161c18; }
+  /* Simple field rows: name + status on line 1, growth bar + one action on line 2 */
+  .fhead { padding-left:8px; }
+  #fieldchips .frow { cursor:default; }
+  #fieldchips .frow:hover { background:transparent; }
+  .frow .fl1 { align-items:flex-start; gap:8px; }
+  #fieldchips .fnm { flex:none; width:96px; padding:5px 0 0; border:0; background:transparent; text-align:left; font-size:14px; font-weight:700; line-height:1.25; white-space:normal; color:var(--ink); cursor:pointer; }
+  #fieldchips .fnm:hover { text-decoration:underline; }
+  #fieldchips .fsum { flex:1; min-width:0; width:auto; margin:0; font-size:13.5px; }
+  .frow .fl2 { padding-left:0; margin-top:6px; gap:8px; flex-wrap:wrap; min-height:26px; }
+  .frow .fl2 .mat { width:64px; }
+  #fieldchips .fdt { padding:0; border:0; background:transparent; font-size:11.5px; color:var(--muted); text-decoration:underline; cursor:pointer; }
+  #fieldchips .fdt:hover { color:var(--ink); }
+  .fr { margin-left:auto; display:flex; align-items:center; gap:6px; min-width:0; }
+  #fieldchips .fact { padding:4px 10px; font-size:13px; font-weight:650; color:var(--accent); border:1px solid var(--accent); background:#fff; white-space:nowrap; }
+  #fieldchips .fact:hover { background:#edf2ea; }
+  .fq { font-size:12px; color:var(--ink2); border:1px dashed #b9b3a4; border-radius:2px; padding:2px 6px; }
+  .frow .fmsg { display:block; margin-top:5px; font-size:12.5px; color:var(--working); font-weight:600; }
+  .frow .fmsg.err { color:var(--fault); }
+  .frow .fdet { display:grid; grid-template-columns:auto minmax(0,1fr); gap:2px 10px; margin-top:7px; padding-top:6px; border-top:1px solid var(--line2); font-size:12.5px; }
+  .fdet .dk { color:var(--muted); white-space:nowrap; }
+  .fdet .low { color:var(--hold); font-weight:600; }
+  .custom { border-top:1px solid var(--line); padding-top:10px; }
+  .custom > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--ink2); width:max-content; }
+  .custom > summary:hover { color:var(--ink); }
+  .custombody { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding-top:10px; }
+  #bbanner { margin-bottom:6px; color:var(--ink2); }
+  .listhead { border-top:0; padding-top:0; }
+  .toplink + .toplink { margin-left:6px; }
+  #map text.sub { font-size:7.2px; }
+  .fconf { flex:1; min-width:0; font-size:11.5px; line-height:1.25; color:var(--muted); }
+  .fconf.low { color:var(--hold); font-weight:600; }
+  .frow .flow { display:block; padding-left:22px; margin-top:3px; font-size:11.5px; font-weight:600; color:var(--hold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .frow .fl3 { flex-wrap:wrap; gap:4px 5px; font-size:11.5px; }
+  .ftag { display:inline-block; font-size:11px; line-height:1.3; padding:1px 5px; border:1px solid var(--line); border-radius:2px; color:var(--ink2); background:#faf8f2; }
+  .ftag.pest { color:#fff; background:var(--fault); border-color:var(--fault); font-weight:600; }
+  .ftag.q { border-style:dashed; }
+  .startrow.stick { position:sticky; bottom:0; z-index:4; }
+  .startrow { background:var(--panel); border-top:1px solid var(--line); margin:0 -12px; padding:10px 12px; }
 
   /* ---- Needs a person ---- */
   #peoplecard { border-color:var(--person); border-left-width:4px; background:#eef4fa; }
@@ -213,7 +307,8 @@
   .trail .fault { font-weight:600; }
 
   /* ---- Plan explanations ---- */
-  #planchange { padding:10px 12px; font-size:13px; }
+  #planchange { padding:10px 12px; font-size:13px; max-height:300px; overflow-y:auto; }
+  .planlines li.warn { color:var(--fault); font-weight:600; }
   .planhead { display:grid; grid-template-columns:40px minmax(0,1fr); gap:6px; }
   .planhead time { color:var(--muted); }
   .planlines { margin:6px 0 0; padding:0 0 0 16px; font-weight:400; }
@@ -228,7 +323,7 @@
   .whyrow .planlines { margin-top:4px; }
   .dronerep { margin-top:8px; padding-top:8px; border-top:1px solid var(--line2); }
 
-  @media (min-width:1700px) { main { grid-template-columns:340px minmax(0,1fr) 400px; } body { font-size:15px; } }
+  @media (min-width:1700px) { main { grid-template-columns:400px minmax(0,1fr) 400px; } body { font-size:15px; } }
   @media (max-width:1320px) {
     .top { flex-wrap:wrap; }
     .brand { order:1; } .clockbox { order:2; } .toplink { order:3; }
@@ -237,7 +332,7 @@
     html { scroll-padding-top:110px; }
   }
   @media (max-width:1180px) {
-    main { grid-template-columns:300px minmax(0,1fr); }
+    main { grid-template-columns:340px minmax(0,1fr); }
     .col.right { grid-column:1 / -1; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
   }
   @media (max-width:860px) {
@@ -262,7 +357,8 @@
     <div class="stat"><span class="k">Fuel truck</span><span class="v" id="st-truck">–</span></div>
     <div class="stat"><span class="k">Drone</span><span class="v" id="st-drone">–</span></div>
   </div>
-  <div class="clockbox"><span id="clock">--:--</span><span id="daystate">Connecting</span></div>
+  <div class="clockbox"><span id="clock">--:--</span><span class="dayrow"><span id="aimark" hidden>AI driving</span><span id="daystate">Connecting</span></span></div>
+  <a class="toplink" href="/chat">Ask the assistant</a>
   <a class="toplink" href="/3d" target="_blank">Open 3D view</a>
 </header>
 <main>
@@ -274,39 +370,52 @@
     <section class="panel">
       <div class="phead"><h2>Add jobs</h2></div>
       <div id="builder">
-        <div class="banner" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
+        <div class="aibox">
+          <label class="switch" for="aidrive"><input type="checkbox" id="aidrive"><span class="track"></span><span class="swl">Let the AI drive</span></label>
+          <div class="note" id="aihelp">Manual: you pick the fields and the work.</div>
+        </div>
         <div>
-          <div class="step"><span class="n">1</span>Pick fields</div>
+          <div class="note" id="fieldcap">What is on each field. Click a status to send the drone for a fresh look.</div>
           <div id="fieldchips"></div>
-          <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
-        </div>
-        <div>
-          <div class="step"><span class="n">2</span>Pick the work, in order</div>
-          <div id="chips">
-            <button type="button" data-type="till">Plow</button>
-            <button type="button" data-type="seed">Sow</button>
-            <button type="button" data-type="spray">Spray</button>
-            <button type="button" data-type="mow">Mow</button>
-          </div>
-          <div id="stepsum" class="muted">None chosen yet.</div>
-        </div>
-        <div>
-          <div class="step"><span class="n">3</span>Add to the list</div>
-          <div class="pair">
-            <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
-            <label>Finish by <input id="jdl" type="time" value="17:00"></label>
-          </div>
-          <button type="button" class="add" id="jadd" disabled>Add to list</button>
-          <div id="jmsg" class="muted"></div>
         </div>
         <div>
           <div class="listhead"><span class="k">Today's job list</span></div>
-          <div id="draftlist" class="muted">Pick fields, choose the work, then Add to list.</div>
+          <div id="draftlist" class="muted">No jobs yet. Use a button beside a field to add its work.</div>
         </div>
-        <div>
+        <div class="startrow">
+          <div class="note" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
           <button type="button" class="go" id="startbtn" disabled>Start the day</button>
           <div id="startmsg" class="muted"></div>
         </div>
+        <details class="custom" id="customjob">
+          <summary>Custom job</summary>
+          <div class="custombody">
+            <div>
+              <div class="step"><span class="n">1</span>Pick fields<button type="button" class="small" id="fscan">Scan picked fields</button></div>
+              <div id="pickchips"></div>
+              <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
+              <div class="note" id="fscanmsg"></div>
+            </div>
+            <div>
+              <div class="step"><span class="n">2</span>Pick the work, in order<span id="stepsum" class="muted">None chosen yet.</span></div>
+              <div id="chips">
+                <button type="button" data-type="till">Plow</button>
+                <button type="button" data-type="seed">Sow</button>
+                <button type="button" data-type="spray">Spray</button>
+                <button type="button" data-type="mow">Mow</button>
+              </div>
+            </div>
+            <div>
+              <div class="step"><span class="n">3</span>Add to the list</div>
+              <div class="pair">
+                <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
+                <label>Finish by <input id="jdl" type="time" value="17:00"></label>
+                <button type="button" class="add" id="jadd" disabled>Add to list</button>
+              </div>
+              <div id="jmsg" class="muted"></div>
+            </div>
+          </div>
+        </details>
         <div class="resetrow">
           <button id="startover" type="button">Start over</button>
           <span class="note">Sends every tractor home and clears the day.</span>
@@ -397,18 +506,128 @@ async function loadFarm() {
   drawFarm();
 }
 let lastChipKey = null;
+// "Refresh" on a field: send the drone to survey just that field. The short note it leaves
+// ("Drone sent") is kept here by field name so the one-second re-render does not wipe it.
+const scanSent = new Map();
+const scanNote = (name) => { const v = scanSent.get(name); return v && Date.now() - v.at < 4000 ? v.text : ''; };
+async function refreshField(name) {
+  if (!name) return;
+  scanSent.set(name, { at: Date.now(), text: 'Sending' });
+  drawFarm();
+  let text = 'Not sent';
+  try {
+    const res = await fetch('/drone/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: [name] }) });
+    if (res.ok) text = 'Drone sent';
+  } catch {}
+  scanSent.set(name, { at: Date.now(), text });
+  drawFarm();
+}
+// While the pointer is down on the map or the field list, their markup is left alone, so the
+// click that follows always lands on the element that was pressed.
+let pressAt = 0;
+const pressing = () => Date.now() - pressAt < 1500;
+document.addEventListener('pointerdown', (e) => { if (e.target.closest && e.target.closest('#map, #fieldchips')) pressAt = Date.now(); }, true);
+window.addEventListener('pointerup', () => { pressAt = 0; }, true);
+window.addEventListener('pointercancel', () => { pressAt = 0; }, true);
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('[data-refresh]');
+  if (b) refreshField(b.getAttribute('data-refresh'));
+});
+document.addEventListener('change', async (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-sow]');
+  if (!sel || !sel.value) return;
+  try { await fetch('/field/crop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: sel.getAttribute('data-sow'), crop: sel.value }) }); } catch {}
+  sel.blur();
+  refresh();
+});
+// Rows whose detail is open, and short per-row notes; both live here so re-renders keep them.
+const openRows = new Set(), rowMsg = new Map();
+const rowNote = (name) => { const v = rowMsg.get(name); return v && Date.now() - v.at < 6000 ? v : null; };
+const fieldRec = (name) => (lastState && Array.isArray(lastState.fields) ? lastState.fields.find(x => x && x.name === name) : null);
+// One click on a field's suggested work adds it to today's list.
+async function addSuggested(name) {
+  const f = fieldRec(name), steps = f && f.suggest && Array.isArray(f.suggest.steps) ? f.suggest.steps : [];
+  if (!steps.length) return;
+  rowMsg.set(name, { at: Date.now(), text: 'Adding', ok: true });
+  drawFarm();
+  let text = 'Added to today\'s list.', ok = true;
+  try {
+    const res = await fetch('/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: [name], steps, priority: 'medium', deadline: '17:00' }) });
+    if (!res.ok) { ok = false; text = `Not added: ${await reasonOf(res)}`; }
+  } catch { ok = false; text = 'Not added: the runner is not reachable.'; }
+  rowMsg.set(name, { at: Date.now(), text, ok });
+  refresh();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!t.closest) return;
+  const d = t.closest('[data-detail]');
+  if (d) { const n = d.getAttribute('data-detail'); openRows.has(n) ? openRows.delete(n) : openRows.add(n); pressAt = 0; drawFarm(); return; }
+  const a = t.closest('[data-suggest]');
+  if (a) { pressAt = 0; addSuggested(a.getAttribute('data-suggest')); }
+});
+// One row of the field list: two lines, with everything else behind "Details".
+// Every value is optional; anything missing is simply left out.
+function fieldRowInner(f) {
+  const name = String(f.name), sent = scanNote(name), open = openRows.has(name), low = f.confidence === 'low';
+  const head = f.summaryText || f.statusText || f.ground || 'No record';
+  let h = `<span class="fl1"><button type="button" class="fnm" data-detail="${esc(name)}" aria-expanded="${open}">${esc(name)}</button><button type="button" class="fsum" data-refresh="${esc(name)}" title="Send the drone to survey ${esc(name)} again"><span class="fsumt">${esc(head)}</span><span class="frf${sent ? ' sent' : ''}">${esc(sent || 'Refresh')}</span></button></span>`;
+  let left = '';
+  if (f.standing && typeof f.maturityPct === 'number' && isFinite(f.maturityPct)) {
+    const m = Math.max(0, Math.min(100, f.maturityPct)), g = Math.max(0, Number(f.marginPct) || 0), lo = Math.max(0, m - g), hi = Math.min(100, m + g);
+    left += `<span class="mat" title="How far along the crop is; the hatched band is the uncertainty"><i class="solid" style="width:${lo}%"></i><i class="band" style="left:${lo}%;width:${hi - lo}%"></i><i class="tick" style="left:${m}%"></i></span><span class="mpct">${Math.round(m)}%${g ? ` <span class="pm">± ${Math.round(g)}</span>` : ''}</span>`;
+  }
+  if (Number(f.pests) > 0) left += `<span class="ftag pest">${esc(f.pests)} pest patch${Number(f.pests) === 1 ? '' : 'es'}</span>`;
+  left += `<button type="button" class="fdt" data-detail="${esc(name)}">${open ? 'Hide details' : 'Details'}</button>`;
+  let right = '';
+  if (f.ground === 'plowed' && Array.isArray(f.cropOptions) && f.cropOptions.length)
+    right += `<label class="fsow">Sow: <select data-sow="${esc(name)}">${f.cropChoice ? '' : '<option value="" disabled selected>pick a plant</option>'}${f.cropOptions.map(c => `<option value="${esc(c)}"${c === f.cropChoice ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`;
+  if (f.queuedText) right += `<span class="fq">${esc(f.queuedText)}</span>`;
+  else if (f.suggest && f.suggest.label && Array.isArray(f.suggest.steps) && f.suggest.steps.length) right += `<button type="button" class="fact" data-suggest="${esc(name)}">${esc(f.suggest.label)}</button>`;
+  h += `<span class="fl2">${left}<span class="fr">${right}</span></span>`;
+  const note = rowNote(name);
+  if (note) h += `<span class="fmsg${note.ok ? '' : ' err'}">${esc(note.text)}</span>`;
+  if (open) {
+    const rows = [['Now', f.statusText], ['Stage', f.stage], ['Harvest', f.harvestText], ['Stand', f.standPct != null ? f.standPct + '%' : ''], ['Soil moisture', f.moisturePct != null ? f.moisturePct + '%' : ''],
+      ['Weather', f.conditionsText], ['Today', f.todayText], ['Planted', f.plantedOn ? f.plantedOn + (f.plantedSource ? ' (' + f.plantedSource + ')' : '') : ''], ['Size', f.acres != null ? f.acres + ' acres' : ''], ['Next', f.nextText]]
+      .filter(r => r[1]).map(r => `<span class="dk">${r[0]}</span><span>${esc(r[1])}</span>`);
+    if (f.confidenceText || low) rows.splice(Math.min(rows.length, 3), 0, `<span class="dk">Drone survey</span><span class="${low ? 'low' : ''}">${esc(f.confidenceText || '')}${low ? (f.confidenceText ? ' · ' : '') + 'scan again' : ''}</span>`);
+    h += `<span class="fdet">${rows.join('') || '<span class="muted">No more on record.</span>'}</span>`;
+  }
+  return h;
+}
 function renderFieldChips() {
+  const fl = lastState && Array.isArray(lastState.fields) ? lastState.fields.filter(f => f && f.name) : [];
+  // Plain chips for the custom job: same class and data-name as the map polygons, so the one
+  // existing click handler picks from both.
+  const pc = document.getElementById('pickchips');
+  const names = farm && Array.isArray(farm.fields) ? farm.fields.map(f => f.name) : fl.map(f => f.name);
+  if (pc && names.length) setHTML(pc, names.map(n => `<button type="button" class="field${picked.has(n) ? ' on' : ''}" data-name="${esc(n)}">${esc(n)}</button>`).join(''));
   const el = document.getElementById('fieldchips');
-  if (!el || !farm || !Array.isArray(farm.fields)) return;
-  const key = farm.fields.map(f => f.name).join('|') + '#' + [...picked].join('|');
-  if (key === lastChipKey) return;
-  lastChipKey = key;
-  // Same class and data-name as the map polygons, so the existing click handler picks them.
-  el.innerHTML = farm.fields.map(f => `<button type="button" class="field${picked.has(f.name) ? ' on' : ''}" data-name="${esc(f.name)}">${esc(f.name)}</button>`).join('');
+  if (!el) return;
+  const cap = document.getElementById('fieldcap');
+  if (cap) cap.hidden = !fl.length;
+  if (!fl.length) { if (lastChipKey !== 'none') { lastChipKey = 'none'; el.className = ''; el.innerHTML = ''; } return; }
+  // The row elements are built once and only their contents are refreshed.
+  const key = 'list#' + fl.map(f => f.name).join('|');
+  if (key !== lastChipKey) {
+    lastChipKey = key;
+    el.className = 'flist';
+    el.innerHTML = fl.map(f => `<div class="frow" data-row="${esc(f.name)}"></div>`).join('');
+  }
+  const rows = el.querySelectorAll('.frow');
+  const held = pressing(), ae = document.activeElement;
+  fl.forEach((f, i) => {
+    const r = rows[i];
+    if (!r) return;
+    // Leave a row alone while it is being pressed or its Sow menu is open.
+    if (held || (ae && ae.tagName === 'SELECT' && r.contains(ae))) return;
+    try { setHTML(r, fieldRowInner(f)); } catch {}
+  });
 }
 function drawFarm() {
-  if (!farm || !farm.home) return;
   try { renderFieldChips(); } catch {}
+  if (!farm || !farm.home) return;
   const svg = document.getElementById('map');
   let x0 = -40, x1 = 40, y0 = -40, y1 = 40;
   const polys = farm.fields.map(f => ({ f, pts: f.boundary.map(([lon, lat]) => proj(lat, lon)) }));
@@ -427,10 +646,21 @@ function drawFarm() {
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     h += `<polygon class="field ${cls} ${picked.has(f.name) ? 'sel' : ''}" data-name="${esc(f.name)}" points="${pts.map(p => p.map(v => v.toFixed(0)).join(',')).join(' ')}"></polygon>`;
     for (const t of f.tracks) h += `<polyline class="line" points="${t.line.map(([lon, lat]) => proj(lat, lon).map(v => v.toFixed(0)).join(',')).join(' ')}"></polyline>`;
-    h += `<text x="${cx.toFixed(0)}" y="${(cy - 1).toFixed(0)}">${esc(f.name)}</text>`;
+    h += `<text x="${cx.toFixed(0)}" y="${(cy - 3).toFixed(0)}">${esc(f.name)}</text>`;
     const open = mine.filter(j => j.status !== 'done' && j.status !== 'cancelled').map(j => `${j.id} ${j.type} ${j.pct}%`).join(' · ');
     const gnd = lastState && lastState.ground && lastState.ground[f.name];
-    h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
+    const rec = lastState && Array.isArray(lastState.fields) ? lastState.fields.find(x => x && x.name === f.name) : null;
+    const xs = pts.map(q => q[0]), cap = Math.max(10, Math.floor((Math.max(...xs) - Math.min(...xs) - 6) / 3.5));
+    const cut = (v) => { const u = String(v ?? ''); return u.length > cap ? u.slice(0, cap - 1).trimEnd() + '…' : u; };
+    if (rec && (rec.summaryText || rec.statusText)) {
+      const full = rec.summaryText || rec.statusText, note = scanNote(f.name);
+      const ls = []; let cur = '';
+      for (const w of String(note || full).split(/\s+/)) { if (cur && (cur + ' ' + w).length > cap) { ls.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
+      if (cur) ls.push(cur);
+      if (ls.length > 3) { ls.length = 3; ls[2] = cut(ls[2] + '…'); }
+      h += `<text class="sub scan" data-refresh="${esc(f.name)}" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}"><title>${esc(full)}. Click to send the drone to survey this field again.</title>${ls.map((l, k) => `<tspan x="${cx.toFixed(0)}" dy="${k ? 7.6 : 0}">${esc(cut(l))}</tspan>`).join('')}</text>`;
+      if (open) h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7 + ls.length * 7.6).toFixed(0)}">${esc(cut(open))}</text>`;
+    } else h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
   }
   // Ground already worked, as strips one implement-width wide.
   const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#1f6f8b', mow: '#c99700' };
@@ -450,7 +680,7 @@ function drawFarm() {
     if (dr.path && dr.path.length > 1) h += `<polyline class="dronepath" points="${[{ e: dr.e, n: dr.n }, ...dr.path].map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
     h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#161c18" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#161c18" stroke-width="1.2"></line></g>`;
   }
-  setHTML(svg, h);
+  if (!pressing()) setHTML(svg, h);
 }
 // ---- Job list builder ----
 const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
@@ -462,6 +692,7 @@ const $ = (id) => document.getElementById(id);
 
 function renderPicked() {
   $('picked').textContent = [...picked].join(', ') || 'Click fields on the map, or pick them here.';
+  const cj = $('customjob'); if (cj && picked.size) cj.open = true;
   updateAdd();
 }
 function renderSteps() {
@@ -492,7 +723,7 @@ function renderBuilder(s) {
   const key = JSON.stringify([building, list]);
   if (key === lastListKey) return;
   lastListKey = key;
-  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'Pick fields, choose the work, then Add to list.'; return; }
+  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet. Use a button beside a field to add its work.'; return; }
   const byField = new Map();
   for (const j of list) { if (!byField.has(j.field)) byField.set(j.field, []); byField.get(j.field).push(j); }
   const STATUS = { draft: 'Not started', waiting: 'Waiting', released: 'Sent to the planner' };
@@ -510,6 +741,7 @@ async function reasonOf(res) { try { return (await res.text()).trim() || `Error 
 document.addEventListener('click', async (e) => {
   const t = e.target;
   if (!t.closest) return;
+  if (t.closest('[data-refresh], .fsow')) return; // Refresh and the Sow menu do not pick the field
   const el = t.closest('.field');
   if (el) {
     const n = el.dataset.name;
@@ -605,7 +837,9 @@ function renderJobs(s) {
 // Plain-language reasons attached to a re-plan message (optional fields).
 function planLines(r) {
   const lines = r && Array.isArray(r.lines) ? r.lines : [];
-  return (lines.length ? `<ul class="planlines">${lines.map(l => `<li>${esc(String(l).replace(/^\s*[•·]\s*/, ''))}</li>`).join('')}</ul>` : '') + (r && r.footer ? `<div class="planfoot">${esc(r.footer)}</div>` : '');
+  // Lines the planner marks with a warning sign are shown as warnings, without the sign.
+  const li = (l) => { const t = String(l ?? '').replace(/^\s*[•·]\s*/, ''), w = /^\s*\u26a0\ufe0f?\s*/.test(t); return `<li${w ? ' class="warn"' : ''}>${esc(t.replace(/^\s*\u26a0\ufe0f?\s*/, ''))}</li>`; };
+  return (lines.length ? `<ul class="planlines">${lines.map(li).join('')}</ul>` : '') + (r && r.footer ? `<div class="planfoot">${esc(r.footer)}</div>` : '');
 }
 function renderPlanChange(s) {
   const el = document.getElementById('planchange');
@@ -614,6 +848,29 @@ function renderPlanChange(s) {
   setHTML(el, r ? `<div class="planhead"><time>${esc(r.clock)}</time><b>${esc(r.text)}</b></div>${planLines(r) || '<div class="muted planfoot">No job moved to another tractor or time.</div>'}`
     : '<div class="muted">No plan change yet. When the plan changes, what moved and why is listed here.</div>');
 }
+
+// ---- Let the AI drive: the switch follows the state, except while its own request is in flight ----
+let aiBusy = false;
+const AI_HELP_OFF = 'Manual: you pick the fields and the work.';
+const AI_HELP_ON = 'The crop manager reads each field\'s status, queues the plowing, sowing and surveys it needs, and starts the day. You can still add jobs yourself.';
+function renderAi(s) {
+  const cb = document.getElementById('aidrive'), on = !!(s && s.ai && s.ai.on);
+  if (cb) {
+    if (!aiBusy) cb.checked = on;
+    const help = document.getElementById('aihelp');
+    if (help) help.textContent = cb.checked ? AI_HELP_ON : AI_HELP_OFF;
+  }
+  const mk = document.getElementById('aimark');
+  if (mk) mk.hidden = !on;
+}
+document.getElementById('aidrive').addEventListener('change', async (e) => {
+  const cb = e.target;
+  aiBusy = true;
+  document.getElementById('aihelp').textContent = cb.checked ? AI_HELP_ON : AI_HELP_OFF;
+  try { await fetch('/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on: cb.checked }) }); } catch { /* not live yet, or the runner is away: the next refresh puts the switch back */ }
+  aiBusy = false;
+  refresh();
+});
 
 // ---- At-a-glance counters in the top bar, all computed from the same state ----
 const DRONE_SHORT = { docked: 'Docked', flying: 'Flying', hovering: 'Circling', escorting: 'Wind watch', scanning: 'Mapping', spraying: 'Spraying', returning: 'Returning', charging: 'Charging' };
@@ -692,12 +949,14 @@ function build(s) {
 
 async function refresh() {
   let s;
-  try { s = await (await fetch('/state', { cache: 'no-store' })).json(); } catch { document.getElementById('clock').textContent = 'runner offline'; return; }
+  try { s = await (await fetch('/state', { cache: 'no-store' })).json(); } catch { document.getElementById('clock').textContent = 'runner offline'; const ds = document.getElementById('daystate'); if (ds) ds.textContent = 'Not connected'; return; }
   lastState = s;
   if (!built) { build(s); loadFarm(); }
   drawFarm();
   try { renderBuilder(s); } catch {}
+  try { document.querySelector('.startrow').classList.toggle('stick', modeOf(s) === 'building'); } catch {}
   try { renderSummary(s); } catch {}
+  try { renderAi(s); } catch {}
   const scn = document.getElementById('scn'), scTxt = String(s.scenario ?? '');
   scn.textContent = scTxt.includes(': ') ? scTxt.slice(scTxt.indexOf(': ') + 2) : scTxt;
   scn.title = scTxt;
@@ -763,10 +1022,19 @@ async function refresh() {
     `<div class="${r.type === 'fault' ? 'fault' : r.type === 'plan' ? 'plan' : ''}"><time>${r.clock}</time><div><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}${planLines(r)}</div></div>`).join('') || '<div class="muted">No messages yet. Agents start talking when the day starts.</div>');
   renderJobs(s);
 }
-document.getElementById('dscan').addEventListener('click', async () => {
-  const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
-  document.getElementById('droneinfo').textContent = res.ok ? 'Drone sent.' : await res.text();
-});
+// One handler for both scan buttons (drone card and field list).
+async function scanPicked() {
+  let msg;
+  try {
+    const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
+    msg = res.ok ? 'Drone sent.' : await res.text();
+  } catch { msg = 'Drone not sent: the runner is not reachable.'; }
+  document.getElementById('droneinfo').textContent = msg;
+  const fm = document.getElementById('fscanmsg');
+  if (fm) fm.textContent = msg;
+}
+document.getElementById('dscan').addEventListener('click', scanPicked);
+document.getElementById('fscan').addEventListener('click', scanPicked);
 document.getElementById('vehtoggle').addEventListener('click', () => {
   const ds = [...document.querySelectorAll('#tractors details')], open = ds.some(x => !x.open);
   ds.forEach(x => { x.open = open; });
