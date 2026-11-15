@@ -46,8 +46,28 @@
   button.small { font-size:12px; padding:2px 8px; float:right; }
   #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
   #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
-  .roundtable { max-height:300px; overflow:auto; display:grid; gap:6px; }
+  /* Roundtable box: grey-blue panel, dark-blue scrollbar, "← newest" read down the right edge. */
+  .rt-wrap { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:stretch; }
+  .roundtable { --rt-panel:#d8e0ea; --rt-track:#c2ccd8; --rt-navy:#1f3a5f; --rt-rule:#bfc9d5;
+    max-height:300px; overflow:auto; display:grid; gap:6px; background:var(--rt-panel); border-radius:8px; padding:8px 10px;
+    scrollbar-color:var(--rt-navy) var(--rt-track); scrollbar-width:thin; }
+  .roundtable::-webkit-scrollbar { width:10px; }
+  .roundtable::-webkit-scrollbar-track { background:var(--rt-track); border-radius:8px; }
+  .roundtable::-webkit-scrollbar-thumb { background:var(--rt-navy); border-radius:8px; border:2px solid var(--rt-track); }
+  .roundtable::-webkit-scrollbar-thumb:hover { background:#16304f; }
+  .roundtable .rt-topic { color:#4f5d70; border-top-color:var(--rt-rule); }
+  .roundtable .rt-meta { color:#56657a; }
+  .rt-newest { writing-mode:vertical-rl; color:#1f3a5f; font-size:11px; font-weight:700; letter-spacing:.04em; user-select:none; }
   .rt-topic { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; border-top:1px solid var(--line); padding-top:6px; }
+  /* One block per discussion. Topics with a colour get a tinted card with a stronger left edge. */
+  .rt-block { display:grid; gap:6px; }
+  .rt-block[class*="rt-c-"] { border-radius:8px; border-left:4px solid var(--rt-edge); background:var(--rt-bg); padding:6px 8px 8px; }
+  .rt-block[class*="rt-c-"] .rt-topic { margin-top:0; border-top:0; padding-top:0; color:var(--rt-edge); font-weight:700; }
+  .rt-c-resume    { --rt-bg:#eef3e2; --rt-edge:#8aa35c; } /* Spraying may resume: light, dry green */
+  .rt-c-stopped   { --rt-bg:#d6f0d0; --rt-edge:#2e9e44; } /* Spraying stopped by the weather: darker, lively green */
+  .rt-c-refuel    { --rt-bg:#fbe5c8; --rt-edge:#d9822b; } /* Refuel T#: light orange */
+  .rt-c-implement { --rt-bg:#ead6bf; --rt-edge:#8a5a2b; } /* Change T#'s implement: darker brown */
+  .rt-c-newjobs   { --rt-bg:#dcebfb; --rt-edge:#1c7ed6; } /* New job(s) slotted into the plan: blue */
   .rt-line { display:grid; grid-template-columns:132px 1fr; gap:8px; align-items:start; font-size:13px; }
   .rt-who { font-weight:700; font-size:12px; padding:2px 8px; border-radius:10px; color:#fff; background:#6b756e; text-align:center; }
   .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
@@ -130,7 +150,7 @@
   </div>
   <div class="card">
     <h2>Roundtable <small class="muted" id="rtmeta">the managers discuss each event; the tractors have already acted</small></h2>
-    <div id="roundtable" class="roundtable"></div>
+    <div class="rt-wrap"><div id="roundtable" class="roundtable"></div><span class="rt-newest" aria-hidden="true">&larr; newest</span></div>
   </div>
   <div class="row">
     <div class="card">
@@ -405,11 +425,22 @@ async function refresh() {
   const rtKey = (s.roundtable || []).length + ':' + ((s.roundtable || [])[0] || {}).id;
   if (rtEl.dataset.key !== rtKey) {
     rtEl.dataset.key = rtKey;
+    // Colour a discussion by its topic title (refuel and implement changes share one type, so the title decides).
+    const rtColour = (t = '') => /^Spraying may resume/i.test(t) ? 'rt-c-resume'
+      : /^Spraying stopped/i.test(t) ? 'rt-c-stopped'
+      : /implement to/i.test(t) ? 'rt-c-implement'
+      : /^Refuel T\d|^Fuel truck to T\d|^Fuel for T\d/i.test(t) ? 'rt-c-refuel'
+      : /new job\(s\) slotted into the plan/i.test(t) ? 'rt-c-newjobs' : '';
     let lastTopic = null, out = '';
     for (const l of (s.roundtable || [])) {
-      if (l.topicId !== lastTopic) { out += `<div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`; lastTopic = l.topicId; }
+      if (l.topicId !== lastTopic) {
+        if (lastTopic !== null) out += '</div>';
+        out += `<div class="rt-block ${rtColour(l.topic)}"><div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`;
+        lastTopic = l.topicId;
+      }
       out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who" style="background:${RT_COLOR[l.agent] || '#6b756e'}">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
     }
+    if (lastTopic !== null) out += '</div>';
     rtEl.innerHTML = out || '<div class="muted">Nothing to discuss yet. The managers speak when the day starts, a tractor faults, a job finishes, or work is held.</div>';
   }
   if (s.roundtableStats) document.getElementById('rtmeta').textContent = `${s.roundtableStats.lines || 0} lines · ${s.roundtableStats.modelCalls || 0} model calls · ${s.roundtableStats.toolCalls || 0} tool calls · ${s.roundtableStats.fallbacks || 0} rule-written`;
