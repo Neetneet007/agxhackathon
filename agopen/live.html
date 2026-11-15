@@ -41,7 +41,7 @@
   .toplink:hover { border-color:var(--ink2); }
 
   /* ---- Grid ---- */
-  main { display:grid; grid-template-columns:400px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
+  main { display:grid; grid-template-columns:340px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
   .col { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; min-width:0; align-content:start; }
   .panel { background:var(--panel); border:1px solid var(--line); border-radius:3px; min-width:0; }
   .phead { display:flex; align-items:baseline; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
@@ -323,7 +323,62 @@
   .whyrow .planlines { margin-top:4px; }
   .dronerep { margin-top:8px; padding-top:8px; border-top:1px solid var(--line2); }
 
-  @media (min-width:1700px) { main { grid-template-columns:400px minmax(0,1fr) 400px; } body { font-size:15px; } }
+  /* ---- Today's jobs (left) ---- */
+  #planbtn { width:100%; font-size:14px; font-weight:650; padding:9px 14px; margin-bottom:6px; }
+  .tj { display:grid; grid-template-columns:10px minmax(0,1fr) auto; gap:2px 8px; align-items:baseline; padding:6px 0; border-bottom:1px solid var(--line2); font-size:13px; }
+  .tj:last-child { border-bottom:0; }
+  .tj.done { color:var(--muted); }
+  .tj .tjm { grid-column:2 / 3; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .tj .jst { grid-row:1 / 3; grid-column:3; align-self:center; font-size:12px; }
+  .pdot { width:9px; height:9px; border-radius:50%; border:1.5px solid var(--ink); background:var(--ink); align-self:center; }
+  .pdot.medium { background:#9aa19b; border-color:#9aa19b; } .pdot.low { background:transparent; border-color:#9aa19b; }
+  .late { color:var(--fault); font-weight:650; }
+
+  /* ---- Plan jobs dialog ---- */
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(22,28,24,.5); display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; }
+  .modal[hidden] { display:none; }
+  .dialog { width:min(1100px,100%); max-height:90vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--ink); border-radius:4px; }
+  .dhead { display:flex; align-items:baseline; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .dhead h2 { margin:0; font-size:16px; font-weight:700; }
+  .dhead button { margin-left:auto; }
+  .dbody { overflow-y:auto; padding:0 14px 16px; }
+  .dbody h3 { margin:14px 0 6px; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  .dbody section + section { border-top:1px solid var(--line); margin-top:14px; }
+  #prinote:empty { display:none; }
+  #prinote { margin-bottom:6px; color:var(--ink); font-size:13px; border-left:3px solid var(--accent); padding-left:8px; }
+  #plantasks select { font:inherit; font-size:13px; padding:3px 4px; border:1px solid #c4beb0; border-radius:3px; background:#fff; }
+  #plantasks tr.donerow td { color:var(--muted); }
+  #plantasks th:first-child, #plantasks td:first-child { padding-left:0; }
+  #fieldchips.flist { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; max-height:none; overflow:visible; border:0; background:transparent; }
+  #fieldchips .frow, #fieldchips .frow:last-child { border:1px solid var(--line); border-radius:3px; background:#fff; padding:8px; }
+  .dbody .custom { margin-top:12px; }
+  .dbody .custombody { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; }
+  .dbody #builderless { display:none; }
+  .dbody label { display:grid; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .dbody .pair select, .dbody .pair input { font:inherit; font-size:13px; letter-spacing:0; text-transform:none; color:var(--ink); padding:5px 6px; border:1px solid #c4beb0; border-radius:3px; background:#fff; width:100%; min-width:0; height:31px; }
+  .dbody label.fsow { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink); }
+  .dbody .fsow select { font:inherit; font-size:12.5px; height:24px; padding:1px 4px; border:1px solid #c4beb0; border-radius:3px; background:#fff; }
+  /* Schedule */
+  #gantt { font-size:12px; }
+  .gaxis, .glane { display:grid; grid-template-columns:92px minmax(0,1fr); align-items:center; }
+  .gticks { position:relative; height:18px; }
+  .gt { position:absolute; top:0; transform:translateX(-50%); font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .gt.first { transform:none; } .gt.last { transform:translateX(-100%); }
+  .glane { border-top:1px solid var(--line2); }
+  .gname { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gtrack { position:relative; height:36px; background:#fff; border-left:1px solid var(--line); border-right:1px solid var(--line); }
+  .gg { position:absolute; top:0; bottom:0; width:1px; background:var(--line2); }
+  .gb { position:absolute; top:7px; height:22px; min-width:2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:11.5px; line-height:22px; padding:0 5px; color:#fff; background:var(--ink2); border-radius:2px; }
+  .gb.till { background:#6d4c41; } .gb.seed { background:#2e7d32; } .gb.spray { background:#4f7186; } .gb.mow { background:#7d7a2a; }
+  .gb.travel, .gb.travel-depot { top:15px; height:6px; padding:0; border-radius:0; background:#c9c3b3; }
+  .gb.swap, .gb.refuel { padding:0; background:repeating-linear-gradient(135deg, #a8841f 0 3px, #dcc277 3px 6px); }
+  .gnow { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:var(--fault); z-index:2; }
+  .gleg { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:8px; font-size:11.5px; color:var(--ink2); }
+  .gleg span { display:inline-flex; align-items:center; gap:5px; }
+  .gleg i { display:inline-block; width:14px; height:9px; }
+  @media (max-width:1000px) { #fieldchips.flist, .dbody .custombody { grid-template-columns:minmax(0,1fr); } }
+
+  @media (min-width:1700px) { main { grid-template-columns:360px minmax(0,1fr) 400px; } body { font-size:15px; } }
   @media (max-width:1320px) {
     .top { flex-wrap:wrap; }
     .brand { order:1; } .clockbox { order:2; } .toplink { order:3; }
@@ -345,6 +400,16 @@
     .stat { padding:6px 10px; }
   }
 </style>
+<!-- Map-only view (?map=1): just the farm map, for embedding above the assistant's chat. -->
+<style>
+  html.maponly header.top, html.maponly .col.left, html.maponly .col.right, html.maponly .col.centre > section:not(:first-child), html.maponly .col.centre > section:first-child > *:not(#map) { display: none !important; }
+  html.maponly, html.maponly body { margin: 0; height: 100%; overflow: hidden; }
+  html.maponly main { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  html.maponly .col.centre { display: block !important; }
+  html.maponly .col.centre > section:first-child { border: 0 !important; margin: 0 !important; padding: 0 !important; background: transparent !important; }
+  html.maponly #map { display: block; width: 100vw !important; height: 100vh !important; max-height: none !important; }
+</style>
+<script>if (new URLSearchParams(location.search).has('map')) document.documentElement.classList.add('maponly');</script>
 </head>
 <body>
 <header class="top">
@@ -368,54 +433,22 @@
       <div id="people"></div>
     </section>
     <section class="panel">
-      <div class="phead"><h2>Add jobs</h2></div>
+      <div class="phead"><h2>Today's jobs</h2></div>
       <div id="builder">
         <div class="aibox">
           <label class="switch" for="aidrive"><input type="checkbox" id="aidrive"><span class="track"></span><span class="swl">Let the AI drive</span></label>
           <div class="note" id="aihelp">Manual: you pick the fields and the work.</div>
         </div>
         <div>
-          <div class="note" id="fieldcap">What is on each field. Click a status to send the drone for a fresh look.</div>
-          <div id="fieldchips"></div>
-        </div>
-        <div>
-          <div class="listhead"><span class="k">Today's job list</span></div>
-          <div id="draftlist" class="muted">No jobs yet. Use a button beside a field to add its work.</div>
+          <div id="todaylist" hidden></div>
+          <div id="draftlist" class="muted">No jobs yet. Use Plan jobs to add work.</div>
         </div>
         <div class="startrow">
           <div class="note" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
+          <button type="button" id="planbtn">Plan jobs</button>
           <button type="button" class="go" id="startbtn" disabled>Start the day</button>
           <div id="startmsg" class="muted"></div>
         </div>
-        <details class="custom" id="customjob">
-          <summary>Custom job</summary>
-          <div class="custombody">
-            <div>
-              <div class="step"><span class="n">1</span>Pick fields<button type="button" class="small" id="fscan">Scan picked fields</button></div>
-              <div id="pickchips"></div>
-              <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
-              <div class="note" id="fscanmsg"></div>
-            </div>
-            <div>
-              <div class="step"><span class="n">2</span>Pick the work, in order<span id="stepsum" class="muted">None chosen yet.</span></div>
-              <div id="chips">
-                <button type="button" data-type="till">Plow</button>
-                <button type="button" data-type="seed">Sow</button>
-                <button type="button" data-type="spray">Spray</button>
-                <button type="button" data-type="mow">Mow</button>
-              </div>
-            </div>
-            <div>
-              <div class="step"><span class="n">3</span>Add to the list</div>
-              <div class="pair">
-                <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
-                <label>Finish by <input id="jdl" type="time" value="17:00"></label>
-                <button type="button" class="add" id="jadd" disabled>Add to list</button>
-              </div>
-              <div id="jmsg" class="muted"></div>
-            </div>
-          </div>
-        </details>
         <div class="resetrow">
           <button id="startover" type="button">Start over</button>
           <span class="note">Sends every tractor home and clears the day.</span>
@@ -482,6 +515,57 @@
     </section>
   </div>
 </main>
+<!-- Plan jobs dialog. Its containers are static; only their contents are re-rendered. -->
+<div id="planmodal" class="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="planttl">
+    <div class="dhead"><h2 id="planttl">Plan jobs</h2><span class="muted" id="plansub"></span><button type="button" id="planclose">Close</button></div>
+    <div class="dbody">
+      <section>
+        <h3>Tasks, most urgent first</h3>
+        <div class="note" id="prinote"></div>
+        <div class="scroll"><table id="plantasks"></table></div>
+      </section>
+      <section>
+        <h3>Add work</h3>
+        <div class="note" id="fieldcap">What is on each field. Click a status to send the drone for a fresh look.</div>
+        <div id="fieldchips"></div>
+        <details class="custom" id="customjob">
+          <summary>Custom job</summary>
+          <div class="custombody">
+            <div>
+              <div class="step"><span class="n">1</span>Pick fields<button type="button" class="small" id="fscan">Scan picked fields</button></div>
+              <div id="pickchips"></div>
+              <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
+              <div class="note" id="fscanmsg"></div>
+            </div>
+            <div>
+              <div class="step"><span class="n">2</span>Pick the work, in order<span id="stepsum" class="muted">None chosen yet.</span></div>
+              <div id="chips">
+                <button type="button" data-type="till">Plow</button>
+                <button type="button" data-type="seed">Sow</button>
+                <button type="button" data-type="spray">Spray</button>
+                <button type="button" data-type="mow">Mow</button>
+              </div>
+            </div>
+            <div>
+              <div class="step"><span class="n">3</span>Add to the list</div>
+              <div class="pair">
+                <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
+                <label>Finish by <input id="jdl" type="time" value="17:00"></label>
+                <button type="button" class="add" id="jadd" disabled>Add to list</button>
+              </div>
+              <div id="jmsg" class="muted"></div>
+            </div>
+          </div>
+        </details>
+      </section>
+      <section>
+        <h3>Schedule today</h3>
+        <div id="gantt"></div>
+      </section>
+    </div>
+  </div>
+</div>
 <script>
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cmd = (c) => fetch('/cmd/' + encodeURIComponent(c), { method: 'POST' });
@@ -526,7 +610,7 @@ async function refreshField(name) {
 // click that follows always lands on the element that was pressed.
 let pressAt = 0;
 const pressing = () => Date.now() - pressAt < 1500;
-document.addEventListener('pointerdown', (e) => { if (e.target.closest && e.target.closest('#map, #fieldchips')) pressAt = Date.now(); }, true);
+document.addEventListener('pointerdown', (e) => { if (e.target.closest && e.target.closest('#map, #fieldchips, #plantasks')) pressAt = Date.now(); }, true);
 window.addEventListener('pointerup', () => { pressAt = 0; }, true);
 window.addEventListener('pointercancel', () => { pressAt = 0; }, true);
 document.addEventListener('click', (e) => {
@@ -723,7 +807,7 @@ function renderBuilder(s) {
   const key = JSON.stringify([building, list]);
   if (key === lastListKey) return;
   lastListKey = key;
-  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet. Use a button beside a field to add its work.'; return; }
+  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet. Use Plan jobs to add work.'; return; }
   const byField = new Map();
   for (const j of list) { if (!byField.has(j.field)) byField.set(j.field, []); byField.get(j.field).push(j); }
   const STATUS = { draft: 'Not started', waiting: 'Waiting', released: 'Sent to the planner' };
@@ -872,6 +956,108 @@ document.getElementById('aidrive').addEventListener('change', async (e) => {
   refresh();
 });
 
+// ---- Plan jobs: today's list in the left panel, and the planning dialog ----
+let planOpen = false, priNote = null;
+const planOf = (s) => (s && s.plan && typeof s.plan === 'object' ? s.plan : null);
+const planTasks = (s) => { const p = planOf(s); return p && Array.isArray(p.tasks) ? p.tasks.filter(t => t && t.id != null) : []; };
+const capWord = (w) => { const t = String(w ?? ''); return t.charAt(0).toUpperCase() + t.slice(1); };
+const taskTitle = (t) => (t.step || t.field ? `<b>${esc(t.step || '')}</b> ${esc(t.field || '')}` : `<b>${esc(t.label || t.id)}</b>`);
+function setPlanOpen(v) {
+  planOpen = !!v;
+  const m = document.getElementById('planmodal');
+  if (m) m.hidden = !planOpen;
+  document.body.style.overflow = planOpen ? 'hidden' : '';
+  if (planOpen && lastState) { try { renderPlan(lastState); } catch {} }
+}
+function renderToday(s) {
+  const el = document.getElementById('todaylist'), old = document.getElementById('draftlist'), has = !!planOf(s);
+  if (!el) return;
+  el.hidden = !has;
+  if (old) old.hidden = has; // the earlier job list stays as the fallback until the plan is in the state
+  if (!has) return;
+  const ts = planTasks(s), live = ts.filter(t => t.status !== 'done'), done = ts.filter(t => t.status === 'done');
+  setHTML(el, [...live, ...done].map(t => `<div class="tj ${t.status === 'done' ? 'done' : ''}"><i class="pdot ${esc(t.priority || '')}" title="${esc(capWord(t.priority))} priority"></i><span>${taskTitle(t)}</span><span class="jst ${esc(t.status)}">${esc(t.status)}${t.status === 'active' && t.pct != null ? ' ' + Math.round(Number(t.pct) || 0) + '%' : ''}</span><span class="tjm">${esc(t.tractor || 'No tractor yet')}${t.end ? ` · finishes <span class="${t.late ? 'late' : ''}">${esc(t.end)}${t.late ? ' late' : ''}</span>` : ''}</span></div>`).join('')
+    || '<div class="muted">No jobs today yet. Use Plan jobs to add work.</div>');
+}
+function renderPlanTasks(s) {
+  const el = document.getElementById('plantasks');
+  if (!el) return;
+  const note = document.getElementById('prinote');
+  if (note) note.textContent = priNote && Date.now() - priNote.at < 6000 ? priNote.text : '';
+  const ae = document.activeElement;
+  if (pressing() || (ae && ae.tagName === 'SELECT' && el.contains(ae))) return; // do not rebuild under an open menu or a click
+  const ts = planTasks(s), live = ts.filter(t => t.status !== 'done'), done = ts.filter(t => t.status === 'done');
+  setHTML(el, '<tr><th>Priority</th><th>Task</th><th>Tractor</th><th>Starts</th><th>Finishes</th><th>Deadline</th><th>Status</th><th></th></tr>' +
+    ([...live, ...done].map(t => {
+      const isDone = t.status === 'done', canDel = t.status === 'draft' || t.status === 'waiting';
+      return `<tr class="${isDone ? 'donerow' : ''}"><td><select data-pri="${esc(t.id)}" aria-label="Priority of ${esc(t.id)}"${isDone ? ' disabled' : ''}>${['high', 'medium', 'low'].map(p => `<option value="${p}"${p === t.priority ? ' selected' : ''}>${capWord(p)}</option>`).join('')}</select></td>` +
+        `<td><span class="muted">${esc(t.id)}</span> ${taskTitle(t)}${t.after ? ` <span class="muted">after ${esc(t.after)}</span>` : ''}</td><td>${esc(t.tractor || '–')}</td><td>${esc(t.start || '–')}</td><td class="${t.late ? 'late' : ''}">${esc(t.end || '–')}${t.late ? ' late' : ''}</td><td>${esc(t.deadline || '–')}</td>` +
+        `<td><span class="jst ${esc(t.status)}">${esc(t.status)}${t.status === 'active' && t.pct != null ? ' ' + Math.round(Number(t.pct) || 0) + '%' : ''}</span></td><td class="whycell">${canDel ? `<button type="button" class="small" data-del="${esc(t.id)}">Remove</button>` : ''}</td></tr>`;
+    }).join('') || '<tr><td class="empty" colspan="8">No tasks yet. Add work below: one click on a field\'s suggested work, or a custom job.</td></tr>'));
+}
+function renderGantt(s) {
+  const el = document.getElementById('gantt');
+  if (!el) return;
+  const p = planOf(s), lanes = p && Array.isArray(p.schedule) ? p.schedule.filter(Boolean) : [];
+  if (!lanes.some(l => Array.isArray(l.items) && l.items.length)) { setHTML(el, '<div class="muted">The schedule appears once the day has started and the planner has placed the jobs.</div>'); return; }
+  const end = Math.max(60, Number(p.dayEndMin) || 660), now = Number(p.nowMin);
+  const pos = (m) => Math.max(0, Math.min(100, (Number(m) || 0) / end * 100));
+  let ticks = '', grid = '';
+  for (let m = 0; m <= end; m += 60) {
+    ticks += `<span class="gt${m === 0 ? ' first' : m + 60 > end ? ' last' : ''}" style="left:${pos(m)}%">${String(6 + m / 60).padStart(2, '0')}:00</span>`;
+    grid += `<i class="gg" style="left:${pos(m)}%"></i>`;
+  }
+  const nowLine = isFinite(now) && now >= 0 && now <= end ? `<i class="gnow" style="left:${pos(now)}%" title="Now"></i>` : '';
+  const typeOf = (l) => (/plow|till/i.test(l) ? 'till' : /sow|seed/i.test(l) ? 'seed' : /spray/i.test(l) ? 'spray' : /mow/i.test(l) ? 'mow' : '');
+  setHTML(el, `<div class="gaxis"><span></span><div class="gticks">${ticks}</div></div>` + lanes.map(l => {
+    const bars = (Array.isArray(l.items) ? l.items : []).filter(Boolean).map(it => {
+      const a = pos(it.startMin), w = Math.max(0.15, pos(it.endMin) - a), label = String(it.label || it.kind || ''), work = it.kind === 'work';
+      const text = work ? (w > 9 ? label : w > 3 ? String(it.job || '') : '') : '';
+      return `<div class="gb ${esc(it.kind || '')} ${work ? (['till', 'seed', 'spray', 'mow'].includes(it.type) ? it.type : typeOf(label)) : ''}" style="left:${a}%;width:${w}%" title="${esc(label)} · ${esc(it.start || '')} to ${esc(it.end || '')}">${esc(text)}</div>`;
+    }).join('');
+    return `<div class="glane"><div class="gname"><b>${esc(l.tractor || '')}</b> ${esc(l.name || '')}</div><div class="gtrack">${grid}${bars}${nowLine}</div></div>`;
+  }).join('') + '<div class="gleg"><span><i style="background:#6d4c41"></i>Plow</span><span><i style="background:#2e7d32"></i>Sow</span><span><i style="background:#4f7186"></i>Spray</span><span><i style="background:#7d7a2a"></i>Mow</span><span><i style="background:#c9c3b3;height:5px"></i>Driving</span><span><i style="background:repeating-linear-gradient(135deg,#a8841f 0 3px,#dcc277 3px 6px)"></i>Implement change or refuel</span><span><i style="background:var(--fault);width:2px;height:12px"></i>Now</span></div>');
+}
+function renderPlan(s) {
+  try { renderToday(s); } catch {}
+  const pb = document.getElementById('planbtn'), sb = document.getElementById('startbtn');
+  if (pb && sb) pb.classList.toggle('go', !!sb.disabled); // one primary button: Start the day while it can be pressed, otherwise Plan jobs
+  if (!planOpen) return;
+  const sub = document.getElementById('plansub');
+  if (sub) sub.textContent = s && s.clock ? `Plan clock ${s.clock}. The schedule rebuilds whenever a task or a priority changes.` : '';
+  try { renderPlanTasks(s); } catch {}
+  try { renderGantt(s); } catch {}
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  if (!t.closest) return;
+  if (t.closest('#planbtn')) { setPlanOpen(true); return; }
+  if (t.closest('#planclose') || t.id === 'planmodal') { setPlanOpen(false); return; }
+  const del = t.closest('#plantasks button[data-del]');
+  if (del) {
+    del.disabled = true;
+    let msg = '';
+    try { const res = await fetch('/draft/' + encodeURIComponent(del.getAttribute('data-del')), { method: 'DELETE' }); if (!res.ok) msg = `Not removed: ${await reasonOf(res)}`; }
+    catch { msg = 'Not removed: the runner is not reachable.'; }
+    priNote = msg ? { at: Date.now(), text: msg } : null;
+    pressAt = 0;
+    refresh();
+  }
+});
+document.addEventListener('change', async (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-pri]');
+  if (!sel) return;
+  let note = '';
+  try {
+    const res = await fetch('/job/priority', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job: sel.getAttribute('data-pri'), priority: sel.value }) });
+    if (res.ok) { try { note = String((await res.json()).note || ''); } catch {} } else note = `Not changed: ${await reasonOf(res)}`;
+  } catch { note = 'Not changed: the runner is not reachable.'; }
+  priNote = note ? { at: Date.now(), text: note } : null;
+  sel.blur();
+  refresh();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && planOpen) setPlanOpen(false); });
+
 // ---- At-a-glance counters in the top bar, all computed from the same state ----
 const DRONE_SHORT = { docked: 'Docked', flying: 'Flying', hovering: 'Circling', escorting: 'Wind watch', scanning: 'Mapping', spraying: 'Spraying', returning: 'Returning', charging: 'Charging' };
 function renderSummary(s) {
@@ -957,6 +1143,7 @@ async function refresh() {
   try { document.querySelector('.startrow').classList.toggle('stick', modeOf(s) === 'building'); } catch {}
   try { renderSummary(s); } catch {}
   try { renderAi(s); } catch {}
+  try { renderPlan(s); } catch {}
   const scn = document.getElementById('scn'), scTxt = String(s.scenario ?? '');
   scn.textContent = scTxt.includes(': ') ? scTxt.slice(scTxt.indexOf(': ') + 2) : scTxt;
   scn.title = scTxt;
