@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Tractor } from './tractor.js';
+import { kindOf } from './rig.js';
 
 const [id, agPort] = [process.argv[2] || 'T1', Number(process.argv[3] || 5175)];
 const port = agPort + 1000;
@@ -23,6 +24,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 const t = new Tractor(id, agPort);
 let fault = 'ok', cmd = null, seq = 0, acked = 0, lastCmdAt = 0;
+let bayHome = null;
+// This tractor's own parking bay: 10 m apart along the depot front, so three machines never share a spot.
+const bayIndex = process.argv.includes('--bay') ? Number(process.argv[process.argv.indexOf('--bay') + 1]) : Math.max(0, Number(id.replace(/\D/g, '')) - 1);
+const bayLon = (home) => home.lon + ((bayIndex - 1) * 10) / (111412.84 * Math.cos(home.lat * Math.PI / 180) - 93.5 * Math.cos(3 * home.lat * Math.PI / 180));
 
 await t.connect();
 await sleep(1200);
@@ -36,13 +41,16 @@ if (fs.existsSync(farmFile)) {
   const { home } = JSON.parse(fs.readFileSync(farmFile, 'utf8'));
   t.setHome(home.lat, home.lon);
   const w = t.world();
-  if (!w || Math.hypot(w.e, w.n) > 5000) { t.send(`sim.setCoords|${home.lat},${home.lon}`); await sleep(1200); }
+  if (!w || Math.hypot(w.e, w.n) > 5000 || process.argv.includes('--depot')) { t.send('sim.stop');
+    // Park in this tractor's own bay: 10 m apart along the depot front, so three machines never share a spot.
+    t.send(`sim.setCoords|${home.lat},${bayLon(home)}`); await sleep(1200); }
+  bayHome = home;
 } else t.world();
 
 // Drive towards the commanded target unless a fault says otherwise.
 t.pursue(() => (fault === 'ok' && !service && cmd && cmd.type === 'goto' ? cmd : null));
 // When the command names a field, open it in AgOpenWeb so its boundary, guidance line and coverage show.
-setInterval(() => { if (fault === 'ok' && cmd?.field) t.useField(cmd.field, cmd.job); }, 700);
+setInterval(() => { if (fault === 'ok' && (cmd?.field || t.held)) t.useField(cmd?.field, cmd?.job); }, 300);
 
 // Configuration is whatever the farmer set up in this tractor's AgOpenWeb: read it, do not redefine it.
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), `../../agopen-multi/data-${agPort}/AgOpenWeb`);
@@ -50,12 +58,15 @@ let rig = null, rigAt = 0, activeTool = null;
 // Service lock: while a person is fuelling this tractor or changing its implement it must not move.
 // Only an explicit "good to go" from the web app releases it.
 let service = null;
+// The lock is written to disk so a tractor process that restarts mid-service is still locked.
+const lockFile = path.join(path.dirname(fileURLToPath(import.meta.url)), 'out', `lock-${id}.json`);
+const saveLock = () => { try { fs.mkdirSync(path.dirname(lockFile), { recursive: true }); service ? fs.writeFileSync(lockFile, JSON.stringify(service)) : fs.rmSync(lockFile, { force: true }); } catch { /* best effort */ } };
+try { service = JSON.parse(fs.readFileSync(lockFile, 'utf8')); console.log(`${id}: still LOCKED for ${service.kind} from before this restart.`); } catch { service = null; }
 function readRig() {
   if (Date.now() - rigAt < 10000) return rig;
   rigAt = Date.now();
   const first = (dir) => { try { const f = fs.readdirSync(path.join(dataDir, dir)).filter(n => n.endsWith('.json') && !n.includes('.AutoSteer'))[0]; return f && { name: f.replace(/\.json$/, ''), data: JSON.parse(fs.readFileSync(path.join(dataDir, dir, f), 'utf8')) }; } catch { return null; } };
   const veh = first('Vehicles');
-  const kindOf = (n) => (/spray/i.test(n) ? 'sprayer' : /mow/i.test(n) ? 'mower' : /till|disc|disk/i.test(n) ? 'tiller' : /seed|plant|drill/i.test(n) ? 'seeder' : null);
   let tools = [];
   try {
     tools = fs.readdirSync(path.join(dataDir, 'Tools')).filter(n => n.endsWith('.json')).map((f) => {
@@ -77,12 +88,14 @@ function telemetry() {
   const w = t.world() || { e: 0, n: 0 }, s = t.state;
   return {
     id, seq: ++seq, ts: Date.now(), link: s.connected ? 'ok' : 'agopen-lost',
-    lat: s.lat, lon: s.lon, e: +w.e.toFixed(1), n: +w.n.toFixed(1),
+    lat: t.held ? t.held.lat : s.lat, lon: t.held ? t.held.lon : s.lon, e: +w.e.toFixed(1), n: +w.n.toFixed(1),
     headingDeg: Math.round((s.heading || 0) * 180 / Math.PI), speedKph: +((s.speed || 0) * 3.6 / (s.sim10x ? 10 : 1)).toFixed(1),
     fault: undefined,
     ack: acked, command: cmd ? { type: cmd.type, label: cmd.label, e: cmd.e, n: cmd.n } : null,
     field: s.fieldName, job: s.jobName, areaM2: s.workedAreaSqM, line: s.guidanceActive ? s.lineLabel : null,
+    busy: t.held ? 'opening field in AgOpenWeb' : null,
     rig: readRig(), service: service ? { kind: service.kind, tool: service.tool, lockedForS: Math.round((Date.now() - service.since) / 1000) } : null,
+    onLine: !!t.onLine, painting: !!s.sectionManual, offLineM: t.xt == null ? null : +t.xt.toFixed(2),
     autosteer: !!s.autoSteer, crossTrackM: s.guidanceActive ? +(s.crossTrackError || 0).toFixed(2) : null,
   };
 }
@@ -91,13 +104,21 @@ const server = http.createServer((req, res) => {
   // Test hook so a script can inject the same faults you can type into this terminal.
   if (req.method === 'POST' && req.url.startsWith('/fault/')) { setFault(req.url.slice(7), 'test script'); res.writeHead(200); return res.end('ok'); }
   if (fault === 'dead') { req.socket.destroy(); return; }            // a dead machine says nothing
+  // Start over: back to the bay, unlocked, no fault, nothing to do.
+  if (req.method === 'POST' && req.url === '/home') {
+    service = null; saveLock(); fault = 'ok'; cmd = null; t.held = null; t.started = {}; t.paint(false);
+    t.send('sim.stop'); t.send('sim.setSteer|0');
+    if (bayHome) t.send(`sim.setCoords|${bayHome.lat},${bayLon(bayHome)}`);
+    console.log(`\n${id} ── back in its bay for a fresh start ──`);
+    res.writeHead(200); return res.end('ok');
+  }
   if (req.method === 'POST' && (req.url === '/service' || req.url === '/release')) {
     let body = '';
     req.on('data', c => { body += c; });
     req.on('end', () => {
       let b = {}; try { b = JSON.parse(body || '{}'); } catch { /* empty body is fine */ }
       if (req.url === '/service') {
-        service = { kind: b.kind, tool: b.tool || null, since: Date.now() };
+        service = { kind: b.kind, tool: b.tool || null, since: Date.now() }; saveLock();
         t.send('sim.stop', true);
         console.log(`\n${id} ── LOCKED at depot: ${b.kind === 'swap' ? `implement change to ${b.tool}` : 'refuelling'}. Will not move until "good to go". ──`);
       } else if (service) {
@@ -106,7 +127,7 @@ const server = http.createServer((req, res) => {
           activeTool = service.tool; rigAt = 0;
         }
         console.log(`\n${id} ── GOOD TO GO received${service.tool ? `; AgOpenWeb tool profile is now ${service.tool}` : ''}. ──`);
-        service = null;
+        service = null; saveLock();
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ ok: true, locked: !!service }));
@@ -148,7 +169,7 @@ if (chaos > 0) {
 setInterval(() => {
   const m = telemetry();
   const what = service ? `LOCKED: ${service.kind === 'swap' ? 'implement change' : 'refuelling'}, waiting for good to go` : fault === 'dead' ? 'NOT RESPONDING' : fault === 'stuck' ? `GO ack'd, wheels stopped` :
-    cmd?.type === 'goto' ? `→ ${cmd.label || 'target'}${m.autosteer ? `  [AgOpenWeb autosteer on line, off by ${m.crossTrackM} m]` : ''}` : 'holding';
+    cmd?.type === 'goto' ? `→ ${cmd.label || 'target'}${m.onLine ? `  [on line, off by ${m.offLineM} m${m.painting ? ', implement on' : ''}]` : ''}` : 'holding';
   console.log(`${id} ${new Date().toTimeString().slice(0, 8)}  ${m.lat?.toFixed(6)}, ${m.lon?.toFixed(6)}  e ${String(m.e).padStart(7)} n ${String(m.n).padStart(7)}  ` +
     `${String(m.speedKph).padStart(5)} km/h  hdg ${String(m.headingDeg).padStart(4)}°  ${what}`);
 }, 1000);

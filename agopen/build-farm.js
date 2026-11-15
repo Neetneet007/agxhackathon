@@ -10,13 +10,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { TOOLS as TOOL, kindOf } from './rig.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const opt = (n, d) => (args.includes('--' + n) ? args[args.indexOf('--' + n) + 1] : d);
 const scenario = JSON.parse(fs.readFileSync(args.find(a => a.endsWith('.json')) || path.join(here, 'scenario.live.json'), 'utf8'));
 const [homeLat, homeLon] = opt('home', '32.7200,-114.6741').split(',').map(Number);
-const CELL = Number(opt('cell', 100));
+const CELL = Number(opt('cell', 20));   // metres per plan grid cell; 20 gives fields of about 1.5 acres, small enough to finish in minutes at real speed
 const multi = path.resolve(here, '../../agopen-multi');
 const dirs = opt('dirs', [5175, 5176, 5177].map(p => path.join(multi, `data-${p}`, 'AgOpenWeb', 'Fields')).join(',')).split(',');
 
@@ -36,7 +37,8 @@ const farm = { home: { lat: homeLat, lon: homeLon }, cell: CELL, fields: [] };
 
 for (const f of scenario.fields) {
   const a = cellToWorld(f.x, f.y), b = cellToWorld(f.x + f.w, f.y + f.h);
-  const e0 = Math.min(a.e, b.e), e1 = Math.max(a.e, b.e), n0 = Math.min(a.n, b.n), n1 = Math.max(a.n, b.n);
+  // 3 m in from the grid lines on every side: the gap between neighbouring fields is the farm lane.
+  const e0 = Math.min(a.e, b.e) + 3, e1 = Math.max(a.e, b.e) - 3, n0 = Math.min(a.n, b.n) + 3, n1 = Math.max(a.n, b.n) - 3;
   const centre = toLatLon((e0 + e1) / 2, (n0 + n1) / 2);
   const ringM = [[e0, n0], [e0, n1], [e1, n1], [e1, n0], [e0, n0]];
   const ring = ringM.map(([e, n], i) => {
@@ -47,8 +49,8 @@ for (const f of scenario.fields) {
   ring[ring.length - 1] = [...ring[0]];
   // One guidance line along the long side, one half-pass in from the edge.
   const alongE = (e1 - e0) >= (n1 - n0);
-  const A = alongE ? toLatLon(e0, n1 - 15) : toLatLon(e0 + 15, n0);
-  const B = alongE ? toLatLon(e1, n1 - 15) : toLatLon(e0 + 15, n1);
+  const A = alongE ? toLatLon(e0, n1 - 6) : toLatLon(e0 + 6, n0);
+  const B = alongE ? toLatLon(e1, n1 - 6) : toLatLon(e0 + 6, n1);
   const heading = alongE ? Math.PI / 2 : 0;
   const hectares = (e1 - e0) * (n1 - n0) / 10000;
   const geo = {
@@ -64,6 +66,7 @@ for (const f of scenario.fields) {
   };
   for (const dir of dirs) {
     const folder = path.join(dir, f.name);
+    fs.rmSync(folder, { recursive: true, force: true });   // a fresh field: no work sessions or coverage from earlier runs
     fs.mkdirSync(folder, { recursive: true });
     fs.writeFileSync(path.join(folder, 'field.geojson'), JSON.stringify(geo, null, 2));
     fs.writeFileSync(path.join(folder, 'field.origin'), `${centre.lat.toFixed(8)},${centre.lon.toFixed(8)}`);
@@ -72,11 +75,12 @@ for (const f of scenario.fields) {
 }
 // Each tractor's implements become tool profiles in that tractor's own AgOpenWeb, as a farmer would set
 // them up there. The coordinator later reads them back; it never keeps its own list.
-const TOOL = { sprayer: ['Sprayer 24m', 24], mower: ['Mower 6m', 6], tiller: ['Tiller 6m', 6], seeder: ['Seeder 9m', 9] };
 scenario.tractors.forEach((t, i) => {
   const root = path.join(multi, `data-${5175 + i}`, 'AgOpenWeb');
   const base = path.join(root, 'Tools', 'Default.json');
   if (!fs.existsSync(base)) return;
+  // Remove implement profiles from an earlier build so the tractor has exactly the ones listed.
+  for (const f of fs.readdirSync(path.join(root, 'Tools'))) if (f !== 'Default.json' && kindOf(f)) fs.rmSync(path.join(root, 'Tools', f));
   for (const impl of t.implements) {
     const [name, w] = TOOL[impl];
     const d = JSON.parse(fs.readFileSync(base, 'utf8'));

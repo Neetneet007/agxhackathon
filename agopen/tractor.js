@@ -21,10 +21,13 @@ export class Tractor {
         this.send(`control.acquire|Fleet-${this.id}`);
         // The app revokes control (and stops steering) if the operator is silent for 1.5 s.
         this.beat = setInterval(() => this.send('control.presence', true), 500);
+        // AgOpenWeb takes control away if it misses our heartbeat for 1.5 s, which happens when it is briefly
+        // busy (starting a job, loading a tool profile). Asking again is harmless when we still hold it.
+        this.claim = setInterval(() => this.send(`control.acquire|Fleet-${this.id}`, true), 2000);
         resolve(this);
       });
       ws.on('message', (data, isBinary) => { if (isBinary) this.decode(data); });
-      ws.on('close', () => { this.state.connected = false; clearInterval(this.beat); });
+      ws.on('close', () => { this.state.connected = false; clearInterval(this.beat); clearInterval(this.claim); });
       ws.on('error', reject);
     });
   }
@@ -36,7 +39,7 @@ export class Tractor {
     return true;
   }
 
-  close() { clearInterval(this.beat); clearInterval(this.pilot); this.ws?.close(); }
+  close() { clearInterval(this.beat); clearInterval(this.claim); clearInterval(this.pilot); this.ws?.close(); }
 
   // The simulator only has "0.5 km/h faster / slower" buttons, so step towards the target speed.
   // Status frames arrive slower than we send, so count our own steps and only re-sync from the
@@ -92,8 +95,12 @@ export class Tractor {
   // (The app's own east/north change origin whenever a field is opened, so they are not used.)
   setHome(lat, lon) { this.home = { lat, lon }; }
   world() {
+    if (this.state.lat === undefined) return null;
+    if (this.held) return { ...this.held.w };          // see useField: position is being put back
+    return this.rawWorld();
+  }
+  rawWorld() {
     const s = this.state;
-    if (s.lat === undefined) return null;
     if (!this.home) this.home = { lat: s.lat, lon: s.lon };
     const r = Math.PI / 180, p0 = this.home.lat * r, p = s.lat * r;
     const mLat = 111132.92 - 559.82 * Math.cos(2 * p0) + 1.175 * Math.cos(4 * p0);
@@ -101,33 +108,55 @@ export class Tractor {
     return { e: (s.lon - this.home.lon) * mLon, n: (s.lat - this.home.lat) * mLat };
   }
 
-  // Keep steering towards whatever getTarget() returns: {e, n, maxKph, follow} in world metres, or null to hold still.
-  // With follow:true and a guidance line selected in AgOpenWeb, its own autosteer holds the line and we
-  // only set the speed; otherwise we steer ourselves (driving between fields, turning at a field end).
-  pursue(getTarget, { radius = 4, maxSteer = 35, gain = 1.2 } = {}) {
+  // Keep driving towards whatever getTarget() returns, or hold still when it returns null.
+  //   { e, n, maxKph }                      aim at a point (lanes, turns)
+  //   { e, n, from:{e,n}, track:true, ... } hold the straight line from → (e,n) itself, the way a guidance
+  //                                         system does: steer out the sideways error as well as the heading
+  //                                         error, so a pass is straight from its first metre to its last.
+  //   paint:true                            implement on, but only while on that line and between its ends.
+  // Steering is always ours, through AgOpenWeb's simulator controls; AgOpenWeb's own autosteer stays off so
+  // every pass is driven the same way.
+  pursue(getTarget, { radius = 3.5, maxSteer = 35, gain = 1.2 } = {}) {
     clearInterval(this.pilot);
-    const autosteer = (want) => {
-      if (!!this.state.autoSteer === want || Date.now() - (this.autoAt || 0) < 1200) return;
-      this.send('autosteer.toggle', true); this.autoAt = Date.now();
-    };
     this.pilot = setInterval(() => {
       const w = this.world(), s = this.state;
       if (!s.connected || !w) return;
+      if (this.held) return;                             // do not steer from a position we know is wrong
+      if (s.autoSteer && Date.now() - (this.autoAt || 0) > 1200) { this.send('autosteer.toggle', true); this.autoAt = Date.now(); }
       const tg = getTarget();
       const d = tg ? Math.hypot(tg.e - w.e, tg.n - w.n) : 0;
-      this.paint(!!tg && !!tg.paint && d >= radius);
-      if (!tg || d < radius) { autosteer(false); this.setSpeed(0); this.send('sim.setSteer|0', true); this.moving = false; this.onLine = false; return; }
-      let err = Math.atan2(tg.e - w.e, tg.n - w.n) - s.heading;
-      err = Math.atan2(Math.sin(err), Math.cos(err));
-      const useLine = !!tg.follow && s.guidanceActive && s.autoSteerAvail && Math.abs(err) < 0.45;
-      autosteer(useLine);
-      this.onLine = useLine && s.autoSteer;
-      if (!this.onLine) {
-        const steer = Math.max(-maxSteer, Math.min(maxSteer, err * 180 / Math.PI * gain));
-        this.send(`sim.setSteer|${steer.toFixed(1)}`, true);
+      const stop = () => { this.paint(false); this.setSpeed(0); this.send('sim.setSteer|0', true); this.moving = false; this.onLine = false; };
+      if (!tg || tg.maxKph === 0) return stop();
+      const wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+      let err, steerDeg, painting = false, top = tg.maxKph ?? 20;
+      const L = tg.from ? Math.hypot(tg.e - tg.from.e, tg.n - tg.from.n) : 0;
+      if (tg.track && L > 0.5) {
+        const de = (tg.e - tg.from.e) / L, dn = (tg.n - tg.from.n) / L;                 // along the line
+        const along = (w.e - tg.from.e) * de + (w.n - tg.from.n) * dn;
+        const xt = (w.e - tg.from.e) * dn - (w.n - tg.from.n) * de;                     // metres to the right of the line
+        if (along >= L - 0.3) return stop();                                            // end of the line reached
+        err = wrap(Math.atan2(de, dn) - s.heading);
+        const v = Math.max(0.8, s.speed || 0);
+        steerDeg = (err - Math.atan2(1.4 * xt, v + 1)) * 180 / Math.PI;                 // heading error plus pull back onto the line
+        this.onLine = Math.abs(xt) < 0.6 && Math.abs(err) < 0.25;
+        painting = !!tg.paint && this.onLine && along >= -0.2 && along <= L + 0.2;
+        this.xt = xt;
+        if (!this.onLine) top = Math.min(top, 6);                                       // creep until lined up
+        if (L - along < 4) top = Math.min(top, 7);                                      // ease off for the turn
+      } else {
+        if (d < radius) return stop();
+        err = wrap(Math.atan2(tg.e - w.e, tg.n - w.n) - s.heading);
+        steerDeg = err * 180 / Math.PI * gain;
+        this.onLine = false; this.xt = null;
+        if (d < 8) top = Math.min(top, 6);
       }
-      const top = tg.maxKph ?? 20;
-      this.setSpeed(Math.abs(err) > 1.0 ? Math.min(top, 5) : Math.abs(err) > 0.5 ? Math.min(top, 10) : top);
+      this.paint(painting);
+      this.send(`sim.setSteer|${Math.max(-maxSteer, Math.min(maxSteer, steerDeg)).toFixed(1)}`, true);
+      // AgOpenWeb's simulator sometimes drops to a standstill while still reporting its old speed setting
+      // (it does this when a field is opened). If we want to move and have not moved for 2 s, start again from zero.
+      if ((s.speed || 0) > 0.15) this.stillSince = Date.now();
+      else if (Date.now() - (this.stillSince || Date.now()) > 2000) { this.send('sim.stop', true); this.cmdKph = 0; this.cmdAt = Date.now(); this.stillSince = Date.now(); }
+      this.setSpeed(Math.abs(err) > 1.0 ? Math.min(top, 4) : Math.abs(err) > 0.5 ? Math.min(top, 7) : top);
       this.moving = true;
     }, 100);
   }
@@ -145,15 +174,25 @@ export class Tractor {
   // Safe to call repeatedly.
   useField(name, job) {
     const s = this.state, now = Date.now();
-    if (!name || now - (this.fieldAt || 0) < 2500) return;
     this.started ||= {};
-    // A job from the coordinator becomes an AgOpenWeb work session on that field, so AgOpenWeb keeps its
-    // own record (job.json, coverage, worked area). Without a job we just open the field.
+    // Opening a field makes AgOpenWeb's simulator jump the tractor to the middle of that field. A real
+    // tractor does not teleport, so: remember where it is, open the field, then set it straight back.
+    if (this.held) {
+      const moved = Math.hypot(this.rawWorld().e - this.held.w.e, this.rawWorld().n - this.held.w.n);
+      if (now - this.held.at > 900 && moved > 2 && now - (this.held.sentAt || 0) > 1200) { this.send(`sim.setCoords|${this.held.lat},${this.held.lon}`, true); this.held.sentAt = now; }
+      if ((this.held.sentAt && moved <= 2) || (now - this.held.at > 2500 && moved <= 2) || now - this.held.at > 9000) { this.held = null; this.cmdKph = 0; this.cmdAt = now; this.stillSince = now; }
+      return;
+    }
+    if (!name || now - (this.fieldAt || 0) < 2500) return;
+    const hold = () => { this.send('sim.stop', true); this.held = { lat: s.lat, lon: s.lon, w: this.rawWorld(), at: now }; };
     if (job && !this.started[job.task]) {
+      // A job from the coordinator becomes an AgOpenWeb work session on that field, so AgOpenWeb keeps its
+      // own record (job.json, coverage, worked area).
+      hold();
       this.send(`field.startJob|${name}\t${job.workType || ''}\t${job.notes || ''}\t${job.task}`);
       this.started[job.task] = now; this.fieldAt = now; this.lineFor = null; return;
     }
-    if (s.fieldName !== name) { this.send(`field.openOnly|${name}`); this.fieldAt = now; this.lineFor = null; return; }
+    if (s.fieldName !== name) { hold(); this.send(`field.openOnly|${name}`); this.fieldAt = now; this.lineFor = null; return; }
     if (this.lineFor !== name) { this.send('track.select|0'); this.fieldAt = now; this.lineFor = name; }
   }
 

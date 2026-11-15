@@ -344,14 +344,6 @@
    "fieldId": "F3",
    "priority": "medium",
    "deadline": 510
-  },
-  {
-   "id": "J12",
-   "type": "seed",
-   "fieldId": "F7",
-   "acres": 16,
-   "priority": "low",
-   "deadline": 690
   }
  ],
  "events": [],
@@ -428,5 +420,13 @@
     "alert": false
    }
   ]
+ },
+ "costs": {
+  "note": "Assumptions for comparing a depot refuel with the fuel truck. Change them to suit the farm.",
+  "dieselPerGal": 4,
+  "tractorPerHour": 120,
+  "truckPerHour": 45,
+  "tankGal": 60,
+  "truckGalPerKm": 0.1
  }
 }

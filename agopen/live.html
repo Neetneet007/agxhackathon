@@ -36,30 +36,66 @@
   .trail .fault .who, .trail .fault { color:var(--bad); font-weight:600; }
   .muted { color:var(--muted); }
   .scroll { overflow-x:auto; }
+  .wx { font-size:13px; display:grid; gap:6px; }
+  .wxpill { display:inline-block; font-weight:800; font-size:18px; padding:4px 16px; border-radius:16px; color:#fff; }
+  .wxpill.GO { background:var(--ok); } .wxpill.CAUTION { background:var(--warn); } .wxpill.STOP { background:var(--bad); }
+  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
+  .wxlog { font-size:12px; color:var(--muted); max-height:86px; overflow:auto; }
+  .dronebox { display:grid; grid-template-columns:170px 1fr; gap:10px; align-items:start; font-size:13px; }
+  #dronecam { width:170px; height:128px; background:#e9e3d2; border-radius:6px; border:1px solid var(--line); }
+  button.small { font-size:12px; padding:2px 8px; float:right; }
+  #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
+  #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
+  .roundtable { max-height:300px; overflow:auto; display:grid; gap:6px; }
+  .rt-topic { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; border-top:1px solid var(--line); padding-top:6px; }
+  .rt-line { display:grid; grid-template-columns:132px 1fr; gap:8px; align-items:start; font-size:13px; }
+  .rt-who { font-weight:700; font-size:12px; padding:2px 8px; border-radius:10px; color:#fff; background:#6b756e; text-align:center; }
+  .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
+  .rt-line.tool .rt-text::before { content:"Tool: "; color:var(--info); }
+  .rt-meta { color:var(--muted); font-size:11px; margin-left:6px; white-space:nowrap; }
   #peoplecard { border-color:var(--warn); background:#fff8e8; }
   .task { display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #f0e2bf; flex-wrap:wrap; }
   .task b { min-width:220px; }
   button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; font-size:13px; padding:5px 14px; }
   button.go:disabled { background:#c9d2cc; border-color:#c9d2cc; cursor:default; }
   header a { color:#bfe3cf; font-size:13px; }
-  .farm { display:grid; grid-template-columns:minmax(0,1fr) 230px; gap:12px; align-items:start; }
+  #startover { font-size:12px; padding:3px 10px; border-radius:6px; border:1px solid #6b756e; background:#2c3a33; color:#fff; cursor:pointer; }
+  #startovermsg { opacity:.8; }
+  .farm { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:12px; align-items:start; }
   #map { width:100%; height:auto; max-height:460px; background:#e9e3d2; border-radius:6px; }
-  #map .field { fill:#cfe3b4; stroke:#5f7a45; stroke-width:6; cursor:pointer; }
+  #map .field { fill:#cfe3b4; stroke:#5f7a45; stroke-width:1.2; cursor:pointer; }
   #map .field.open { fill:#f6e3a1; } #map .field.active { fill:#9fd3a8; } #map .field.done { fill:#c9d2cc; }
-  #map .field.sel { stroke:#1c7ed6; stroke-width:16; }
-  #map .line { stroke:#8e24aa; stroke-width:5; stroke-dasharray:24 18; fill:none; pointer-events:none; }
-  #map text { font:600 34px sans-serif; fill:#1f2a24; pointer-events:none; text-anchor:middle; }
-  #map text.sub { font:400 26px sans-serif; fill:#4a554e; }
-  #map .tr { stroke:#fff; stroke-width:6; }
-  #jobform { display:grid; gap:8px; font-size:13px; }
-  #jobform label { display:grid; gap:2px; color:var(--muted); font-size:12px; }
-  #jobform select, #jobform input { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+  #map .field.sel { stroke:#1c7ed6; stroke-width:3.5; }
+  #map .lane { stroke:#b79c6b; stroke-width:3.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  #map .gate { fill:#7a5f33; }
+  #map .line { stroke:#8e24aa; stroke-width:1; stroke-dasharray:5 4; fill:none; pointer-events:none; }
+  #map text { font:600 8px sans-serif; fill:#1f2a24; pointer-events:none; text-anchor:middle; }
+  #map text.sub { font:400 6px sans-serif; fill:#4a554e; }
+  #map .tr { stroke:#fff; stroke-width:1.2; }
+  #builder { display:grid; gap:10px; font-size:13px; }
+  #builder label { display:grid; gap:2px; color:var(--muted); font-size:12px; }
+  #builder select, #builder input { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
+  #builder .banner { background:#e7f1fb; border:1px solid #b9d6f2; border-radius:6px; padding:6px 8px; font-size:12.5px; }
+  #builder .step { font-weight:700; font-size:12px; margin-bottom:3px; }
+  #chips { display:flex; gap:6px; flex-wrap:wrap; }
+  #chips button { padding:4px 10px; font-size:13px; border-radius:14px; }
+  #chips button.on { background:var(--info); border-color:var(--info); color:#fff; font-weight:700; }
+  #builder button.add { background:#fff; border-color:var(--info); color:var(--info); font-weight:700; font-size:13px; padding:5px 12px; }
+  #builder button.add:disabled { color:var(--muted); border-color:var(--line); cursor:default; }
+  #draftlist .fgroup { border-top:1px solid var(--line); padding:5px 0; }
+  #draftlist .fname { font-weight:700; }
+  #draftlist .jb { display:flex; align-items:baseline; gap:6px; padding:2px 0; font-size:12.5px; }
+  #draftlist .jb .lbl { flex:1; min-width:0; }
+  #draftlist .jb small { display:block; color:var(--muted); font-size:11.5px; }
+  #draftlist .jb button { padding:1px 7px; }
+  #startbtn { width:100%; }
   @media (max-width: 760px) { .farm { grid-template-columns:1fr; } }
 </style>
 </head>
 <body>
 <header>
-  <h1>Fleet live status</h1><small id="scn"></small> <a href="/dashboard/?live=1" target="_blank">Open 3D view</a>
+  <h1>Fleet live status</h1><small id="scn"></small> <a href="/3d" target="_blank">Open 3D view</a>
+  <button id="startover" type="button">Start over</button><small id="startovermsg"></small>
   <span id="clock">--:--</span>
 </header>
 <main>
@@ -67,15 +103,46 @@
     <h2>Farm <small class="muted" id="farmsrc"></small></h2>
     <div class="farm">
       <svg id="map" role="img" aria-label="Farm map"></svg>
-      <form id="jobform">
-        <div><b>Selected fields</b><div id="picked" class="muted">Click fields on the map.</div></div>
-        <label>Job <select id="jtype"><option value="spray">Spray</option><option value="mow">Mow</option><option value="till">Till</option><option value="seed">Seed</option></select></label>
+      <div id="builder">
+        <div class="banner" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
+        <div><div class="step">1. Pick fields</div><div id="picked" class="muted">Click fields on the map.</div></div>
+        <div><div class="step">2. Pick operations in order</div>
+          <div id="chips">
+            <button type="button" data-type="till">Plow</button>
+            <button type="button" data-type="seed">Sow</button>
+            <button type="button" data-type="spray">Spray</button>
+            <button type="button" data-type="mow">Mow</button>
+          </div>
+          <div id="stepsum" class="muted" style="margin-top:4px">None chosen yet.</div>
+        </div>
         <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
         <label>Finish by <input id="jdl" type="time" value="17:00"></label>
-        <button type="submit" id="jadd" disabled>Add jobs to the plan</button>
+        <button type="button" class="add" id="jadd" disabled>Add to list</button>
         <div id="jmsg" class="muted"></div>
+        <div><div class="step">Today's job list</div><div id="draftlist" class="muted">No jobs yet.</div></div>
+        <div>
+          <button type="button" class="go" id="startbtn" disabled>Start the day</button>
+          <div id="startmsg" class="muted" style="margin-top:4px"></div>
+        </div>
         <div class="muted" style="font-size:11px">Solid outline: field boundary. Dashed: its guidance line. Both are read from AgOpenWeb's field files.</div>
-      </form>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Roundtable <small class="muted" id="rtmeta">the managers discuss each event; the tractors have already acted</small></h2>
+    <div id="roundtable" class="roundtable"></div>
+  </div>
+  <div class="row">
+    <div class="card">
+      <h2>Spray conditions <small class="muted">weather at two heights, simulated feed</small></h2>
+      <div id="wx" class="wx muted">Starts with the day.</div>
+    </div>
+    <div class="card">
+      <h2>Scout drone <small class="muted">fully simulated</small> <button id="dscan" type="button" class="small">Map the picked fields</button></h2>
+      <div class="dronebox">
+        <svg id="dronecam" role="img" aria-label="Simulated drone camera"></svg>
+        <div id="droneinfo" class="muted">Docked.</div>
+      </div>
     </div>
   </div>
   <div class="card" id="peoplecard" hidden>
@@ -107,48 +174,161 @@ async function loadFarm() {
 function drawFarm() {
   if (!farm || !farm.home) return;
   const svg = document.getElementById('map');
-  let x0 = -150, x1 = 150, y0 = -150, y1 = 150;
+  let x0 = -40, x1 = 40, y0 = -40, y1 = 40;
   const polys = farm.fields.map(f => ({ f, pts: f.boundary.map(([lon, lat]) => proj(lat, lon)) }));
   for (const p of polys) for (const [x, y] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  svg.setAttribute('viewBox', `${x0 - 120} ${y0 - 120} ${x1 - x0 + 240} ${y1 - y0 + 240}`);
-  const jobs = lastState ? lastState.jobs : [];
+  svg.setAttribute('viewBox', `${x0 - 25} ${y0 - 25} ${x1 - x0 + 50} ${y1 - y0 + 50}`);
+  const jobs = lastState && Array.isArray(lastState.jobs) ? lastState.jobs : [];
   let h = '';
+  // Farm lanes first, so fields and tractors draw on top. Lanes are in metres from the depot (east, north).
+  for (const lane of farm.lanes || []) h += `<polyline class="lane" points="${lane.map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
+  for (const g of farm.gates || []) h += `<circle class="gate" cx="${g.e.toFixed(0)}" cy="${(-g.n).toFixed(0)}" r="2"></circle>`;
   for (const { f, pts } of polys) {
     if (pts.length < 3) continue;
     const mine = jobs.filter(j => j.field === f.name);
-    const cls = mine.some(j => j.status === 'active') ? 'active' : mine.some(j => j.status !== 'done' && j.status !== 'cancelled') ? 'open' : mine.length ? 'done' : '';
+    const pending = backlogOf(lastState).some(b => b.field === f.name && b.status !== 'released');
+    const cls = mine.some(j => j.status === 'active') ? 'active' : (pending || mine.some(j => j.status !== 'done' && j.status !== 'cancelled')) ? 'open' : mine.length ? 'done' : '';
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     h += `<polygon class="field ${cls} ${picked.has(f.name) ? 'sel' : ''}" data-name="${esc(f.name)}" points="${pts.map(p => p.map(v => v.toFixed(0)).join(',')).join(' ')}"></polygon>`;
     for (const t of f.tracks) h += `<polyline class="line" points="${t.line.map(([lon, lat]) => proj(lat, lon).map(v => v.toFixed(0)).join(',')).join(' ')}"></polyline>`;
-    h += `<text x="${cx.toFixed(0)}" y="${(cy - 6).toFixed(0)}">${esc(f.name)}</text>`;
+    h += `<text x="${cx.toFixed(0)}" y="${(cy - 1).toFixed(0)}">${esc(f.name)}</text>`;
     const open = mine.filter(j => j.status !== 'done' && j.status !== 'cancelled').map(j => `${j.id} ${j.type} ${j.pct}%`).join(' · ');
-    if (open) h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 30).toFixed(0)}">${esc(open)}</text>`;
+    const gnd = lastState && lastState.ground && lastState.ground[f.name];
+    h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
   }
-  h += `<rect x="-45" y="-45" width="90" height="90" fill="#3d4a43"></rect><text x="0" y="95">${esc(farm.depot || 'Depot')}</text>`;
+  // Ground already worked, as strips one implement-width wide.
+  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#7b1fa2', mow: '#c99700' };
+  for (const c of (lastState && lastState.coverage) || []) for (const [e0, n0, e1, n1] of c.segs)
+    h += `<line x1="${e0}" y1="${-n0}" x2="${e1}" y2="${-n1}" stroke="${COVER[c.type] || '#555'}" stroke-opacity="0.55" stroke-width="${c.widthM}" stroke-linecap="butt" pointer-events="none"></line>`;
+  h += `<rect x="-17" y="4" width="34" height="14" fill="#3d4a43"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
   if (lastState) lastState.tractors.forEach((t, i) => {
     if (!t.tel || t.tel.lat == null) return;
     const [x, y] = proj(t.tel.lat, t.tel.lon);
     const bad = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
-    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="46" fill="${bad ? '#c0392b' : TR_COLOR[i % 4]}"></circle><text x="${x.toFixed(0)}" y="${(y + 12).toFixed(0)}" style="fill:#fff">${esc(t.id)}</text>`;
+    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#c0392b' : TR_COLOR[i % 4]}"></circle><text x="${x.toFixed(0)}" y="${(y + 2.8).toFixed(1)}" style="fill:#fff">${esc(t.id)}</text>`;
   });
+  const dr = lastState && lastState.drone;
+  if (dr) {
+    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#7b1fa2" fill-opacity="0.45" pointer-events="none"></circle>`;
+    if (dr.path && dr.path.length > 1) h += `<polyline class="dronepath" points="${[{ e: dr.e, n: dr.n }, ...dr.path].map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
+    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#111" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#111" stroke-width="1.2"></line></g>`;
+  }
   svg.innerHTML = h;
+  // The drone's "camera": the same scene, looking straight down from where the drone is. Simulated.
+  const cam = document.getElementById('dronecam');
+  if (cam && dr) { cam.setAttribute('viewBox', `${(dr.e - 34).toFixed(1)} ${(-dr.n - 26).toFixed(1)} 68 52`); cam.innerHTML = h; }
 }
-document.addEventListener('click', (e) => {
-  const el = e.target.closest && e.target.closest('.field');
-  if (!el) return;
-  const n = el.dataset.name;
-  picked.has(n) ? picked.delete(n) : picked.add(n);
-  document.getElementById('picked').textContent = [...picked].join(', ') || 'Click fields on the map.';
-  document.getElementById('jadd').disabled = !picked.size;
-  drawFarm();
-});
-document.addEventListener('submit', async (e) => {
-  if (e.target.id !== 'jobform') return;
-  e.preventDefault();
-  const body = { fields: [...picked], type: document.getElementById('jtype').value, priority: document.getElementById('jpri').value, deadline: document.getElementById('jdl').value };
-  const res = await fetch('/jobs', { method: 'POST', body: JSON.stringify(body) });
-  document.getElementById('jmsg').textContent = res.ok ? `Added: ${(await res.json()).added.join(', ')}. See the messages below for the new plan.` : `Not added: ${await res.text()}`;
-  if (res.ok) { picked.clear(); document.getElementById('picked').textContent = 'Click fields on the map.'; document.getElementById('jadd').disabled = true; }
+// ---- Job list builder ----
+const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
+const opName = (t) => OP_NAME[t] || String(t ?? '');
+let steps = [], startBusy = false, lastListKey = null;
+const backlogOf = (s) => (s && Array.isArray(s.backlog) ? s.backlog : []);
+const modeOf = (s) => (s && s.mode === 'building' ? 'building' : 'running');
+const $ = (id) => document.getElementById(id);
+
+function renderPicked() {
+  $('picked').textContent = [...picked].join(', ') || 'Click fields on the map.';
+  updateAdd();
+}
+function renderSteps() {
+  document.querySelectorAll('#chips button').forEach(b => {
+    const i = steps.indexOf(b.dataset.type);
+    b.classList.toggle('on', i >= 0);
+    b.textContent = (i >= 0 ? (i + 1) + ' ' : '') + opName(b.dataset.type);
+  });
+  $('stepsum').textContent = steps.length ? steps.map((t, i) => `${i + 1} ${opName(t)}`).join(' → ') : 'None chosen yet.';
+  updateAdd();
+}
+function updateAdd() { $('jadd').disabled = !(picked.size && steps.length); }
+
+function renderBuilder(s) {
+  const building = modeOf(s) === 'building', list = backlogOf(s);
+  $('bbanner').hidden = !building;
+  const sb = $('startbtn');
+  if (building) {
+    sb.textContent = 'Start the day';
+    sb.disabled = startBusy || !list.length;
+    if (!startBusy && !$('startmsg').dataset.err) $('startmsg').textContent = list.length ? '' : 'Add at least one job to start.';
+  } else {
+    sb.textContent = 'Day is running';
+    sb.disabled = true;
+    $('startmsg').textContent = 'The day is running. You can still add more work.';
+    delete $('startmsg').dataset.err;
+  }
+  const key = JSON.stringify([building, list]);
+  if (key === lastListKey) return;
+  lastListKey = key;
+  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet.'; return; }
+  const byField = new Map();
+  for (const j of list) { if (!byField.has(j.field)) byField.set(j.field, []); byField.get(j.field).push(j); }
+  const STATUS = { draft: 'Not started', waiting: 'Waiting', released: 'Sent to the planner' };
+  $('draftlist').className = '';
+  $('draftlist').innerHTML = [...byField].map(([f, js]) => `<div class="fgroup"><div class="fname">${esc(f)}</div>` +
+    js.map((j, i) => {
+      const note = [j.waitsFor ? `after ${j.waitsFor}` : '', j.priority ? j.priority + ' priority' : '', j.deadline ? 'by ' + j.deadline : '', STATUS[j.status] || j.status].filter(Boolean).join(' · ');
+      const canDel = j.status === 'draft' || j.status === 'waiting';
+      return `<div class="jb"><span>${i + 1}.</span><span class="lbl">${esc(opName(j.type))}<small>${esc(note)}</small></span>${canDel ? `<button type="button" data-del="${esc(j.id)}">Remove</button>` : ''}</div>`;
+    }).join('') + '</div>').join('');
+}
+
+async function reasonOf(res) { try { return (await res.text()).trim() || `Error ${res.status}`; } catch { return `Error ${res.status}`; } }
+
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  if (!t.closest) return;
+  const el = t.closest('.field');
+  if (el) {
+    const n = el.dataset.name;
+    picked.has(n) ? picked.delete(n) : picked.add(n);
+    renderPicked();
+    drawFarm();
+    return;
+  }
+  const chip = t.closest('#chips button');
+  if (chip) {
+    const i = steps.indexOf(chip.dataset.type);
+    if (i >= 0) steps.splice(i, 1); else steps.push(chip.dataset.type);
+    renderSteps();
+    return;
+  }
+  const del = t.closest('#draftlist button[data-del]');
+  if (del) {
+    del.disabled = true;
+    try {
+      const res = await fetch('/draft/' + encodeURIComponent(del.dataset.del), { method: 'DELETE' });
+      if (!res.ok) { $('jmsg').textContent = `Not removed: ${await reasonOf(res)}`; del.disabled = false; }
+      else refresh();
+    } catch { $('jmsg').textContent = 'Not removed: the runner is not reachable.'; del.disabled = false; }
+    return;
+  }
+  if (t.closest('#jadd')) {
+    const btn = $('jadd');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    const body = { fields: [...picked], steps: [...steps], priority: $('jpri').value, deadline: $('jdl').value };
+    try {
+      const res = await fetch('/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) {
+        let n = 0; try { n = ((await res.json()).added || []).length; } catch {}
+        $('jmsg').textContent = n ? `Added ${n} job${n === 1 ? '' : 's'} to the list.` : 'Added to the list.';
+        picked.clear(); steps = [];
+        renderPicked(); renderSteps(); drawFarm(); refresh();
+      } else $('jmsg').textContent = `Not added: ${await reasonOf(res)}`;
+    } catch { $('jmsg').textContent = 'Not added: the runner is not reachable.'; }
+    updateAdd();
+    return;
+  }
+  if (t.closest('#startbtn')) {
+    if ($('startbtn').disabled) return;
+    startBusy = true; $('startbtn').disabled = true;
+    const m = $('startmsg'); delete m.dataset.err; m.textContent = '';
+    try {
+      const res = await fetch('/start', { method: 'POST' });
+      if (!res.ok) { m.textContent = `Could not start: ${await reasonOf(res)}`; m.dataset.err = '1'; }
+    } catch { m.textContent = 'Could not start: the runner is not reachable.'; m.dataset.err = '1'; }
+    startBusy = false;
+    refresh();
+  }
 });
 
 function build(s) {
@@ -174,6 +354,7 @@ async function refresh() {
   lastState = s;
   if (!built) { build(s); loadFarm(); }
   drawFarm();
+  try { renderBuilder(s); } catch {}
   document.getElementById('scn').textContent = s.scenario;
   document.getElementById('clock').textContent = s.clock + (s.finished ? ' · ended' : '');
   for (const t of s.tractors) {
@@ -186,6 +367,9 @@ async function refresh() {
       <dt>Task</dt><dd>${esc(t.task || '–')}</dd>
       <dt>Next jobs</dt><dd>${esc(t.queue.join(' → ') || '–')}</dd>
       <dt>Implement</dt><dd>${esc(t.mounted)} · fuel ${t.fuelPct}%</dd>
+      ${t.eta && t.eta.jobDoneAt ? `<dt>Job finishes</dt><dd>in ${t.eta.jobDoneInMin} min, at ${esc(t.eta.jobDoneAt)} <span class="muted">(${t.eta.ratePctPerMin}% a minute${t.eta.measured ? ', measured' : ', rated'})</span></dd>
+      <dt>Fuel to reserve</dt><dd>${t.eta.fuelToReserveAt ? `in ${t.eta.fuelToReserveInMin} min, at ${esc(t.eta.fuelToReserveAt)}` : 'not burning'} · ${t.eta.fuelPctAtJobEnd}% left when this job ends${t.eta.runsShortBeforeJobEnds ? ' · <b style="color:var(--bad)">runs short before the job ends</b>' : ''}</dd>
+      ${t.eta.fuelPlan ? `<dt>Next refuel</dt><dd>${t.eta.fuelPlan.needsFuelFirst ? (t.eta.fuelPlan.choice ? `needed before ${esc(t.eta.fuelPlan.next)}: <b>${t.eta.fuelPlan.choice === 'truck' ? 'fuel truck' : 'depot'}</b> (depot detour ${t.eta.fuelPlan.depotExtraM} m, about USD ${t.eta.fuelPlan.depotCost}; truck round trip ${t.eta.fuelPlan.truckRoundTripM} m, about USD ${t.eta.fuelPlan.truckCost})` : `needed before ${esc(t.eta.fuelPlan.next)}`) : `enough for ${esc(t.eta.fuelPlan.next)} too`}</dd>` : ''}` : ''}
       <dt>From AgOpenWeb</dt><dd>${m.rig && m.rig.tool ? `mounted "${esc(m.rig.tool.profile)}" ${m.rig.tool.widthM} m · can also use ${esc((m.rig.tools || []).filter(x => x.kind && x.profile !== m.rig.tool.profile).map(x => x.profile).join(', ') || 'nothing else')}` : '–'}${m.service ? ' · <b>LOCKED for service</b>' : ''}</dd>
       <dt>AgOpenWeb job</dt><dd>${m.field && m.field !== 'No Field' ? esc(m.field) : 'no field open'}${m.job ? ' · ' + esc(m.job) : ''}${m.areaM2 ? ' · ' + (m.areaM2 / 10000).toFixed(2) + ' ha worked' : ''}${m.autosteer ? ' · autosteer on line' : ''}</dd>
       <dt>GPS</dt><dd>${m.lat != null ? m.lat.toFixed(6) + ', ' + m.lon.toFixed(6) : '–'}</dd>
@@ -193,15 +377,60 @@ async function refresh() {
       <dt>Last heard</dt><dd>${t.heardAgoMs == null ? 'never' : (t.heardAgoMs / 1000).toFixed(1) + ' s ago'} · command ack ${m.ack ?? '–'}</dd>
       <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`;
   }
+  const wx = s.weather, wxEl = document.getElementById('wx');
+  if (wx) {
+    wxEl.classList.remove('muted');
+    wxEl.innerHTML = `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
+      <div>${esc(wx.reason)}</div>
+      <div class="wxgrid"><span></span><b>2 m</b><b>10 m</b><span class="muted">Temperature</span><span>${wx.low.tempC.toFixed(1)} °C</span><span>${wx.high.tempC.toFixed(1)} °C</span><span class="muted">Wind</span><span>${wx.low.windMph.toFixed(1)} mph</span><span>${wx.high.windMph.toFixed(1)} mph</span></div>
+      <div class="${wx.caughtByTwoHeights ? '' : 'muted'}">A single ground station would say: <b>${esc(wx.groundOnly.status === 'GO' ? 'Go' : wx.groundOnly.status === 'STOP' ? 'Stop' : 'Caution')}</b>${wx.caughtByTwoHeights ? '. The second height caught the risk.' : ''}</div>
+      <div class="wxlog">${(wx.log || []).map(l => `<div>${esc(l.clock)} ${esc(l.status)}: ${esc(l.note)}</div>`).join('')}</div>
+      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`;
+  }
+  const d = s.drone, dEl = document.getElementById('droneinfo');
+  if (d && dEl) {
+    const rep = (d.reports || [])[0];
+    const words = { docked: 'Docked', flying: 'Flying', hovering: 'Hovering', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
+    dEl.classList.remove('muted');
+    dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
+      <div class="muted" style="font-size:11px">Camera view on the left is rendered from the simulation, not a real camera.</div>
+      ${rep ? `<div style="margin-top:6px"><b>${esc(rep.clock)} ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</b><br>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
+  }
   document.getElementById('peoplecard').hidden = !s.tasks.length;
   document.getElementById('people').innerHTML = s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
     <span class="muted">${k.state === 'waiting' ? 'Tractor is parked and locked. Do the work, then confirm.' : 'Tractor is on its way to the depot.'} Asked at ${k.since}.</span>
     <button class="go" ${k.state === 'waiting' ? '' : 'disabled'} onclick="fetch('/human/${k.id}/go', { method: 'POST' })">Good to go</button></div>`).join('');
+  const RT_COLOR = { 'Plan Manager': '#2f6f4f', 'Fleet Manager': '#1c7ed6', 'Fault Manager': '#c0392b', 'Route Manager': '#8e24aa', 'Depot Manager': '#b7791f', 'Safety Officer': '#0b7285', 'Weather Manager': '#5c7cfa' };
+  const rtEl = document.getElementById('roundtable');
+  const rtKey = (s.roundtable || []).length + ':' + ((s.roundtable || [])[0] || {}).id;
+  if (rtEl.dataset.key !== rtKey) {
+    rtEl.dataset.key = rtKey;
+    let lastTopic = null, out = '';
+    for (const l of (s.roundtable || [])) {
+      if (l.topicId !== lastTopic) { out += `<div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`; lastTopic = l.topicId; }
+      out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who" style="background:${RT_COLOR[l.agent] || '#6b756e'}">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
+    }
+    rtEl.innerHTML = out || '<div class="muted">Nothing to discuss yet. The managers speak when the day starts, a tractor faults, a job finishes, or work is held.</div>';
+  }
+  if (s.roundtableStats) document.getElementById('rtmeta').textContent = `${s.roundtableStats.lines || 0} lines · ${s.roundtableStats.modelCalls || 0} model calls · ${s.roundtableStats.toolCalls || 0} tool calls · ${s.roundtableStats.fallbacks || 0} rule-written`;
   document.getElementById('trail').innerHTML = s.trail.map(r =>
     `<div class="${r.type === 'fault' ? 'fault' : ''}"><time>${r.clock}</time><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}</div>`).join('') || '<div class="muted">No messages yet.</div>';
   document.getElementById('jobs').innerHTML = '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th></tr>' +
     s.jobs.map(j => `<tr><td>${esc(j.label)}</td><td>${esc(j.priority)}</td><td>${j.deadline}</td><td>${esc(j.tractor || '–')}</td><td>${j.pct}%</td><td>${esc(j.status)}</td></tr>`).join('');
 }
+document.getElementById('dscan').addEventListener('click', async () => {
+  const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
+  document.getElementById('droneinfo').textContent = res.ok ? 'Drone sent.' : await res.text();
+});
+// Start over needs two clicks, so it cannot be hit by accident.
+const so = document.getElementById('startover'), soMsg = document.getElementById('startovermsg');
+let soArmed = 0;
+so.addEventListener('click', async () => {
+  if (Date.now() - soArmed > 4000) { soArmed = Date.now(); so.textContent = 'Click again to confirm'; setTimeout(() => { so.textContent = 'Start over'; }, 4000); return; }
+  so.disabled = true; soMsg.textContent = ' Sending tractors home…';
+  try { await fetch('/reset', { method: 'POST' }); } catch { /* the runner restarts, so the reply may not arrive */ }
+  setTimeout(() => location.reload(), 3500);
+});
 refresh();
 setInterval(refresh, 1000);
 </script>

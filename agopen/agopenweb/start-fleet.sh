@@ -4,7 +4,11 @@
 #   ./start-fleet.sh stop     stop them all
 # Needs the patched build in ./bin (see README.md).
 M="$(cd "$(dirname "$0")" && pwd)"
-if [ "$1" = "stop" ]; then pkill -f "AgOpenWeb.Desktop --headless"; echo "stopped"; exit 0; fi
+if [ "$1" = "stop" ]; then
+  pkill -f "AgOpenWeb.Desktop --headless"
+  for k in $(seq 1 40); do pgrep -f "AgOpenWeb.Desktop --headless" >/dev/null || break; sleep 0.5; done
+  echo "stopped"; exit 0
+fi
 N=${1:-2}
 for i in $(seq 1 "$N"); do
   P=$((5174 + i))
