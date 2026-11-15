@@ -1007,7 +1007,7 @@ const chat = createChat({
       drone: ({ send_drone }, out) => (send_drone && out?.droneSent ? { field: out.name } : null) },
     { name: 'add_jobs', description: 'Put work on the job list for one or more fields. steps is an ordered list from: till (plow), seed (sow), spray, mow. The list rules may refuse (for example sowing before plowing); the reason is returned.',
       input_schema: { type: 'object', properties: { fields: { type: 'array', items: { type: 'string' } }, steps: { type: 'array', items: { type: 'string', enum: ['till', 'seed', 'spray', 'mow'] } }, priority: { type: 'string', enum: ['high', 'medium', 'low'] }, deadline: { type: 'string', description: 'HH:MM today, default 17:00' } }, required: ['fields', 'steps'] },
-      handler: async ({ fields, steps, priority, deadline }) => { const names = fields.map(n => { const f = fieldByName(n); if (!f) throw new Error(`No field called "${n}".`); return f.name; }); const ids = draftJobs({ fields: names, steps, priority: priority || 'medium', deadline: deadline || '17:00' }); return { added: ids, dayRunning: mode === 'running', note: mode === 'running' ? 'The planner is fitting them in now.' : 'The day has not started; call start_day when the list is ready.' }; },
+      handler: async ({ fields, steps, priority, deadline }) => { const names = fields.map(n => { const f = fieldByName(n); if (!f) throw new Error(`No field called "${n}".`); return f.name; }); const ids = draftJobs({ fields: names, steps, priority: priority || 'medium', deadline: deadline || '17:00' }); enforcePriorities(); return { added: ids, dayRunning: mode === 'running', note: mode === 'running' ? 'The planner is fitting them in now.' : 'The day has not started; call start_day when the list is ready.' }; },
       summary: ({ fields, steps }, out) => `Added ${out.added.length} job(s): ${steps.map(x => STEP_WORD[x] || x).join(' then ')} on ${fields.join(', ')}` },
     { name: 'remove_job', description: 'Take a job off the list (only jobs not yet sent to the planner, and any job that waits for it).', input_schema: { type: 'object', properties: { job: { type: 'string' } }, required: ['job'] },
       handler: async ({ job }) => { removeDraft(job); return `Removed ${job}.`; }, summary: ({ job }) => `Removed job ${job}` },
@@ -1016,7 +1016,7 @@ const chat = createChat({
     { name: 'why_job', description: 'Why a job is with its tractor and when it will finish, with the alternatives the planner rejected. Needs the job id (for example N3).', input_schema: { type: 'object', properties: { job: { type: 'string' } }, required: ['job'] },
       handler: async ({ job }) => [].concat(sim.dispatcher.why(sim, job)) },
     { name: 'change_priority', description: 'Change a job\'s priority so the planner brings it forward or pushes it back. The planner re-plans at once.', input_schema: { type: 'object', properties: { job: { type: 'string' }, priority: { type: 'string', enum: ['high', 'medium', 'low'] }, reason: { type: 'string' } }, required: ['job', 'priority'] },
-      handler: async ({ job, priority, reason }) => { if (!sim.jobs.get(job)) throw new Error(`No job ${job} with the planner.`); sim.inject({ type: 'priority_change', job, priority, note: reason || 'operator request', source: 'operator', signal: 'Operator, through the assistant' }); return `${job} is now ${priority} priority.`; },
+      handler: async ({ job, priority }) => { const r = setPriority(job, priority); return `${job} is now ${priority} priority.${r.note ? ' ' + r.note + '.' : ''}`; },
       summary: ({ job, priority }) => `Changed ${job} to ${priority} priority` },
     { name: 'set_ai_drive', description: 'Switch "Let the AI drive" on or off. On: the crop manager queues the plowing and sowing each field needs and starts the day.', input_schema: { type: 'object', properties: { on: { type: 'boolean' } }, required: ['on'] },
       handler: async ({ on }) => { setAiDrive(on); return `AI drive is ${aiDrive ? 'on' : 'off'}.`; }, summary: ({ on }) => `Switched AI drive ${on ? 'on' : 'off'}` },
@@ -1033,6 +1033,57 @@ const chat = createChat({
     return `${f.name}: ${r.summaryText}. ${r.confidenceText || ''} ${r.nextText || ''} The drone is on its way; its camera is below. (Answered from the records without the language model, which could not be reached.)`.replace(/\s+/g, ' ');
   },
 });
+
+// ---- The day's plan as the operator sees it: every task ranked by urgency, and each tractor's schedule.
+const RANK = { low: 0, medium: 1, high: 2 };
+const STEP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
+const prioOf = (id) => sim.jobs.get(id)?.priority || backlog.find(b => b.id === id)?.priority || 'medium';
+function applyPriority(id, priority, changed) {
+  if (prioOf(id) === priority) return;
+  const b = backlog.find(x => x.id === id), j = sim.jobs.get(id);
+  if (b) b.priority = priority;
+  if (j && j.status !== 'done') sim.inject({ type: 'priority_change', job: id, priority, note: 'job planner', source: 'operator', signal: 'Job planner' });
+  changed.push({ job: id, priority });
+}
+// A job that must happen first is always at least as urgent as the job that waits for it: sowing can never
+// outrank the plowing it depends on. Raising a later step raises the earlier one; lowering an earlier step
+// lowers what follows it.
+function setPriority(id, priority) {
+  if (!(priority in RANK)) throw new Error(`Unknown priority: ${priority}`);
+  if (!backlog.some(b => b.id === id) && !sim.jobs.get(id)) throw new Error(`No job ${id}.`);
+  const changed = [], notes = [];
+  applyPriority(id, priority, changed);
+  for (let up = backlog.find(x => x.id === id)?.waitsFor; up; up = backlog.find(x => x.id === up)?.waitsFor) {
+    if (RANK[prioOf(up)] < RANK[priority] && sim.jobs.get(up)?.status !== 'done') { applyPriority(up, priority, changed); notes.push(`${up} raised to ${priority} as well: it has to be done first, so it must be at least as urgent`); }
+  }
+  const down = (pid) => backlog.filter(x => x.waitsFor === pid).forEach(d => { if (RANK[prioOf(d.id)] > RANK[priority]) { applyPriority(d.id, priority, changed); notes.push(`${d.id} lowered to ${priority} as well: it cannot be more urgent than the job it waits for`); } down(d.id); });
+  down(id);
+  if (changed.length) trail('operator', 'planner', 'priority', `${id} set to ${priority} priority.${notes.length ? ' ' + notes.join('. ') + '.' : ''}`, { changed });
+  return { changed, note: notes.join('. ') || null };
+}
+function enforcePriorities() {                      // after jobs are added: the same rule over the whole list
+  for (const b of backlog) if (b.waitsFor && stillToDo(b) && RANK[prioOf(b.id)] > RANK[prioOf(b.waitsFor)] && sim.jobs.get(b.waitsFor)?.status !== 'done') applyPriority(b.waitsFor, prioOf(b.id), []);
+}
+function planView() {
+  const plan = sim.dispatcher.plan || {};
+  const tractorOf = (id) => Object.keys(plan.assign || {}).find(t => (plan.assign[t] || []).some(x => (x?.id ?? x) === id)) || null;
+  const tasks = backlog.map(b => {
+    const j = sim.jobs.get(b.id), sc = plan.schedule?.[b.id], r = routes.get(b.id);
+    if (j?.status === 'cancelled') return null;
+    return {
+      id: b.id, step: STEP_NAME[b.type] || b.type, field: b.field, label: `${STEP_NAME[b.type] || b.type} ${b.field}`, type: b.type,
+      priority: prioOf(b.id), deadline: fmtTime(j?.deadline ?? b.deadline), status: j ? j.status : b.status === 'waiting' ? 'waiting' : 'draft',
+      tractor: j?.status === 'done' ? (j.doneBy || null) : tractorOf(b.id), start: sc ? fmtTime(sc.start) : null,
+      end: j?.status === 'done' ? fmtTime(j.doneAt) : sc ? fmtTime(sc.end) : null, late: !!sc?.late && j?.status !== 'done',
+      pct: j?.status === 'done' ? 100 : r ? Math.round(r.fraction * 100) : null, after: b.waitsFor || null,
+    };
+  }).filter(Boolean).sort((a, b) => (a.status === 'done') - (b.status === 'done') || RANK[b.priority] - RANK[a.priority] || a.deadline.localeCompare(b.deadline) || (a.end || '99').localeCompare(b.end || '99'));
+  const schedule = units.map(u => ({
+    tractor: u.id, name: u.twin.name,
+    items: (plan.evals?.[u.id]?.legs || []).filter(l => l.end > l.start).map(l => ({ kind: l.kind, job: l.jobId || null, type: l.jobId ? sim.jobs.get(l.jobId)?.type : null, label: l.jobId && sim.jobs.get(l.jobId) ? sim.label(sim.jobs.get(l.jobId)) : l.kind === 'swap' ? `change to ${l.impl || 'implement'}` : l.kind, startMin: Math.round(l.start), endMin: Math.round(l.end), start: fmtTime(l.start), end: fmtTime(l.end) })),
+  }));
+  return { tasks, schedule, nowMin: sim.time, now: fmtTime(sim.time), dayEndMin: 660 };
+}
 
 function droneTick(dt) {
   escortSprayer();
@@ -1212,6 +1263,7 @@ function snapshot() {
     weather: (() => { const c = weather.current(); return c ? { day: weather.day, clock: c.reading.clock, low: c.reading.low, high: c.reading.high, status: c.assessment.status, reason: c.assessment.reason, groundOnly: c.assessment.groundOnly, caughtByTwoHeights: c.assessment.caughtByTwoHeights, log: weather.log().filter(x => x.note).slice(-6).reverse() } : null; })(),
     fields: (() => { try { return fieldStatus(); } catch (err) { return []; } })(),
     ai: { on: aiDrive },
+    plan: (() => { try { return planView(); } catch (err) { return { tasks: [], schedule: [], nowMin: sim.time, dayEndMin: 660, error: err.message }; } })(),
     drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed, wind: droneWind },
     fuelPlan: fuelMission ? { tractor: fuelMission.u.id, phase: fuelMission.phase, ...fuelMission.numbers } : null, fuelScale: FUEL_SCALE,
     jobs: [...sim.jobs.values()].map(j => ({
@@ -1280,7 +1332,8 @@ const server = http.createServer((req, res) => {
   const readBody = (cb) => { let body = ''; req.on('data', c => { body += c; }); req.on('end', () => { let b; try { b = JSON.parse(body || '{}'); } catch { res.writeHead(400); return res.end('The request was not valid JSON.'); } try { cb(b); } catch (err) { res.writeHead(409); res.end(String(err.message)); } }); };
   const ok = (obj) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(obj ?? { ok: true })); };
   // Job list
-  if (req.method === 'POST' && req.url === '/draft') return readBody((b) => ok({ added: draftJobs(b) }));
+  if (req.method === 'POST' && req.url === '/draft') return readBody((b) => { const added = draftJobs(b); enforcePriorities(); ok({ added }); });
+  if (req.method === 'POST' && req.url === '/job/priority') return readBody((b) => ok(setPriority(String(b.job), String(b.priority))));
   if (req.method === 'POST' && req.url === '/jobs') return readBody((b) => ok({ added: draftJobs({ fields: b.fields, steps: [b.type], priority: b.priority, deadline: b.deadline }) }));
   if (req.method === 'DELETE' && req.url.startsWith('/draft/')) { try { removeDraft(decodeURIComponent(req.url.slice(7))); return ok(); } catch (err) { res.writeHead(409); return res.end(String(err.message)); } }
   if (req.method === 'POST' && req.url === '/field/crop') return readBody((b) => {

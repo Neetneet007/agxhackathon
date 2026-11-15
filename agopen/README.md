@@ -227,6 +227,15 @@ Job order is also a rule: nothing is sown before it is plowed (see [Build a job 
 **Let the AI drive.** A switch at the top of the Add jobs panel (`POST /ai {"on": true}`). Off, the operator builds the job list. On, the crop manager reads every field's record, queues the work each one needs (plowed soil: sow; stubble: plow, then sow), nearest and ready-to-sow fields first and no more than five jobs open at a time, and starts the day. Growing fields are left alone. The operator can still add or remove jobs, and every tractor still waits for Good to go at the depot.
 
 
+## Farm assistant (chat)
+
+http://localhost:5190/chat is a plain chat with the farm assistant (`agopen/chat.js`): one language model (`claude-haiku-5-5`, or `CHAT_MODEL`) with a short instruction text and plain-code tools, the same functions the dashboard's buttons call. It can read the farm (`farm_overview`, `field_report`), add and remove jobs, start the day, change a priority, explain any assignment (`why_job`), switch AI drive, pick a crop, and send the drone. Asking what a field is like answers from the field's record and sends the drone there; its camera is shown under the answer. The rules stay in the tools: it cannot sow before plowing, cannot release a tractor locked at the depot, and cannot lift a weather stop. It needs internet and `ANTHROPIC_API_KEY`; without them a question that names a field still gets the record and the drone, and anything else gets a plain "could not reach the model". Both sides of each exchange are written to the message trail.
+
+## Planning jobs: ranked tasks and the day's schedule
+
+**Plan jobs** on the dashboard opens the planner: every task ranked by urgency, the fields with one suggested action each, and each tractor's schedule for the day (drive, work, refuel, implement change) drawn from the planner's own plan, so it redraws when a task or a priority changes. A job that has to happen first is always at least as urgent as the job that waits for it: raising a sowing job raises its plowing, and lowering the plowing lowers the sowing (`POST /job/priority {"job","priority"}`; the reply says what else was changed and why). `/state` carries this as `plan.tasks` and `plan.schedule`.
+
+
 ## Fuel truck
 
 The fuel truck "FUEL" is a fourth AgOpenWeb vehicle, on port 5178. It carries fuel to a tractor that is working in a field, when that is cheaper than the tractor driving to the depot and back. If no truck node is running, the option is not offered and every refuel is at the depot.
