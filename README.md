@@ -2,9 +2,13 @@
 
 A coordinator that assigns field jobs to a small fleet of autonomous tractors, re-plans in milliseconds when something goes wrong, and explains every change in plain language. It also answers "why?" for any assignment.
 
-**Simulation:** we use **our own simulation**, not AgOpenWeb. It is a minute-by-minute farm sim on a 30×20 grid, with a creek crossed by two bridges, a depot (fuel and implement shed), 9 fields and 3 tractors. Judges score the coordinator, so we kept the sim small and spent our time on the planning.
+**Simulation:** the original mode described in this file uses **our own simulation**, not AgOpenWeb (the live mode below does use AgOpenWeb). It is a minute-by-minute farm sim on a 30×20 grid, with a creek crossed by two bridges, a depot (fuel and implement shed), 9 fields and 3 tractors. Judges score the coordinator, so we kept the sim small and spent our time on the planning.
 
 **Stack:** Node.js 18+. The planner, simulator and CLI have no dependencies; the dashboard server uses the Anthropic SDK for optional Claude explanations, and the 3D view loads three.js from a CDN. The same coordinator code runs in the CLI and live in the browser.
+
+## Live mode on AgOpenWeb
+
+The `agopen/` folder runs the same coordinator on three tractors, each a separate process driving its own AgOpenWeb instance. The coordinator watches their telemetry, detects a stalled tractor, reassigns its unfinished work and explains the new plan. Fuel, job timing and the plan clock are still the planner's own simulation. For how to run it and what is real, see [agopen/README.md](agopen/README.md). For the five-minute demo script, see [agopen/DEMO.md](agopen/DEMO.md).
 
 ## Run it
 
@@ -142,7 +146,7 @@ This maps to the "AI Farm Orchestrator" layer of ATC's diagram.
 - [x] Planning around fuel and battery levels: reserve-aware, with refuel stops inserted and a refuel-first rule so jobs aren't split by a mid-job refuel
 - [x] Beats the FCFS baseline on completed work, deadlines, travel and idle time
 - [x] Operator can ask "why?" about any assignment
-- [ ] AgOpenWeb integration (not attempted; the coordinator talks to the simulator through a small dispatcher interface — `nextJob`, `onEvent`, `onJobDone` — so another simulator could sit behind it)
+- [x] AgOpenWeb integration in the live mode (`agopen/`, see [agopen/README.md](agopen/README.md)). The original mode in this file does not use AgOpenWeb; the coordinator talks to its own simulator through a small dispatcher interface — `nextJob`, `onEvent`, `onJobDone` — so another simulator could sit behind it
 
 ## Limitations
 - Travel is grid-based (4-connected) with flat per-tractor speeds. There are no slopes, turning time or road speed classes.

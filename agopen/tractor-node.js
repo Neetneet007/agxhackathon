@@ -26,7 +26,8 @@ const t = new Tractor(id, agPort);
 let fault = 'ok', cmd = null, seq = 0, acked = 0, lastCmdAt = 0;
 let bayHome = null;
 // This tractor's own parking bay: 10 m apart along the depot front, so three machines never share a spot.
-const bayLon = (home) => home.lon + ((Math.max(0, Number(id.replace(/\D/g, '')) - 1) - 1) * 10) / (111412.84 * Math.cos(home.lat * Math.PI / 180) - 93.5 * Math.cos(3 * home.lat * Math.PI / 180));
+const bayIndex = process.argv.includes('--bay') ? Number(process.argv[process.argv.indexOf('--bay') + 1]) : Math.max(0, Number(id.replace(/\D/g, '')) - 1);
+const bayLon = (home) => home.lon + ((bayIndex - 1) * 10) / (111412.84 * Math.cos(home.lat * Math.PI / 180) - 93.5 * Math.cos(3 * home.lat * Math.PI / 180));
 
 await t.connect();
 await sleep(1200);

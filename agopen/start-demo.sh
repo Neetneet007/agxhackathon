@@ -19,9 +19,9 @@ echo "1/5 Stopping anything left from an earlier run..."
 stop_all
 echo "2/5 Writing the farm and implement profiles into each AgOpenWeb copy..."
 (cd "$REPO" && node agopen/build-farm.js) || exit 1
-echo "3/5 Starting three AgOpenWeb copies..."
-"$MULTI/start-fleet.sh" 3 >/dev/null 2>&1 </dev/null
-for P in 5175 5176 5177; do
+echo "3/5 Starting four AgOpenWeb copies (three tractors and the fuel truck)..."
+"$MULTI/start-fleet.sh" 4 >/dev/null 2>&1 </dev/null
+for P in 5175 5176 5177 5178; do
   for k in $(seq 1 40); do curl -s -o /dev/null -m 1 "http://localhost:$P/" && break; sleep 0.5; done
   curl -s -o /dev/null -m 1 "http://localhost:$P/" || { echo "AgOpenWeb did not start on port $P. See $MULTI/tractor-$P.log"; exit 1; }
 done
@@ -41,7 +41,8 @@ echo "4/5 Opening a Terminal window per tractor, then the coordinator..."
 win "Tractor T1 telemetry" 0    560 640 300 "node agopen/tractor-node.js T1 5175 --depot"
 win "Tractor T2 telemetry" 640  560 640 300 "node agopen/tractor-node.js T2 5176 --depot"
 win "Tractor T3 telemetry" 1280 560 640 300 "node agopen/tractor-node.js T3 5177 --depot"
-for P in 6175 6176 6177; do for k in $(seq 1 40); do curl -s -m 1 -o /dev/null "http://127.0.0.1:$P/telemetry" && break; sleep 0.5; done; done
+win "Fuel truck telemetry" 960 40 640 300 "node agopen/tractor-node.js FUEL 5178 --depot --bay 3"
+for P in 6175 6176 6177 6178; do for k in $(seq 1 40); do curl -s -m 1 -o /dev/null "http://127.0.0.1:$P/telemetry" && break; sleep 0.5; done; done
 win "Fleet coordinator" 0 40 960 500 "node agopen/live.js ${LIVE_ARGS:-}"
 for k in $(seq 1 30); do curl -s -m 1 -o /dev/null http://127.0.0.1:5190/state && break; sleep 0.5; done
 open "http://localhost:5190/"

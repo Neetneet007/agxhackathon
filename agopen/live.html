@@ -36,6 +36,16 @@
   .trail .fault .who, .trail .fault { color:var(--bad); font-weight:600; }
   .muted { color:var(--muted); }
   .scroll { overflow-x:auto; }
+  .wx { font-size:13px; display:grid; gap:6px; }
+  .wxpill { display:inline-block; font-weight:800; font-size:18px; padding:4px 16px; border-radius:16px; color:#fff; }
+  .wxpill.GO { background:var(--ok); } .wxpill.CAUTION { background:var(--warn); } .wxpill.STOP { background:var(--bad); }
+  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
+  .wxlog { font-size:12px; color:var(--muted); max-height:86px; overflow:auto; }
+  .dronebox { display:grid; grid-template-columns:170px 1fr; gap:10px; align-items:start; font-size:13px; }
+  #dronecam { width:170px; height:128px; background:#e9e3d2; border-radius:6px; border:1px solid var(--line); }
+  button.small { font-size:12px; padding:2px 8px; float:right; }
+  #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
+  #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
   .roundtable { max-height:300px; overflow:auto; display:grid; gap:6px; }
   .rt-topic { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; border-top:1px solid var(--line); padding-top:6px; }
   .rt-line { display:grid; grid-template-columns:132px 1fr; gap:8px; align-items:start; font-size:13px; }
@@ -122,6 +132,19 @@
     <h2>Roundtable <small class="muted" id="rtmeta">the managers discuss each event; the tractors have already acted</small></h2>
     <div id="roundtable" class="roundtable"></div>
   </div>
+  <div class="row">
+    <div class="card">
+      <h2>Spray conditions <small class="muted">weather at two heights, simulated feed</small></h2>
+      <div id="wx" class="wx muted">Starts with the day.</div>
+    </div>
+    <div class="card">
+      <h2>Scout drone <small class="muted">fully simulated</small> <button id="dscan" type="button" class="small">Map the picked fields</button></h2>
+      <div class="dronebox">
+        <svg id="dronecam" role="img" aria-label="Simulated drone camera"></svg>
+        <div id="droneinfo" class="muted">Docked.</div>
+      </div>
+    </div>
+  </div>
   <div class="card" id="peoplecard" hidden>
     <h2>Needs a person at the depot <small class="muted">a tractor being serviced is locked and cannot move until you press Good to go</small></h2>
     <div id="people"></div>
@@ -184,7 +207,16 @@ function drawFarm() {
     const bad = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
     h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#c0392b' : TR_COLOR[i % 4]}"></circle><text x="${x.toFixed(0)}" y="${(y + 2.8).toFixed(1)}" style="fill:#fff">${esc(t.id)}</text>`;
   });
+  const dr = lastState && lastState.drone;
+  if (dr) {
+    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#7b1fa2" fill-opacity="0.45" pointer-events="none"></circle>`;
+    if (dr.path && dr.path.length > 1) h += `<polyline class="dronepath" points="${[{ e: dr.e, n: dr.n }, ...dr.path].map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
+    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#111" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#111" stroke-width="1.2"></line></g>`;
+  }
   svg.innerHTML = h;
+  // The drone's "camera": the same scene, looking straight down from where the drone is. Simulated.
+  const cam = document.getElementById('dronecam');
+  if (cam && dr) { cam.setAttribute('viewBox', `${(dr.e - 34).toFixed(1)} ${(-dr.n - 26).toFixed(1)} 68 52`); cam.innerHTML = h; }
 }
 // ---- Job list builder ----
 const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
@@ -335,12 +367,34 @@ async function refresh() {
       <dt>Task</dt><dd>${esc(t.task || '–')}</dd>
       <dt>Next jobs</dt><dd>${esc(t.queue.join(' → ') || '–')}</dd>
       <dt>Implement</dt><dd>${esc(t.mounted)} · fuel ${t.fuelPct}%</dd>
+      ${t.eta && t.eta.jobDoneAt ? `<dt>Job finishes</dt><dd>in ${t.eta.jobDoneInMin} min, at ${esc(t.eta.jobDoneAt)} <span class="muted">(${t.eta.ratePctPerMin}% a minute${t.eta.measured ? ', measured' : ', rated'})</span></dd>
+      <dt>Fuel to reserve</dt><dd>${t.eta.fuelToReserveAt ? `in ${t.eta.fuelToReserveInMin} min, at ${esc(t.eta.fuelToReserveAt)}` : 'not burning'} · ${t.eta.fuelPctAtJobEnd}% left when this job ends${t.eta.runsShortBeforeJobEnds ? ' · <b style="color:var(--bad)">runs short before the job ends</b>' : ''}</dd>
+      ${t.eta.fuelPlan ? `<dt>Next refuel</dt><dd>${t.eta.fuelPlan.needsFuelFirst ? (t.eta.fuelPlan.choice ? `needed before ${esc(t.eta.fuelPlan.next)}: <b>${t.eta.fuelPlan.choice === 'truck' ? 'fuel truck' : 'depot'}</b> (depot detour ${t.eta.fuelPlan.depotExtraM} m, about USD ${t.eta.fuelPlan.depotCost}; truck round trip ${t.eta.fuelPlan.truckRoundTripM} m, about USD ${t.eta.fuelPlan.truckCost})` : `needed before ${esc(t.eta.fuelPlan.next)}`) : `enough for ${esc(t.eta.fuelPlan.next)} too`}</dd>` : ''}` : ''}
       <dt>From AgOpenWeb</dt><dd>${m.rig && m.rig.tool ? `mounted "${esc(m.rig.tool.profile)}" ${m.rig.tool.widthM} m · can also use ${esc((m.rig.tools || []).filter(x => x.kind && x.profile !== m.rig.tool.profile).map(x => x.profile).join(', ') || 'nothing else')}` : '–'}${m.service ? ' · <b>LOCKED for service</b>' : ''}</dd>
       <dt>AgOpenWeb job</dt><dd>${m.field && m.field !== 'No Field' ? esc(m.field) : 'no field open'}${m.job ? ' · ' + esc(m.job) : ''}${m.areaM2 ? ' · ' + (m.areaM2 / 10000).toFixed(2) + ' ha worked' : ''}${m.autosteer ? ' · autosteer on line' : ''}</dd>
       <dt>GPS</dt><dd>${m.lat != null ? m.lat.toFixed(6) + ', ' + m.lon.toFixed(6) : '–'}</dd>
       <dt>Speed</dt><dd>${m.speedKph ?? '–'} km/h · heading ${m.headingDeg ?? '–'}°</dd>
       <dt>Last heard</dt><dd>${t.heardAgoMs == null ? 'never' : (t.heardAgoMs / 1000).toFixed(1) + ' s ago'} · command ack ${m.ack ?? '–'}</dd>
       <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`;
+  }
+  const wx = s.weather, wxEl = document.getElementById('wx');
+  if (wx) {
+    wxEl.classList.remove('muted');
+    wxEl.innerHTML = `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
+      <div>${esc(wx.reason)}</div>
+      <div class="wxgrid"><span></span><b>2 m</b><b>10 m</b><span class="muted">Temperature</span><span>${wx.low.tempC.toFixed(1)} °C</span><span>${wx.high.tempC.toFixed(1)} °C</span><span class="muted">Wind</span><span>${wx.low.windMph.toFixed(1)} mph</span><span>${wx.high.windMph.toFixed(1)} mph</span></div>
+      <div class="${wx.caughtByTwoHeights ? '' : 'muted'}">A single ground station would say: <b>${esc(wx.groundOnly.status === 'GO' ? 'Go' : wx.groundOnly.status === 'STOP' ? 'Stop' : 'Caution')}</b>${wx.caughtByTwoHeights ? '. The second height caught the risk.' : ''}</div>
+      <div class="wxlog">${(wx.log || []).map(l => `<div>${esc(l.clock)} ${esc(l.status)}: ${esc(l.note)}</div>`).join('')}</div>
+      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`;
+  }
+  const d = s.drone, dEl = document.getElementById('droneinfo');
+  if (d && dEl) {
+    const rep = (d.reports || [])[0];
+    const words = { docked: 'Docked', flying: 'Flying', hovering: 'Hovering', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
+    dEl.classList.remove('muted');
+    dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
+      <div class="muted" style="font-size:11px">Camera view on the left is rendered from the simulation, not a real camera.</div>
+      ${rep ? `<div style="margin-top:6px"><b>${esc(rep.clock)} ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</b><br>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
   }
   document.getElementById('peoplecard').hidden = !s.tasks.length;
   document.getElementById('people').innerHTML = s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
@@ -364,6 +418,10 @@ async function refresh() {
   document.getElementById('jobs').innerHTML = '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th></tr>' +
     s.jobs.map(j => `<tr><td>${esc(j.label)}</td><td>${esc(j.priority)}</td><td>${j.deadline}</td><td>${esc(j.tractor || '–')}</td><td>${j.pct}%</td><td>${esc(j.status)}</td></tr>`).join('');
 }
+document.getElementById('dscan').addEventListener('click', async () => {
+  const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
+  document.getElementById('droneinfo').textContent = res.ok ? 'Drone sent.' : await res.text();
+});
 // Start over needs two clicks, so it cannot be hit by accident.
 const so = document.getElementById('startover'), soMsg = document.getElementById('startovermsg');
 let soArmed = 0;
