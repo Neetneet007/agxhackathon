@@ -8,7 +8,61 @@ A coordinator that assigns field jobs to a small fleet of autonomous tractors, r
 
 ## Live mode on AgOpenWeb
 
-The `agopen/` folder runs the same coordinator on three tractors, each a separate process driving its own AgOpenWeb instance. The coordinator watches their telemetry, detects a stalled tractor, reassigns its unfinished work and explains the new plan. Fuel, job timing and the plan clock are still the planner's own simulation. For how to run it and what is real, see [agopen/README.md](agopen/README.md). For the five-minute demo script, see [agopen/DEMO.md](agopen/DEMO.md).
+The `agopen/` folder runs the same coordinator on a fleet of four vehicles: tractors T1, T2 and T3 and a fuel truck "FUEL". Each is a separate process driving its own real AgOpenWeb instance (AgOpenGPS web). The coordinator watches their telemetry, detects a stalled tractor, reassigns its unfinished work and explains the new plan in plain language. Fuel, job timing and the plan clock are still the planner's own simulation, and the weather feed and scout drone are simulated. Full details: [agopen/README.md](agopen/README.md). Five-minute demo script: [agopen/DEMO.md](agopen/DEMO.md).
+
+**Run it.** After the one-time set-up in `agopen/README.md` (a patched AgOpenWeb build, `npm install`), one command starts everything on macOS:
+
+```bash
+agopen/start-demo.sh          # starts all vehicles, the coordinator and the status page, then a preflight check
+agopen/start-demo.sh stop     # stops everything
+LIVE_ARGS="--preset" agopen/start-demo.sh    # options for live.js, here: start with the scenario's 11 jobs
+```
+
+| What | Where |
+| --- | --- |
+| Status page (job list, tractor cards, roundtable, spray conditions, drone) | http://localhost:5190 |
+| 3D view (needs the internet) | http://localhost:5190/3d |
+| AgOpenWeb of T1, T2, T3 and FUEL | ports 5175, 5176, 5177, 5178 |
+| Telemetry node of T1, T2, T3 and FUEL | ports 6175, 6176, 6177, 6178 |
+
+`live.js` options (`LIVE_ARGS`), with defaults: `--cell` 20, `--sec` 1.8, `--until` none, `--preset` off, `--auto-humans` 0 (off), `--fuel-scale` 25, `--weather` demo (also `calm`, `windy`, `still`), `--truck` 6178, `--script` none, `--page` 5190.
+
+**What it does**
+
+- **Fault recovery.** Type `stuck` or `dead` in a tractor's Terminal window (`ok` to recover). The coordinator detects it from telemetry only, hands the unfinished job to another tractor and explains the change.
+- **Full-length passes.** Every pass runs edge to edge and the tractor turns outside the field boundary, so coverage reaches the edges. There is no headland lap.
+- **People in the loop.** A refuel or an implement change locks the tractor until a person presses **Good to go** on the status page. An implement change is then written to that tractor's AgOpenWeb (`profile.load`). Nothing is sown before it is plowed.
+- **Fuel truck.** The planner compares the cost in US dollars of a detour via the depot with the fuel truck's round trip (rates in `agopen/scenario.live.json` under `costs`), picks the cheaper and sends the truck so that it arrives as the job ends. Each tractor card shows when its job finishes, when its fuel reaches the reserve, and the next refuel choice with both costs.
+- **Spray or Wait?** Weather at 2 m and 10 m, an inversion check, wind limits (2 m wind 3 to 10 mph, at most 5 mph between heights), and Go, Caution or Stop with a reason. Every change is time-stamped in the log at `GET /weather-log`. A Stop holds spray jobs and releases them when conditions return.
+- **Scout drone (simulated).** Scans a field for crop status (`POST /drone/scan`, or **Map the picked fields** on the status page), is sent to look at a faulted tractor, shows a simulated camera view, and can spot-spray.
+- **Roundtable of AI managers** (`agopen/roundtable/`, one manager per task for the whole fleet, model `claude-haiku-5-5`, rule-written lines when offline) explain each event. They never move a tractor.
+- **AgOpenWeb patch** (`agopen/agopenweb/agopenweb-multi-instance.patch`), four changes: `AGOPENWEB_PORT`, a single-instance lock named per port, `AGOPENWEB_OPERATOR=Fleet` (only clients named Fleet... can take the controls) and `?embed=1` (a map-only page for the small windows on the status page).
+
+**Hand-in files for the live mode**
+
+| Item | Where |
+| --- | --- |
+| Scenario | [`agopen/scenario.live.json`](agopen/scenario.live.json) |
+| Event log of the live run | [`agopen/handin/event-log.jsonl`](agopen/handin/event-log.jsonl), a copy of `agopen/out/trail.jsonl` (that file is emptied each time the coordinator starts) |
+| Comparison against first come, first served | [`agopen/test/TEST_REPORT.md`](agopen/test/TEST_REPORT.md) |
+
+Headline numbers from `agopen/test/TEST_REPORT.md` (breakdown day: T1 breaks at 07:00 and is repaired at 09:00):
+
+| | Coordinator | First come, first served |
+|---|---:|---:|
+| Jobs completed (of 11) | 11 | 11 |
+| Jobs finished on time | 11 | 7 |
+| Travel (tractor-minutes) | 698 | 758 |
+| Idle (tractor-minutes) | 0 | 22 |
+| Day ended at | 15:56 | 17:16 |
+
+**Known limits**
+
+- The status page shows only the headline of each re-plan. The line for each moved job is in the coordinator's Terminal window.
+- After a hand-over, the new tractor drives the interrupted pass again from its start.
+- Lanes do not react to a `block_route` event.
+- The 3D view and the roundtable model lines need the internet. Without it, the roundtable uses rule-written lines.
+- Fuel truck: the depot-on-the-way branch has been seen in a live run. The in-field hand-over by the truck is implemented but has not yet been seen end to end in a live run.
 
 ## Run it
 

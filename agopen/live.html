@@ -18,7 +18,7 @@
   .card h2 { margin:0 0 6px; font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; color:#fff; background:var(--muted); letter-spacing:.02em; }
   .WORKING { background:var(--ok); } .DRIVING { background:var(--info); } .SWAP,.REFUEL { background:var(--warn); }
-  .STANDBY { background:var(--muted); } .NO_RESPONSE,.GO_NOT_MOVING,.DOWN { background:var(--bad); }
+  .STANDBY { background:var(--muted); } .HOLD { background:#b7791f; } .NO_RESPONSE,.GO_NOT_MOVING,.DOWN { background:var(--bad); }
   .fault { border-color:var(--bad); background:#fdf1ef; }
   dl { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; margin:0; font-size:13px; }
   dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; }
@@ -41,8 +41,8 @@
   .wxpill.GO { background:var(--ok); } .wxpill.CAUTION { background:var(--warn); } .wxpill.STOP { background:var(--bad); }
   .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
   .wxlog { font-size:12px; color:var(--muted); max-height:86px; overflow:auto; }
-  .dronebox { display:grid; grid-template-columns:170px 1fr; gap:10px; align-items:start; font-size:13px; }
-  #dronecam { width:170px; height:128px; background:#e9e3d2; border-radius:6px; border:1px solid var(--line); }
+  .dronebox { display:block; font-size:13px; }
+  #dronecam { display:block; width:100%; aspect-ratio:16/9; height:auto; margin:0 0 6px; background:#cfe6f5; border-radius:6px; border:0; }
   button.small { font-size:12px; padding:2px 8px; float:right; }
   #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
   #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
@@ -140,7 +140,9 @@
     <div class="card">
       <h2>Scout drone <small class="muted">fully simulated</small> <button id="dscan" type="button" class="small">Map the picked fields</button></h2>
       <div class="dronebox">
-        <svg id="dronecam" role="img" aria-label="Simulated drone camera"></svg>
+        <!-- Static element: created once, never re-rendered, so the 3D view is not reloaded on each refresh. -->
+        <iframe id="dronecam" src="/3d?drone=1" title="Simulated drone camera" loading="lazy"></iframe>
+        <div class="muted" style="font-size:11px">Drone camera (simulated): the 3D farm seen from the drone</div>
         <div id="droneinfo" class="muted">Docked.</div>
       </div>
     </div>
@@ -214,9 +216,6 @@ function drawFarm() {
     h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#111" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#111" stroke-width="1.2"></line></g>`;
   }
   svg.innerHTML = h;
-  // The drone's "camera": the same scene, looking straight down from where the drone is. Simulated.
-  const cam = document.getElementById('dronecam');
-  if (cam && dr) { cam.setAttribute('viewBox', `${(dr.e - 34).toFixed(1)} ${(-dr.n - 26).toFixed(1)} 68 52`); cam.innerHTML = h; }
 }
 // ---- Job list builder ----
 const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
@@ -393,7 +392,7 @@ async function refresh() {
     const words = { docked: 'Docked', flying: 'Flying', hovering: 'Hovering', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
     dEl.classList.remove('muted');
     dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
-      <div class="muted" style="font-size:11px">Camera view on the left is rendered from the simulation, not a real camera.</div>
+      <div class="muted" style="font-size:11px">Camera view above is rendered from the simulation, not a real camera.</div>
       ${rep ? `<div style="margin-top:6px"><b>${esc(rep.clock)} ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</b><br>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
   }
   document.getElementById('peoplecard').hidden = !s.tasks.length;
