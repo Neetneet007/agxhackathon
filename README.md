@@ -2,66 +2,23 @@
 
 A coordinator that assigns field jobs to a small fleet of autonomous tractors, re-plans in milliseconds when something goes wrong, and explains every change in plain language. It also answers "why?" for any assignment.
 
-**Simulation:** the original mode described in this file uses **our own simulation**, not AgOpenWeb (the live mode below does use AgOpenWeb). It is a minute-by-minute farm sim on a 30×20 grid, with a creek crossed by two bridges, a depot (fuel and implement shed), 9 fields and 3 tractors. Judges score the coordinator, so we kept the sim small and spent our time on the planning.
+**Simulation: both.**
+- **Our own simulation** (default; all results below): a minute-by-minute farm sim on a 30×20 grid, with a creek crossed by two bridges, a depot (fuel and implement shed), 9 fields and 3 tractors. Judges score the coordinator, so we kept the sim small and spent our time on the planning.
+- **AgOpenWeb** (stretch goal, [`agopen/`](agopen/README.md)): the same coordinator drives three real AgOpenWeb instances, one per tractor. It reads fields and implements from AgOpenWeb, detects faults from live telemetry, and reassigns work when a tractor goes silent or stops moving. It needs the .NET 10 SDK and a small multi-instance patch, so it is not required to run anything else here.
 
-**Stack:** Node.js 18+. The planner, simulator and CLI have no dependencies; the dashboard server uses the Anthropic SDK for optional Claude explanations, and the 3D view loads three.js from a CDN. The same coordinator code runs in the CLI and live in the browser.
+**Stack:** Node.js 18+. The planner, simulator and CLI have no dependencies; the dashboard server uses the Anthropic SDK for optional Claude explanations, and the 3D view loads three.js from a CDN. The same coordinator code runs in the CLI, live in the browser, and against AgOpenWeb.
 
-## Live mode on AgOpenWeb
+## Challenge checklist
 
-The `agopen/` folder runs the same coordinator on a fleet of four vehicles: tractors T1, T2 and T3 and a fuel truck "FUEL". Each is a separate process driving its own real AgOpenWeb instance (AgOpenGPS web). The coordinator watches their telemetry, detects a stalled tractor, reassigns its unfinished work and explains the new plan in plain language. Fuel, job timing and the plan clock are still the planner's own simulation, and the weather feed and scout drone are simulated. Full details: [agopen/README.md](agopen/README.md). Five-minute demo script: [agopen/DEMO.md](agopen/DEMO.md).
+| Must-have | Where it is |
+|---|---|
+| 1. Take a job list | Operator panel: submit one job or paste a JSON job list; `scenario.json` for the CLI |
+| 2. Assign compatible tractors | `src/fleet.js`: implement, fuel reserve, reachability, shift and deadlines are hard constraints |
+| 3. Show progress | 3D Command Center (`node serve.js`), 2D view at `/dashboard/classic.html` |
+| 4. Recover from a breakdown | Re-plan in ms, partial acres kept, Safety Agent checks for duplicates and lost jobs: 0 in 200 random scenarios |
+| 5. Explain the new plan | A notification for every re-plan, a full change list, and **Why?** on any job |
 
-**Run it.** After the one-time set-up in `agopen/README.md` (a patched AgOpenWeb build, `npm install`), one command starts everything on macOS:
-
-```bash
-agopen/start-demo.sh          # starts all vehicles, the coordinator and the status page, then a preflight check
-agopen/start-demo.sh stop     # stops everything
-LIVE_ARGS="--preset" agopen/start-demo.sh    # options for live.js, here: start with the scenario's 11 jobs
-```
-
-| What | Where |
-| --- | --- |
-| Status page (job list, tractor cards, roundtable, spray conditions, drone) | http://localhost:5190 |
-| 3D view (needs the internet) | http://localhost:5190/3d |
-| AgOpenWeb of T1, T2, T3 and FUEL | ports 5175, 5176, 5177, 5178 |
-| Telemetry node of T1, T2, T3 and FUEL | ports 6175, 6176, 6177, 6178 |
-
-`live.js` options (`LIVE_ARGS`), with defaults: `--cell` 20, `--sec` 1.8, `--until` none, `--preset` off, `--auto-humans` 0 (off), `--fuel-scale` 25 (the launcher passes 70), `--weather` demo (also `calm`, `windy`, `still`), `--truck` 6178, `--script` none, `--page` 5190.
-
-**What it does**
-
-- **Fault recovery.** Type `stuck` or `dead` in a tractor's Terminal window (`ok` to recover). The coordinator detects it from telemetry only, hands the unfinished job to another tractor and explains the change.
-- **Full-length passes.** Every pass runs edge to edge and the tractor turns outside the field boundary, so coverage reaches the edges. There is no headland lap.
-- **People in the loop.** A refuel or an implement change locks the tractor until a person presses **Good to go** on the status page. An implement change is then written to that tractor's AgOpenWeb (`profile.load`). Nothing is sown before it is plowed.
-- **Fuel truck.** The planner compares the cost in US dollars of a detour via the depot with the fuel truck's round trip (rates in `agopen/scenario.live.json` under `costs`), picks the cheaper and sends the truck so that it arrives as the job ends. Each tractor card shows when its job finishes, when its fuel reaches the reserve, and the next refuel choice with both costs.
-- **Spray or Wait?** Weather at 2 m and 10 m, an inversion check, wind limits (2 m wind 3 to 10 mph, at most 5 mph between heights), and Go, Caution or Stop with a reason. Every change is time-stamped in the log at `GET /weather-log`. A Stop holds spray jobs and releases them when conditions return.
-- **Scout drone (simulated).** Scans a field for crop status (`POST /drone/scan`, or **Map the picked fields** on the status page), is sent to look at a faulted tractor, circles it with the camera kept on it, flies above a spraying tractor reading the wind at 10, 30 and 50 m, shows the 3D farm from its own camera, and can spot-spray.
-- **Roundtable of AI managers** (`agopen/roundtable/`, one manager per task for the whole fleet, model `claude-haiku-5-5`, rule-written lines when offline) explain each event. They never move a tractor.
-- **AgOpenWeb patch** (`agopen/agopenweb/agopenweb-multi-instance.patch`), four changes: `AGOPENWEB_PORT`, a single-instance lock named per port, `AGOPENWEB_OPERATOR=Fleet` (only clients named Fleet... can take the controls) and `?embed=1` (a map-only page for the small windows on the status page).
-
-**Hand-in files for the live mode**
-
-| Item | Where |
-| --- | --- |
-| Scenario | [`agopen/scenario.live.json`](agopen/scenario.live.json) |
-| Event log of the live run | [`agopen/handin/event-log.jsonl`](agopen/handin/event-log.jsonl), a copy of `agopen/out/trail.jsonl` (that file is emptied each time the coordinator starts) |
-| Comparison against first come, first served | [`agopen/test/TEST_REPORT.md`](agopen/test/TEST_REPORT.md) |
-
-Headline numbers from `agopen/test/TEST_REPORT.md` (breakdown day: T1 breaks at 07:00 and is repaired at 09:00):
-
-| | Coordinator | First come, first served |
-|---|---:|---:|
-| Jobs completed (of 11) | 11 | 11 |
-| Jobs finished on time | 11 | 7 |
-| Travel (tractor-minutes) | 698 | 758 |
-| Idle (tractor-minutes) | 0 | 22 |
-| Day ended at | 15:56 | 17:16 |
-
-**Known limits**
-
-- The status page shows only the headline of each re-plan. The line for each moved job is in the coordinator's Terminal window.
-- After a hand-over, the new tractor drives the interrupted pass again from its start.
-- Lanes do not react to a `block_route` event.
-- The 3D view and the roundtable model lines need the internet. Without it, the roundtable uses rule-written lines.
+All five stretch goals are covered too: blocked routes and priority changes, fuel planning, beating the baseline, **Why?**, and AgOpenWeb.
 
 ## Run it
 
@@ -72,6 +29,7 @@ node cli.js --no-events     # same farm, no disruptions
 node cli.js --why J13       # print the "why?" explanation for any job
 node stress.js 200          # 200 random scenarios: invariants + comparison
 node serve.js               # 3D Command Center → http://localhost:5180/
+node gis/fetch.js           # optional: refresh the real aerial photo, canals, roads, soil and elevation
 ```
 
 To have Claude write the notifications and answer "why?" questions, start the server with an API key:
@@ -85,6 +43,10 @@ Without a key everything still works: notifications and answers come from the pl
 ### 3D Command Center
 
 - **3D farm** (three.js): fields with crop rows that fill in as work progresses, the creek and bridges, the depot, and a low-poly tractor for each machine with its current implement. The beacon is green while working, amber while driving and flashing red when broken down. Drag to orbit, scroll to zoom, and click a tractor or field for a pop-down card.
+- **Real-world layer** (the **Satellite** button): the farm is drawn on a real aerial photo of open farmland in the Yuma Valley, Arizona (depot at 32.660, −114.740, 100 m per grid cell), with the real canals and roads from OpenStreetMap. Click a field to see its real soil survey unit, drainage, slope and elevation. `node gis/fetch.js` pulls all of it into `dashboard/gis/`; every source is public and credited on screen (USDA NAIP aerial photography, OpenStreetMap, USDA NRCS soil survey, USGS or Copernicus elevation).
+  - What is real: the photo, canals, roads, soil and elevation. What is simulated: the field rectangles, Mill Creek and its two bridges, which come from `scenario.json`. The planner does not use the GIS layer; it changes no result below.
+- **Look:** translucent "liquid glass" panels, no icons, and only the labels an operator needs. The drawn farm is the default view.
+- **Agents:** the **Agents** button opens a flow chart of which agent speaks to which, drawn from the agent code: Weather, Fault and Safety report to the Plan Manager, who decides and tells the operator; Weather and Fleet send requests to the Depot Manager, who gives people their tasks; Route, Agronomy and Records speak straight to the operator.
 - **Re-routing in 3D:** each tractor's live route is a glowing path. When the planner re-routes it, the abandoned route fades out in red and the new one draws in. Planned future legs show as dashed lines. A closed bridge gets a red barrier and a flashing lamp, and every event sends a pulse ring out from where it happened.
 - **Data sources:** every disruption comes from a named feed: tractor telematics (fault codes, fuel), the weather service, bridge water-level gauges, drone and satellite imagery, dealer service tickets, soil-moisture probes, or the operator. The Data sources panel shows each feed's latest reading and flags alerts. Notifications, the event log and Claude's explanations all cite the source.
 - **A notification for every shift:** each re-plan drops down a notification with a short title and reason, written by Claude (Opus 5.5) from the planner's facts. Claude explains the decision; the algorithmic planner makes it. Each notification has Details (the planner's full change list) and **Why?**.
@@ -99,7 +61,7 @@ Operator controls:
 - submit a single job, or paste a JSON job list
 - approve a late finish, or drop a job
 - click any job to ask **why?**
-- "Compare vs baseline" replays the same day, including your manual actions, with both dispatchers.
+- "Compare" replays the same day, including your manual actions, with both dispatchers.
 - Switch to **FCFS baseline** mode to watch the starter dispatcher run the same farm.
 
 ## Hand-in files
@@ -144,7 +106,7 @@ Operator controls:
 **200 random scenarios.** Each has random jobs, fuel levels and 0–4 events (breakdowns, repairs, closures, priority changes, new jobs).
 - The coordinator does more priority-weighted on-time work in 168 of 200 scenarios, ties in 22 and is worse in 10.
 - It completes 1387 jobs on time against 1108 for the baseline.
-- It drives 18% less.
+- It drives 18% less and sits idle 61% less (1603 vs 4124 tractor-min).
 - It has **0** unannounced violations, against 346 for the baseline.
 - No acre was lost or worked twice, and nothing crashed.
 - The slowest re-plan took 9 ms.
@@ -171,6 +133,9 @@ This maps to the "AI Farm Orchestrator" layer of ATC's diagram.
                                           │ next job per tractor
                               Simulator (src/simulator.js) ── tractors, fuel, fields, interlocks
  Command Center dashboard (dashboard/) ◄──┘     Baseline FCFS dispatcher (src/baseline.js)
+
+ Live mode (agopen/live.js): the same coordinator ── commands ──► 3 tractor processes ── WebSocket ──► 3 AgOpenWeb instances
+                                                  ◄── telemetry ──┘  (faults detected from silence or no movement)
 ```
 
 **Fleet Agent.** It plans by priority-first regret insertion, then local search with relocate, swap and eject-and-insert moves. Each candidate plan is scored by simulating every tractor's day with the same action rule the simulator executes (`src/model.js`): drive, swap implement, refuel, work. As a result the predicted plan matched the simulator to the minute in the no-event run.
@@ -199,7 +164,17 @@ This maps to the "AI Farm Orchestrator" layer of ATC's diagram.
 - [x] Planning around fuel and battery levels: reserve-aware, with refuel stops inserted and a refuel-first rule so jobs aren't split by a mid-job refuel
 - [x] Beats the FCFS baseline on completed work, deadlines, travel and idle time
 - [x] Operator can ask "why?" about any assignment
-- [x] AgOpenWeb integration in the live mode (`agopen/`, see [agopen/README.md](agopen/README.md)). The original mode in this file does not use AgOpenWeb; the coordinator talks to its own simulator through a small dispatcher interface — `nextJob`, `onEvent`, `onJobDone` — so another simulator could sit behind it
+- [x] AgOpenWeb integration: [`agopen/`](agopen/README.md). The coordinator talks to any simulator through a small dispatcher interface (`nextJob`, `onEvent`, `onJobDone`), so the same planner drives three AgOpenWeb tractors. Faults come from real telemetry; job progress still comes from the planner's simulator.
+
+## Next: the agent team (experimental)
+
+[`agents/`](agents/README.md) is a team of nine agents (Plan, Fleet, Fault, Route, Depot, Weather, Safety, Records and an Agronomy Advisor) on a durable runtime. They pass requests to each other, share memory, and speak at an operator "roundtable".
+
+- **Sourced rules.** The Weather Manager acts on a playbook of sourced rules (National Weather Service, NOAA, university extension services). A rule with no checked source can only advise. The Agronomy Advisor follows the same rule: its field notes use each field's real soil survey unit and elevation, none has a cited source yet, so it only ever advises.
+- **Ask the team.** `GET /ask?q=...` or `POST /ask` on port 5200 puts a question in plain words to the agent whose job it is: weather, fuel, faults, routes, the depot, safety, the plan, the day's record, or soil and crops. It answers from the live state with no key; with `ANTHROPIC_API_KEY` Claude writes the answer from the same facts and the agent's read-only tools. Asking never acts.
+- **Randomised testing.** `node --test agents/test/fuzz.test.js` runs random days through the whole team: broken weather stations, unknown alerts, tractors that crowd each other or go silent, a runner that drops endpoints, restarts from the durable log, and questions. Eight invariants are checked after each day (nothing off the allowlist, a person's hold is never lifted, no side effect sent twice, every weather stop cites a verified rule, the Agronomy Advisor never acts, and more). 100 random days pass; `FUZZ_RUNS=200` runs more.
+
+Status: the agents work together in their test suite (`node --test agents/test/`, against a fake runner). They are not yet wired into the live runner on `main`, which does not have the `/hold`, `/recall` and `/agent/say` endpoints they call, so they are not part of the scored demo.
 
 ## Limitations
 - Travel is grid-based (4-connected) with flat per-tractor speeds. There are no slopes, turning time or road speed classes.

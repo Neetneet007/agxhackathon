@@ -16,10 +16,10 @@
 <div id="stage"></div>
 
 <header class="bar glass">
-  <div class="brand"><span class="logo">◆</span> Fleet Command Center</div>
+  <div class="brand">Fleet</div>
   <div class="clock" id="clock">06:00</div>
   <div class="ctrls">
-    <button class="btn primary" id="play">▶ Run</button>
+    <button class="btn primary" id="play">Run</button>
     <button class="btn" id="step" title="Advance 10 minutes">+10m</button>
     <select class="btn" id="speed" title="Simulated minutes per second">
       <option value="5">5 min/s</option><option value="15" selected>15 min/s</option><option value="40">40 min/s</option><option value="120">120 min/s</option>
@@ -33,7 +33,9 @@
         <a class="btn" href="./classic.html">Classic 2D dashboard</a>
       </div>
     </details>
-    <button class="btn" id="compare">Compare vs baseline</button>
+    <button class="btn" id="sat" hidden title="Switch between the real aerial photo and the drawn farm">Satellite</button>
+    <button class="btn" id="talk">Agents</button>
+    <button class="btn" id="compare">Compare</button>
   </div>
   <div class="kpis" id="kpis"></div>
   <div class="pill" id="llmPill" title="Who writes the notifications">…</div>
@@ -43,7 +45,7 @@
   <div id="decisions"></div>
   <details class="card glass" open><summary>Fleet</summary><div id="fleet"></div></details>
   <details class="card glass"><summary>Jobs <span class="count" id="jobCount"></span></summary><div id="jobs"></div></details>
-  <details class="card glass" open><summary>Data sources <span class="count" id="srcCount"></span></summary><div id="sources"></div></details>
+  <details class="card glass"><summary>Data sources <span class="count" id="srcCount"></span></summary><div id="sources"></div></details>
   <details class="card glass"><summary>Operator</summary>
     <div class="ops">
       <div class="row"><select id="opTractor"></select><button class="btn danger" id="opBreak">Break down</button><button class="btn" id="opRepair">Repair</button></div>
@@ -68,14 +70,14 @@
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <section class="timeline glass" id="timelineWrap">
-  <details id="timelineDetails"><summary>Schedule <span class="muted">— actual (solid) · plan (light) · │ deadline</span></summary><div id="gantt"></div></details>
+  <details id="timelineDetails"><summary>Schedule</summary><div id="gantt"></div></details>
 </section>
 
 <div class="popover glass" id="popover" hidden></div>
 
-<button class="askfab" id="askFab">✦ Ask why</button>
+<button class="askfab" id="askFab">Ask why</button>
 <section class="ask glass" id="ask" hidden>
-  <div class="askhead"><b>✦ Copilot</b><span class="muted" id="askMode"></span><button class="x" id="askClose" aria-label="Close">×</button></div>
+  <div class="askhead"><b>Copilot</b><span class="muted" id="askMode"></span><button class="x" id="askClose" aria-label="Close">×</button></div>
   <div class="row"><label class="muted">About</label><select id="askCtx"></select></div>
   <div class="chips" id="askChips"></div>
   <div class="thread" id="thread"></div>
@@ -87,7 +89,32 @@
   <p class="muted" id="cmpNote"></p><div id="cmpBody"></div>
 </div></div>
 
+<div class="modal" id="talkModal"><div class="box glass talk">
+  <div class="askhead"><b>How the agents talk</b><button class="x" id="talkClose" aria-label="Close">×</button></div>
+  <svg viewBox="0 0 820 430" role="img" aria-label="Which agent speaks to which: Weather, Fault and Safety report to the Plan Manager, who decides and tells the operator. Weather and Fleet send requests to the Depot Manager, who gives people their tasks. Route, Agronomy and Records speak straight to the operator.">
+  <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z"/></marker></defs>
+  <g class="e">
+    <path d="M200 62 C260 62 270 124 320 132"/><path d="M200 132 L320 138"/><path d="M200 202 C260 202 270 150 320 144"/>
+    <path d="M30 62 C0 100 0 234 30 272"/><path d="M200 272 L320 272"/>
+    <path d="M200 70 C250 110 240 250 320 262"/>
+    <path d="M500 138 L620 138"/><path d="M500 266 L620 266"/><path class="back" d="M620 282 L500 282"/>
+    <path d="M285 350 L285 330 L660 330 L660 296"/><path d="M475 350 L475 330"/><path d="M705 350 L705 296"/>
+  </g>
+  <g class="t">
+    <text x="262" y="92">stop · recall</text><text x="258" y="128">fault</text><text x="262" y="188">stop · objection</text>
+    <text x="38" y="170" class="l">fuel all</text><text x="260" y="290">refuel</text><text x="560" y="130">decision</text>
+    <text x="560" y="258">tasks</text><text x="560" y="300">done</text><text x="470" y="322">route · field note · day record</text>
+  </g>
+  <g class="n "><rect x="30" y="40" width="170" height="44" rx="22"/><text x="115.0" y="67">Weather</text></g><g class="n "><rect x="30" y="110" width="170" height="44" rx="22"/><text x="115.0" y="137">Fault</text></g><g class="n "><rect x="30" y="180" width="170" height="44" rx="22"/><text x="115.0" y="207">Safety</text></g><g class="n "><rect x="30" y="250" width="170" height="44" rx="22"/><text x="115.0" y="277">Fleet</text></g>
+  <g class="n chair"><rect x="320" y="116" width="180" height="44" rx="22"/><text x="410.0" y="143">Plan Manager</text></g><g class="n "><rect x="320" y="250" width="180" height="44" rx="22"/><text x="410.0" y="277">Depot</text></g>
+  <g class="n op"><rect x="620" y="40" width="170" height="256" rx="28"/><text x="705" y="172">Operator</text></g>
+  <g class="n "><rect x="200" y="350" width="170" height="44" rx="22"/><text x="285.0" y="377">Route</text></g><g class="n "><rect x="390" y="350" width="170" height="44" rx="22"/><text x="475.0" y="377">Agronomy</text></g><g class="n "><rect x="620" y="350" width="170" height="44" rx="22"/><text x="705.0" y="377">Records</text></g>
+</svg>
+  <ol class="steps"><li><b>Notice</b></li><li><b>Add</b></li><li><b>Decide</b></li><li><b>Tell the operator</b></li></ol>
+</div></div>
+
 <div class="loading" id="loading">Loading 3D farm…</div>
 <script type="module" src="./app3d.js"></script>
+<div id="gisCredit" class="giscredit" hidden></div>
 </body>
 </html>

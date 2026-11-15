@@ -1,0 +1,24 @@
+{
+  "about": "Field notes the Agronomy Advisor may attach to a job. Every note is general farm practice written by the team, NOT taken from a cited source, so every note is advice only (verified: false). Same rule as the weather playbook: no source, no action. To let a note carry weight, add a source[] with title, publisher, url and dateRead, have a person check it, and set verified: true.",
+  "notes": [
+    { "id": "clay-wet-traffic", "topic": "soil", "when": { "soilTexture": ["clay"] }, "verified": false, "text": "{soil} holds water and packs down under wheels when wet. Have someone check the ground carries the machine before it goes in." },
+    { "id": "sand-dries-fast", "topic": "soil", "when": { "soilTexture": ["sand"] }, "verified": false, "text": "{soil} drains and dries fast. Moisture for seed or after irrigation does not last long here." },
+    { "id": "lowest-ground", "topic": "water", "when": { "lowest": true }, "verified": false, "text": "This is among the lowest ground on the farm ({elevation} m on a coarse elevation model). Water from rain or irrigation collects on low ground first." },
+    { "id": "spray-label", "topic": "spraying", "when": { "jobType": ["spray"] }, "verified": false, "text": "The product label sets the rate, wind limits, buffer distances and how long people stay out afterwards. Check it for this field and crop before the first pass." },
+    { "id": "till-moisture", "topic": "tillage", "when": { "jobType": ["till"] }, "verified": false, "text": "Tilling works best when the soil crumbles in the hand: not sticky, not dusty." },
+    { "id": "seed-settings", "topic": "planting", "when": { "jobType": ["seed"] }, "verified": false, "text": "Seeding depth and rate for {crop} come from the seed supplier. Check the seeder is set for them before the first pass." },
+    { "id": "hay-dry-window", "topic": "harvest", "when": { "jobType": ["mow"], "crop": ["hay", "alfalfa"] }, "verified": false, "text": "Cut {crop} needs dry days to cure before baling. Ask the Weather Manager about rain before cutting." },
+    { "id": "orchard-clearance", "topic": "orchard", "when": { "crop": ["orchard"] }, "verified": false, "text": "Tree rows and low branches: this field needs slower travel and more clearance than open ground." },
+    { "id": "slope-runoff", "topic": "water", "when": { "minSlopePct": 3 }, "verified": false, "text": "The survey gives this ground a {slope}% slope. Spray and irrigation water can run off downhill." }
+  ],
+  "topics": {
+    "irrigation": "Irrigation is not scheduled by this team. What it knows: each field's soil and drainage class from the USDA soil survey, and the soil-moisture reading the weather feed carries.",
+    "fertiliser": "Fertiliser rates are not held by this team. They come from a soil test and the crop plan; a person sets them.",
+    "pests": "Pest and disease scouting is not done by this team. A spray job is the response; the product label and a licensed applicator decide the product and rate.",
+    "harvest": "Harvest timing is a person's call. The team can bring a harvest job forward when the Weather Manager asks, and the Plan Manager decides.",
+    "planting": "Planting dates and varieties are a person's call. The team seeds the fields the operator lists and reports soil facts for each.",
+    "livestock": "This farm plan has no livestock work. The team runs field jobs only: spray, mow, till and seed.",
+    "soil": "Soil facts come from the USDA NRCS soil survey (SSURGO) at each field's map position: map unit, drainage class and slope.",
+    "labour": "People's work at the depot (fuelling, implement changes, inspections) is the Depot Manager's. Only a person can mark it done."
+  }
+}

@@ -1,0 +1,290 @@
+{
+ "fetchedAt": "2026-11-15T22:36:44.781Z",
+ "home": {
+  "lat": 32.66,
+  "lon": -114.74
+ },
+ "cellMetres": 100,
+ "bbox": {
+  "west": -114.74852787813467,
+  "south": 32.64647410653269,
+  "east": -114.7058884874613,
+  "north": 32.6735258934673
+ },
+ "extentCells": {
+  "x0": -5,
+  "y0": -5,
+  "x1": 35,
+  "y1": 25
+ },
+ "note": "Aerial photo, canals, roads, elevation and soil are real. Field rectangles, Mill Creek and its bridges are the scenario's.",
+ "sources": {
+  "imagery": {
+   "file": "imagery.jpg",
+   "bytes": 448129,
+   "size": [
+    2048,
+    1536
+   ],
+   "provider": "USDA NAIP via USGS The National Map",
+   "licence": "public domain",
+   "credit": "USDA NAIP / USGS",
+   "fetchedAt": "2026-11-15T22:36:44.781Z"
+  },
+  "osm": {
+   "file": "features.json",
+   "waterways": 23,
+   "roads": 32,
+   "named": [
+    "West County 11th Street",
+    "West County 12th Street",
+    "West Wall Lane",
+    "South Avenue F",
+    "Drysdale Lane",
+    "West Sunset Street",
+    "South Somerton Avenue",
+    "West Co 12 5/10 Street",
+    "West Sunburst Avenue",
+    "West Main Canal",
+    "Sunburst Avenue",
+    "South Avenue G",
+    "Colorado River / Río Colorado"
+   ],
+   "provider": "OpenStreetMap via Overpass API",
+   "licence": "ODbL",
+   "credit": "© OpenStreetMap contributors",
+   "fetchedAt": "2026-11-15T22:36:44.781Z"
+  },
+  "elevation": {
+   "points": [
+    {
+     "id": "depot",
+     "metres": 34
+    },
+    {
+     "id": "F1",
+     "metres": 34
+    },
+    {
+     "id": "F2",
+     "metres": 34
+    },
+    {
+     "id": "F3",
+     "metres": 33
+    },
+    {
+     "id": "F4",
+     "metres": 34
+    },
+    {
+     "id": "F5",
+     "metres": 34
+    },
+    {
+     "id": "F6",
+     "metres": 37
+    },
+    {
+     "id": "F7",
+     "metres": 33
+    },
+    {
+     "id": "F8",
+     "metres": 34
+    },
+    {
+     "id": "F9",
+     "metres": 33
+    }
+   ],
+   "provider": "Open-Meteo Elevation API (Copernicus DEM GLO-90)",
+   "licence": "CC BY 4.0",
+   "credit": "Open-Meteo, Copernicus DEM",
+   "fetchedAt": "2026-11-15T22:36:44.781Z"
+  },
+  "soil": {
+   "points": [
+    {
+     "id": "depot",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F1",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F2",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F3",
+     "mapUnit": "Holtville clay",
+     "symbol": "12",
+     "component": "Holtville",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F4",
+     "mapUnit": "Holtville clay",
+     "symbol": "12",
+     "component": "Holtville",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F5",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F6",
+     "mapUnit": "Rositas sand",
+     "symbol": "25",
+     "component": "Rositas",
+     "componentPct": 100,
+     "drainage": "Somewhat excessively drained",
+     "hydrologicGroup": "A",
+     "slopePct": 9,
+     "order": "Entisols"
+    },
+    {
+     "id": "F7",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F8",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    },
+    {
+     "id": "F9",
+     "mapUnit": "Kofa clay",
+     "symbol": "17",
+     "component": "Kofa",
+     "componentPct": 100,
+     "drainage": "Well drained",
+     "hydrologicGroup": "C",
+     "slopePct": 1,
+     "order": "Entisols"
+    }
+   ],
+   "provider": "USDA NRCS Soil Data Access (SSURGO)",
+   "licence": "public domain",
+   "credit": "USDA NRCS SSURGO",
+   "fetchedAt": "2026-11-15T22:36:44.781Z"
+  }
+ },
+ "failed": {
+  "elevation@epqs.nationalmap.gov": "The operation was aborted due to timeout"
+ },
+ "points": [
+  {
+   "id": "depot",
+   "name": "Depot (fuel + implement shed)",
+   "lat": 32.659549,
+   "lon": -114.739467
+  },
+  {
+   "id": "F1",
+   "name": "North Field",
+   "lat": 32.666763,
+   "lon": -114.738401
+  },
+  {
+   "id": "F2",
+   "name": "Creek Pasture",
+   "lat": 32.66541,
+   "lon": -114.732005
+  },
+  {
+   "id": "F3",
+   "name": "Home Quarter",
+   "lat": 32.655491,
+   "lon": -114.734137
+  },
+  {
+   "id": "F4",
+   "name": "Orchard Strip",
+   "lat": 32.654139,
+   "lon": -114.74
+  },
+  {
+   "id": "F5",
+   "name": "Ridge 80",
+   "lat": 32.666312,
+   "lon": -114.720812
+  },
+  {
+   "id": "F6",
+   "name": "East Meadow",
+   "lat": 32.661803,
+   "lon": -114.714416
+  },
+  {
+   "id": "F7",
+   "name": "Long Acre",
+   "lat": 32.659549,
+   "lon": -114.720279
+  },
+  {
+   "id": "F8",
+   "name": "South Flats",
+   "lat": 32.65459,
+   "lon": -114.716548
+  },
+  {
+   "id": "F9",
+   "name": "Bottomland",
+   "lat": 32.653237,
+   "lon": -114.722944
+  }
+ ]
+}

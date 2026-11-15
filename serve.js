@@ -10,7 +10,7 @@ import { llmEnabled, explainShift, answerWhy, describeError } from './src/llm.js
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 const port = +(process.argv[2] || process.env.PORT || 5180);
-const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.svg': 'image/svg+xml', '.md': 'text/markdown' };
+const types = { '.html': 'text/html', '.js': 'text/javascript', '.json': 'application/json', '.css': 'text/css', '.svg': 'image/svg+xml', '.md': 'text/markdown', '.jpg': 'image/jpeg' };
 
 function readBody(req) {
   return new Promise((resolve, reject) => {

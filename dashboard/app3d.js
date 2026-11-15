@@ -27,12 +27,11 @@ async function liveSync() {
   let r;
   try { r = await (await fetch('/replay', { cache: 'no-store' })).json(); } catch { return; }
   let stepped = false;
-  const stepTo = (t) => { while (sim.time < t) { sim.finished = false; sim.step(); stepped = true; } };
+  const stepTo = (t) => { while (sim.time < t && !sim.finished) { sim.step(); stepped = true; } };
   for (; liveApplied < r.entries.length; liveApplied++) {
     const en = r.entries[liveApplied];
     stepTo(en.t);
-    if (en.kind === 'event') { injected.push(en.event); sim.finished = false; sim.inject(structuredClone(en.event)); }
-    else if (en.kind === 'progress') { const j = sim.jobs.get(en.job); if (j && j.status !== 'done') j.remaining = en.remaining; }
+    if (en.kind === 'event') { injected.push(en.event); sim.inject(structuredClone(en.event)); }
     else { const a = sim.tractor(en.tractor)?.action; if (a && (a.kind === 'refuel' || a.kind === 'swap')) a.left = en.kind === 'hold' ? en.left : 1; }
     stepped = true;
   }
@@ -43,11 +42,18 @@ async function liveSync() {
 async function boot() {
   scenario = await (await fetch('../scenario.json')).json();
   try { llmOn = (await (await fetch('/api/llm/status')).json()).enabled; } catch { llmOn = false; }
-  $('llmPill').textContent = llmOn ? '✦ Claude explanations on' : 'Planner explanations · set ANTHROPIC_API_KEY for Claude';
+  $('llmPill').textContent = llmOn ? 'Claude' : 'Planner';
   $('llmPill').classList.toggle('on', llmOn);
   $('nField').innerHTML = scenario.fields.map(f => `<option value="${f.id}">${f.id} ${esc(f.name)}</option>`).join('');
   $('opTractor').innerHTML = scenario.tractors.map(t => `<option value="${t.id}">${t.id} ${esc(t.name)}</option>`).join('');
   scene = new FarmScene($('stage'), scenario, { onPick: showPopover });
+  scene.loadGis().then(gis => {
+    if (!gis) return;
+    const credits = Object.values(gis.sources).map(s => s.credit).filter(Boolean);
+    $('gisCredit').textContent = `Real location: ${gis.home.lat.toFixed(3)}, ${gis.home.lon.toFixed(3)} (Yuma Valley, AZ) · ${[...new Set(credits)].join(' · ')} · field shapes and Mill Creek are simulated`;
+    $('sat').hidden = false;
+    $('sat').onclick = () => { const on = scene.setSatellite(!scene.satellite); $('sat').classList.toggle('on', on); $('gisCredit').hidden = !on; };
+  });
   $('loading').remove();
   reset();
   if (LIVE) { $('play').disabled = true; $('play').textContent = 'Live'; setInterval(liveSync, 800); liveSync(); }
@@ -63,7 +69,7 @@ function reset() {
   processLog(); uiDirty = true;
 }
 
-function setPlaying(p) { playing = p && !sim.finished; $('play').textContent = playing ? '❚❚ Pause' : '▶ Run'; }
+function setPlaying(p) { playing = p && !sim.finished; $('play').textContent = playing ? 'Pause' : 'Run'; }
 
 function inject(evt) {
   if (LIVE) { fetch('/event', { method: 'POST', body: JSON.stringify({ source: 'operator', ...evt }) }); return; }   // the live run applies it; we see it via the replay log
@@ -171,9 +177,9 @@ function dismiss(el) { el.classList.add('leaving'); setTimeout(() => el.remove()
 function fillToast(el, s) {
   const src = s.facts.trigger?.source;
   el.innerHTML = `<div class="th"><span class="tt">${esc(s.title)}</span><span class="tm">${esc(s.entry.clock)}</span></div>
-    ${src ? `<span class="src">${s.source?.icon ?? '•'} ${esc(src)}${s.facts.trigger.signal ? ` — ${esc(s.facts.trigger.signal)}` : ''}</span>` : ''}
+    ${src ? `<span class="src">${esc(src)}${s.facts.trigger.signal ? ` — ${esc(s.facts.trigger.signal)}` : ''}</span>` : ''}
     <div class="rs ${s.pending ? 'typing' : ''}">${esc(s.pending ? 'Claude is summarising' : s.reason)}</div>
-    <div class="by">${s.by === 'Claude' ? '<span class="badge claude">✦ Claude</span>' : '<span class="badge">planner</span>'}${s.note ? `<span title="${esc(s.note)}">·  fallback</span>` : ''}
+    <div class="by">${s.by === 'Claude' ? '<span class="badge claude">Claude</span>' : '<span class="badge">planner</span>'}${s.note ? `<span title="${esc(s.note)}">·  fallback</span>` : ''}
       <span class="acts"><button class="btn" data-more>Details</button><button class="btn primary" data-why>Why?</button></span></div>`;
   el.querySelector('[data-why]').onclick = () => openAsk(`shift:${s.id}`, 'Why did the plan change?');
   el.querySelector('[data-more]').onclick = ev => {
@@ -255,7 +261,7 @@ async function ask(q) {
   if (llmOn) {
     try {
       const r = await (await fetch('/api/why', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q, facts: factsForAsk(ctx) }) })).json();
-      if (r.llm) { answer = r.answer; by = '✦ Claude'; }
+      if (r.llm) { answer = r.answer; by = 'Claude'; }
     } catch { /* fall through */ }
   }
   if (!answer) answer = plannerAnswer(ctx);
@@ -382,7 +388,10 @@ function showPopover(data, at, refresh = false) {
   } else {
     const f = sim.fields.get(data.id);
     const jobs = [...sim.jobs.values()].filter(j => j.fieldId === f.id);
+    const soil = scene.gis?.sources?.soil?.points.find(p => p.id === f.id), elev = scene.gis?.sources?.elevation?.points.find(p => p.id === f.id);
+    const real = [soil?.mapUnit && `Soil: ${esc(soil.mapUnit)}${soil.drainage ? `, ${esc(soil.drainage.toLowerCase())}` : ''}${soil.slopePct != null ? `, ${soil.slopePct}% slope` : ''}`, elev && `Elevation: ${Math.round(elev.metres)} m`].filter(Boolean);
     html = `<h3>${esc(f.name)} <span class="muted" style="font-weight:400">${f.acres} ac · ${esc(f.crop)}</span></h3>` +
+      (real.length ? `<p class="muted" title="Real survey data at this field's map position: ${esc([scene.gis.sources.soil?.credit, scene.gis.sources.elevation?.credit].filter(Boolean).join(', '))}">${real.join(' · ')}</p>` : '') +
       (jobs.length ? jobs.map(j => { const [lab, cls] = jobState(j); const o = j.status === 'done' ? j.doneBy : owner(j.id); return `<p><b>${j.id}</b> ${JOB_VERB[j.type]} · due ${fmtTime(j.deadline)} · ${o || '—'} <span class="chip ${cls}">${lab}</span> <button class="btn" data-ask="job:${j.id}" style="padding:1px 7px">Why?</button></p>`; }).join('') : '<p class="muted">No jobs on this field.</p>');
   }
   if (refresh && pop.innerHTML === html) return;
@@ -415,6 +424,11 @@ $('scripted').onchange = reset;
 $('modeC').onclick = () => { mode = 'C'; $('modeC').classList.add('on'); $('modeB').classList.remove('on'); reset(); };
 $('modeB').onclick = () => { mode = 'B'; $('modeB').classList.add('on'); $('modeC').classList.remove('on'); reset(); };
 $('compare').onclick = compare;
+const talk = on => $('talkModal').classList.toggle('open', on);
+$('talk').onclick = () => talk(true);
+$('talkClose').onclick = () => talk(false);
+$('talkModal').onclick = e => { if (e.target.id === 'talkModal') talk(false); };
+addEventListener('keydown', e => { if (e.key === 'Escape') talk(false); });
 $('cmpClose').onclick = () => $('cmpModal').classList.remove('open');
 $('cmpModal').onclick = e => { if (e.target.id === 'cmpModal') $('cmpModal').classList.remove('open'); };
 $('timelineDetails').ontoggle = () => uiDirty = true;
