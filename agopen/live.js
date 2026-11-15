@@ -44,6 +44,7 @@ const script = String(opt('script', '')).split(';').filter(Boolean).map(s => ({ 
 const STALE_MS = 3000;      // no telemetry for this long → NO_RESPONSE
 const STUCK_MS = 8000;      // told to go, far from target, not moving for this long → GO_NOT_MOVING
 const FAR_M = 40, MOVED_M = 5;
+const NEAR_STUCK_MS = 12000; // the same, close to its target (turning, lining up): under 1.5 m in this long
 
 // ---- The farm comes from AgOpenWeb's own field folders (one folder per field, field.geojson inside).
 const FIELDS_DIR = opt('fields', path.resolve(here, '../../agopen-multi/data-5175/AgOpenWeb/Fields'));
@@ -375,9 +376,12 @@ async function poll() {
     if (u.fault === 'NO_RESPONSE' && u.wasSilent && now - u.lastSeen < 500) { u.wasSilent = false; clear(u, 'is answering again'); }
     const c = u.cmd;
     if (c?.type === 'goto' && u.twin.status === 'ok' && !u.tel.busy && c.maxKph !== 0) {
-      const far = Math.hypot(c.e - u.tel.e, c.n - u.tel.n) > FAR_M;
-      if (!u.anchor || Math.hypot(u.tel.e - u.anchor.e, u.tel.n - u.anchor.n) > MOVED_M || !far) { u.anchor = { e: u.tel.e, n: u.tel.n }; u.stuckSince = now; }
-      else if (now - u.stuckSince > STUCK_MS) raise(u, 'GO_NOT_MOVING', `GO acknowledged (ack ${u.tel.ack}), ${Math.round(Math.hypot(c.e - u.tel.e, c.n - u.tel.n))} m from target, moved under ${MOVED_M} m in ${(STUCK_MS / 1000)} s`);
+      // Far from its target a tractor should cover ground quickly; close to it (turning between passes, lining
+      // up) it moves slowly, so the test there is stricter on distance and waits longer. Within 5 m it has arrived.
+      const d = Math.hypot(c.e - u.tel.e, c.n - u.tel.n), far = d > FAR_M;
+      const mustMove = far ? MOVED_M : 1.5, within = far ? STUCK_MS : NEAR_STUCK_MS;
+      if (!u.anchor || d < 5 || Math.hypot(u.tel.e - u.anchor.e, u.tel.n - u.anchor.n) > mustMove) { u.anchor = { e: u.tel.e, n: u.tel.n }; u.stuckSince = now; }
+      else if (now - u.stuckSince > within) raise(u, 'GO_NOT_MOVING', `GO acknowledged (ack ${u.tel.ack}), ${Math.round(d)} m from target, moved under ${mustMove} m in ${within / 1000} s`);
     } else { u.anchor = null; u.stuckSince = now; }
   }));
 }
@@ -773,7 +777,23 @@ function droneScan(name) {
   trail('drone', 'operator', 'scan', `Drone sent to map ${name}.`);
   return true;
 }
+// While a tractor is spraying, the drone flies just behind it and steps through three heights, reading the wind
+// at each. It leaves as soon as the pass stops (job done, hold, fault) or another drone mission is waiting.
+let escort = null, droneWind = [];
+const LIMITS_WIND_MAX = 10;
+function escortSprayer() {
+  if (escort) return;
+  const u = units.find(x => { const t = x.twin, j = t.jobId && sim.jobs.get(t.jobId); return x.tel && !x.fault && t.status === 'ok' && t.action?.kind === 'work' && j?.type === 'spray' && x.place === j.fieldId && !heldBy(j); });
+  if (!u) return;
+  const jobId = u.twin.jobId;
+  const still = () => { const t = u.twin, j = sim.jobs.get(jobId); return !u.fault && t.status === 'ok' && t.jobId === jobId && t.action?.kind === 'work' && j.status !== 'done' && !heldBy(j); };
+  const id = drone.assign({ type: 'escort', subject: u.id, follow: () => (u.tel ? { e: u.tel.e, n: u.tel.n } : null), until: () => !still() });
+  escort = { id, unit: u.id };
+  trail('drone', 'weather', 'wind-watch', `${u.id} is spraying ${sim.label(sim.jobs.get(jobId))}: drone sent to fly above it and read the wind at 10, 30 and 50 m.`);
+}
+
 function droneTick(dt) {
+  escortSprayer();
   for (const ev of drone.tick(dt)) {
     if (ev.type === 'report') {
       const r = ev.report;
@@ -783,12 +803,29 @@ function droneTick(dt) {
         trail('drone', 'fault-manager', 'inspection', `Simulated drone view of ${r.subject}: ${r.assessment} Recommends: ${r.recommend}.`);
         discuss('fault', `Drone inspection of ${r.subject}`, { tractor: r.subject, kind: r.symptom, signal: 'drone inspection (simulated)', droneFindings: r.findings, droneAssessment: r.assessment, droneRecommends: r.recommend });
       } else if (r.kind === 'field-scan') {
-        trail('drone', 'operator', 'field-report', `Simulated scan of ${r.field}: ${r.summary}`);
+        trail('drone', 'operator', 'field-report', r.summary);
         discuss('replan', `Drone scan of ${r.field}`, { field: r.field, scan: { ground: r.ground, moisturePct: r.moisturePct, trafficable: r.trafficable, standPct: r.standPct, maturityPct: r.maturityPct, harvestReady: r.harvestReady, pestSpots: r.pests.length, weedsPct: r.weedsPct, recommend: r.recommend } });
         const wants = (r.recommend || []).find(x => x.action === 'spot-spray');
         if (wants && r.pests.length) {
           if (holds.has(WEATHER_HOLD)) trail('drone', 'operator', 'waiting', `${r.field} has ${r.pests.length} pest patch(es) to spot-spray, but spraying is on hold for weather. The drone will not spray now.`);
           else { drone.assign({ type: 'spot-spray', field: r.field, spots: r.pests.map(p => ({ e: p.e, n: p.n, radiusM: p.radiusM })) }); trail('drone', 'operator', 'spot-spray', `Drone spot-spraying ${r.pests.length} pest patch(es) in ${r.field} instead of sending the 24 m sprayer.`); }
+        }
+      }
+    } else if (ev.type === 'escort-ended') {
+      if (escort?.id === ev.missionId) escort = null;
+    } else if (ev.type === 'wind-sample') {
+      // Wind at the drone's height, from the same simulated air as the mast readings at 2 m and 10 m
+      // (a power-law profile through those two), with a little gust noise.
+      const c = weather.current();
+      if (c) {
+        const lo = c.reading.low, hi = c.reading.high;
+        const alpha = lo.windMph > 0.2 && hi.windMph > 0.2 ? Math.log(hi.windMph / lo.windMph) / Math.log(hi.heightM / lo.heightM) : 0.15;
+        const mph = Math.max(0, lo.windMph * Math.pow(ev.altM / lo.heightM, Math.max(-0.2, Math.min(0.5, alpha))) + (Math.random() - 0.5) * 0.6);
+        droneWind = droneWind.filter(w => w.altM !== ev.altM).concat({ altM: ev.altM, mph: +mph.toFixed(1), clock: fmtTime(sim.time), over: ev.subject }).sort((a, b) => a.altM - b.altM);
+        if (ev.lastOfCycle && sim.time - (escort?.said ?? -99) >= 20) {
+          if (escort) escort.said = sim.time;
+          const top = droneWind[droneWind.length - 1];
+          trail('drone', 'weather', 'wind-profile', `Drone above ${ev.subject} while it sprays: wind ${droneWind.map(w => `${w.mph} mph at ${w.altM} m`).join(', ')} (mast: ${lo.windMph} mph at ${lo.heightM} m).${top.mph > LIMITS_WIND_MAX ? ` Above the ${LIMITS_WIND_MAX} mph limit aloft: watch for drift if it mixes down.` : ''}`, { profile: droneWind });
         }
       }
     } else if (ev.type === 'sprayed') {
@@ -922,7 +959,7 @@ function snapshot() {
       tel: truck.tel ? { ...truck.tel, rig: null } : null, heardAgoMs: Date.now() - truck.lastSeen, planGapM: null,
     }] : []),
     weather: (() => { const c = weather.current(); return c ? { day: weather.day, clock: c.reading.clock, low: c.reading.low, high: c.reading.high, status: c.assessment.status, reason: c.assessment.reason, groundOnly: c.assessment.groundOnly, caughtByTwoHeights: c.assessment.caughtByTwoHeights, log: weather.log().filter(x => x.note).slice(-6).reverse() } : null; })(),
-    drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed },
+    drone: { ...drone.state(), reports: droneReports.slice(-3).reverse(), sprayed: droneSprayed, wind: droneWind },
     fuelPlan: fuelMission ? { tractor: fuelMission.u.id, phase: fuelMission.phase, ...fuelMission.numbers } : null, fuelScale: FUEL_SCALE,
     jobs: [...sim.jobs.values()].map(j => ({
       id: j.id, label: sim.label(j), field: sim.fields.get(j.fieldId)?.name, type: j.type, status: j.status, priority: j.priority, deadline: fmtTime(j.deadline),

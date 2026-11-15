@@ -418,6 +418,47 @@ function buildTractor(color) {
            pos: new THREE.Vector3(), target: new THREE.Vector3(), heading: 0, targetHeading: 0, has: false, color };
 }
 
+function buildFuelTruck(color) {
+  const root = new THREE.Group();
+  const model = new THREE.Group();     // forward = -z (cab at the front)
+  root.add(model);
+  const dark = lamb(0x23272b);
+  const add = (mesh, x, y, z) => { mesh.position.set(x, y, z); mesh.castShadow = true; model.add(mesh); return mesh; };
+  const cabMat = lamb(0xc92a2a), silver = new THREE.MeshLambertMaterial({ color: 0xe3e8ec }), band = lamb(0xf59f00);
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.4, 7.6), lamb(0x33383d)), 0, 0.95, 0);          // chassis
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 1.9, 2.0), cabMat), 0, 2.2, -2.7);                 // cab
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 0.08), new THREE.MeshLambertMaterial({ color: 0x9ed0f0 })), 0, 2.65, -3.72); // windscreen
+  for (const s of [-1, 1]) add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.7, 1.2), new THREE.MeshLambertMaterial({ color: 0x9ed0f0 })), s * 1.22, 2.65, -2.7); // side glass
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.25, 0.3), lamb(0x33383d)), 0, 1.15, -3.85);      // bumper
+  add(new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.15, 2.0), lamb(0x8f1d1d)), 0, 3.22, -2.7);       // cab roof
+  const tank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 4.6, 24), silver);
+  tank.rotation.x = Math.PI / 2; add(tank, 0, 2.35, 1.2);
+  for (const z of [-1.1, 3.5]) {                                                                    // rounded end caps
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(1.1, 20, 12), silver);
+    cap.scale.z = 0.3; add(cap, 0, 2.35, z < 0 ? -1.1 : 3.5);
+  }
+  for (const z of [0.4, 2.0]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(1.13, 1.13, 0.5, 24), band); b.rotation.x = Math.PI / 2; add(b, 0, 2.35, z); }
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.25, 12), dark), 0, 3.55, 1.2);          // top hatch
+  add(new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.0, 0.7), lamb(0x495057)), 0, 1.6, 3.55);          // pump box
+  const reel = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.3, 14), lamb(0xf59f00)); reel.rotation.z = Math.PI / 2;
+  add(reel, 0, 1.6, 3.95);                                                                          // hose reel
+  const wheel = (r, wd) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(r, r, wd, 16), dark); m.rotation.z = Math.PI / 2; return m; };
+  for (const s of [-1, 1]) for (const z of [-2.7, 1.6, 3.0]) add(wheel(0.62, 0.55), s * 1.05, 0.62, z);
+  const beaconMat = new THREE.MeshBasicMaterial({ color: 0xf59f00 });
+  const beacon = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), beaconMat);
+  beacon.position.set(0, 3.6, -2.7); model.add(beacon);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.0, 0.14, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffd43b }));
+  ring.rotation.x = Math.PI / 2; ring.position.set(0, 4.8, 0); ring.visible = false; model.add(ring);
+  const lock = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.7, 0.4), new THREE.MeshBasicMaterial({ color: 0xffd43b }));
+  lock.position.set(0, 4.8, 0); lock.visible = false; model.add(lock);
+  const label = makeLabel(0.022);
+  label.position.set(0, 8, 0);
+  root.add(label);
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)); // dummy, not added to the scene
+  return { root, model, bar, barMat: new THREE.MeshLambertMaterial(), beaconMat, ring, lock, label, bad: false, shown: false, fuel: true,
+           pos: new THREE.Vector3(), target: new THREE.Vector3(), heading: 0, targetHeading: 0, has: false, color };
+}
+
 function angleDiff(a, b) { let d = (b - a) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; }
 const trunc = (s, n) => { s = String(s ?? ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
 
@@ -428,7 +469,7 @@ function updateTractors(list) {
     seen.add(id);
     let o = tractors.get(id);
     if (!o) {
-      o = buildTractor(TR_COLOR[i % 4]);
+      o = (t.kind === 'fuel-truck' || id === 'FUEL') ? buildFuelTruck(0xe03131) : buildTractor(TR_COLOR[i % 4]);
       o.index = i;
       tractors.set(id, o);
       tractorGroup.add(o.root);
@@ -493,6 +534,7 @@ function updateDrone(d) {
   dr.tgtAlt = docked ? 12 : (alt > 1 ? alt : (isFinite(alt) && d.altM != null ? 40 : 40));
   if (!docked && !(alt > 1)) dr.tgtAlt = 40;
   dr.target.set(d.e, dr.tgtAlt, -d.n);
+  dr.focus = (d.focus && typeof d.focus.e === 'number' && typeof d.focus.n === 'number') ? { e: d.focus.e, n: d.focus.n } : null;
   dr.status = d.status; dr.mission = d.mission;
   if (!dr.has) {
     dr.pos.copy(dr.target); dr.has = true;
@@ -672,7 +714,11 @@ function frame() {
       dr.tilt = dr.tilt == null ? want : dr.tilt + (want - dr.tilt) * (1 - Math.exp(-dt * 1.5));
       const ahead = h / Math.tan(dr.tilt);
       camera.position.copy(dr.pos);
-      camera.lookAt(dr.pos.x + Math.sin(dr.heading) * ahead, 0, dr.pos.z - Math.cos(dr.heading) * ahead);
+      const lk = dr.look || (dr.look = new THREE.Vector3());
+      const goal = dr.focus ? new THREE.Vector3(dr.focus.e, 1.5, -dr.focus.n)
+        : new THREE.Vector3(dr.pos.x + Math.sin(dr.heading) * ahead, 0, dr.pos.z - Math.cos(dr.heading) * ahead);
+      if (!dr.lookInit) { lk.copy(goal); dr.lookInit = true; } else lk.lerp(goal, 1 - Math.exp(-dt * 3));
+      camera.lookAt(lk);
     }
     renderer.render(scene, camera);
     return;

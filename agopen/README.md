@@ -108,6 +108,8 @@ This stops the node processes, the coordinator and the AgOpenWeb copies, and rem
 
 Extra coordinator options go in the environment variable `LIVE_ARGS`, which `start-demo.sh` passes to `live.js`. For example, `LIVE_ARGS="--preset" agopen/start-demo.sh` starts with the 11 jobs from `scenario.live.json` already submitted instead of an empty list.
 
+`WITH_AGENTS=1 agopen/start-demo.sh` also opens a window for the durable agent team in [`agents/`](../agents/README.md) (port 5200). It reads this coordinator's `/state` and speaks at the same roundtable through `/agent/say`, `/hold` and `/recall`. Its own weather agent is left out, because the coordinator already reads the weather and two sources contradict each other, and each run gets a fresh memory folder. It is off by default: in a live run next to this coordinator its Fault Manager called working tractors out of service (it read the gap-to-plan figure, since corrected here, and it treats a tractor stopped on a weather hold as a symptom). It has not been re-run since that correction.
+
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `--cell` | 20 (from `farm.json`) | Metres per plan cell. Must match the farm that was built. |
@@ -115,7 +117,7 @@ Extra coordinator options go in the environment variable `LIVE_ARGS`, which `sta
 | `--until` | none | End the run when the plan clock reaches that minute and write `out/live_metrics.json`. Plan minute 0 is 06:00. |
 | `--preset` | off | Start with the scenario's job list already submitted and the day running. |
 | `--auto-humans` | 0 (off) | Press Good to go after this many real seconds. For unattended test runs only. |
-| `--fuel-scale` | 25 | Multiplies each tractor's fuel use, so that refuel decisions come up within a short demo. `--fuel-scale 1` uses the scenario's own rates. |
+| `--fuel-scale` | 25 | Multiplies each tractor's fuel use, so that refuel decisions come up within a short demo. `--fuel-scale 1` uses the scenario's own rates. `start-demo.sh` passes `--fuel-scale 70` when `LIVE_ARGS` is not set, so that a tractor in a far field runs short part-way through a job and the fuel truck goes out. |
 | `--weather` | `demo` | The scripted weather day: `calm`, `windy`, `still` or `demo`. See [Spray conditions](#spray-conditions). |
 | `--truck` | 6178 | Telemetry port of the fuel truck's node. If no truck answers, the truck option is not offered. |
 | `--script` | none | Run commands at plan minutes, for example `"30:fault T1 stuck;75:fault T1 ok;78:repair T1"`. |
@@ -135,7 +137,7 @@ The status page at http://localhost:5190 shows, from top to bottom:
 - The roundtable card: what the AI managers say about each event.
 - A "Needs a person at the depot" card, which appears only when a tractor needs fuel or an implement change.
 - One card per vehicle (T1, T2, T3 and the fuel truck): state, current task, fuel, mounted implement, the forecasts described [below](#forecasts-on-each-tractor-card), a small live AgOpenWeb window (the map-only `?embed=1` page of that vehicle's own AgOpenWeb, for example http://localhost:5175) and the fault buttons.
-- The "Spray conditions" card and the "Scout drone" card, with its simulated camera.
+- The "Spray conditions" card and the "Scout drone" card, with its camera view of the 3D farm.
 - "Messages between agents" (the trail, newest first) and the jobs table.
 
 A **Start over** button (two clicks) and the plan clock are at the top, and a link opens the 3D view.
@@ -184,7 +186,7 @@ The coordinator detects faults from telemetry. It does not trust a status flag.
 | Type into a tractor's Terminal window | What the tractor does | What the coordinator sees |
 | --- | --- | --- |
 | `dead` | Stops answering and halts. | `NO_RESPONSE`: no telemetry for 3 seconds. |
-| `stuck` | Keeps acknowledging GO, but the wheels stop. | `GO_NOT_MOVING`: told to go, more than 40 m from its target, moved less than 5 m for 8 seconds. |
+| `stuck` | Keeps acknowledging GO, but the wheels stop. | `GO_NOT_MOVING`: told to go and, more than 40 m from its target, moved less than 5 m in 8 seconds; or, closer than that (turning, lining up), moved less than 1.5 m in 12 seconds. |
 | `ok` | Clears the fault. | `NO_RESPONSE` clears by itself once telemetry returns. For `stuck`, press **Clear fault** or type `repair T1` in the coordinator window. |
 
 The status page has the same faults as buttons on each tractor card: **Inject: GO but not moving**, **Inject: stop responding** and **Clear fault**. You can also type into the coordinator window: `break T1`, `repair T1`, `fault T2 stuck|dead|ok` or `quit`.
@@ -237,9 +239,9 @@ Both options pay the same time at the pump, so that is left out. The cheaper opt
 
 **If the depot is cheaper**, the tractor refuels there as part of the plan and a depot task appears for a person. **If the truck is cheaper**, the planner waits until the job has about half the truck's round-trip time left (plus 2 plan minutes), then sends it, so that it arrives at the field gate as the tractor's job ends. When the tractor has parked, the truck drives up and stops 7 m short of it. Both machines are then locked, and a task "Refuel T2 from the fuel truck in <field>" appears. The fuel level changes only when a person presses **Good to go**. Then both are released and the truck drives back to the depot. If the tractor breaks down meanwhile, the truck returns to the depot. A tractor that the planner has already sent to the depot for fuel is also met in the field by the truck when the truck is the cheaper option and is not busy.
 
-The rates for fuel use are scaled up by `--fuel-scale` (25 by default), because on this miniature farm a field burns only about 2% of a tank. Without that, no refuel decision would come up in a demo.
+The rates for fuel use are scaled up by `--fuel-scale` (25 by default, 70 from `start-demo.sh`), because on this miniature farm a field burns only about 2% of a tank. Without that, no refuel decision would come up in a demo.
 
-**What has been seen.** The depot-on-the-way branch has been seen in a live run. The in-field hand-over by the truck is implemented, but it has not yet been seen end to end in a live run (see [known limits](#what-is-simulated-and-known-limits)).
+**What has been seen.** Both branches have been seen in a live run: a refuel at the depot when it is on the tractor's way, and the fuel truck driving out to a tractor that would not finish its job (Ridge 80), stopping alongside, both locked until Good to go, then the tractor carrying on with a full tank and the truck returning.
 
 ## Spray conditions
 
@@ -273,7 +275,11 @@ A simulated drone, labelled as simulated on the status page and in every report,
 2. **Looks at a faulted tractor.** When a fault is detected, the drone is sent to the tractor's position, hovers, and reports what it sees with a recommendation.
 3. **Spot-sprays.** If a scan finds pest patches and recommends spot-spraying, the drone sprays those patches instead of sending the 24 m sprayer. It does not do this while the weather hold is on.
 
-The card shows a camera view drawn from the simulation (not a real camera), the drone's state, battery and the latest report. The drone flies at 12 m/s at 40 m, has a 25-minute battery, does not start a flight below 30% and turns back below 20%. All readings are simulated and fixed by the field's name, so the same field gives the same report.
+The card shows the drone's camera: the 3D farm seen from the drone's position, looking down at the field while it works over it (a rendering of the simulation, not a real camera; it needs internet for the 3D library), the drone's state, battery and the latest report. The drone flies at 12 m/s at 40 m, has a 25-minute battery, does not start a flight below 30% and turns back below 20%. All readings are simulated and fixed by the field's name, so the same field gives the same report.
+
+**Looking at a faulted tractor.** When a fault is raised the drone flies out and makes one slow circle round the tractor at 22 m, 24 m up, with the camera kept on the tractor so it stays in the middle of the picture. Then it reports what it saw.
+
+**Reading the wind above a sprayer.** While a tractor is spraying, the drone flies just behind it and steps through 10 m, 30 m and 50 m, reading the wind at each height. The readings appear on the Spray conditions card and in the trail (`wind-profile`). They come from the same simulated air as the mast readings at 2 m and 10 m (a power-law profile through those two, with a little gust noise). The drone leaves when the pass stops (job done, weather hold, fault) or when another drone job is waiting, such as a fault to look at. The Go / Caution / Stop decision itself still uses the two mast heights.
 
 ## Forecasts on each tractor card
 
@@ -461,10 +467,9 @@ The same file lists ten injected-fault cases, all passing in the copy generated 
 | Opening a field moves the simulated tractor | AgOpenWeb's simulator jumps the tractor to the middle of a field when it is opened. The tractor process remembers the position and sets it straight back. This is a workaround. |
 | Planned coverage is not compared with AgOpenWeb's painted area | Passes now run edge to edge and turn outside the field, so there is no headland lap. The planner's own coverage measure counts the implement as extending half a width past each end of a leg. That measures the plan, not AgOpenWeb's painted area, and I did not compare the two or re-measure coverage after the change to full-length passes. |
 | A hand-over restarts the interrupted pass | A job's route is kept when another tractor takes over, but the new tractor drives the interrupted pass again from its start. The code comment says nothing is repeated. By my reading of `live.js`, one pass can be driven twice. I did not watch it. |
-| Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go, is more than 40 m from its target, and is not opening a field. A tractor that stalls within 40 m of its target is not caught by this check. There is no check for a tractor that leaves its lane or drives slowly. |
+| Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go and is not opening a field. Within 5 m of its target a tractor counts as arrived, so one that stalls there is not caught until its next leg. |
 | Lanes do not react to `block_route` | The lane network is built once. A `block_route` event changes the planner's travel times but not where the tractors drive. I did not test this. |
 | The status page shows only the re-plan headline | The line for each moved job and its reason is printed in the coordinator's Terminal window, not on the status page. |
-| Fuel truck hand-over not yet seen live | The depot-on-the-way branch has been seen in a live run. The truck driving to a tractor in a field, the hand-over there and the release are implemented but have not yet been seen end to end in a live run. The cost rates in `scenario.live.json` are assumptions, and fuel use is scaled up by `--fuel-scale` for the demo. |
 | Weather and drone are simulated | The weather feed is a scripted day and the drone's readings are generated from the field's name. Neither reads a real sensor. |
 | Give-way is simple | It stops one tractor when two moving tractors come within 9 m. It does not plan around a tractor that is standing still in the lane. |
 | No persistence | The job list, the trail and the roundtable lines live in memory. Start over, or a restart, loses them. `out/trail.jsonl` is emptied at each start. |

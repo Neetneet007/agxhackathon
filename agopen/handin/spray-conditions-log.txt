@@ -1,0 +1,179 @@
+06:00  STOP    2m 9.0C 4.8mph | 10m 10.8C 6.0mph | triggers: INVERSION | First reading, STOP. INVERSION: The air at 10 m is 1.8 °C warmer than at 2 m, which is a temperature inversion.
+06:01  STOP    2m 9.1C 4.8mph | 10m 10.9C 6.0mph | triggers: INVERSION
+06:02  STOP    2m 9.1C 4.8mph | 10m 10.9C 6.0mph | triggers: INVERSION
+06:03  STOP    2m 9.2C 4.7mph | 10m 10.9C 6.0mph | triggers: INVERSION
+06:04  STOP    2m 9.2C 4.7mph | 10m 11.0C 6.0mph | triggers: INVERSION
+06:05  STOP    2m 9.3C 5.0mph | 10m 10.5C 6.2mph | triggers: INVERSION
+06:06  STOP    2m 9.4C 5.2mph | 10m 10.0C 6.5mph | triggers: INVERSION
+06:07  GO      2m 9.5C 5.5mph | 10m 9.5C 6.7mph | triggers: - | Status changed from STOP to GO. no limits exceeded
+06:08  GO      2m 9.6C 5.7mph | 10m 9.0C 7.0mph | triggers: -
+06:09  GO      2m 9.7C 6.0mph | 10m 9.0C 7.3mph | triggers: -
+06:10  GO      2m 9.8C 6.3mph | 10m 9.0C 7.6mph | triggers: -
+06:11  GO      2m 9.9C 6.6mph | 10m 9.0C 8.0mph | triggers: -
+06:12  GO      2m 10.0C 6.9mph | 10m 9.0C 8.3mph | triggers: -
+06:13  GO      2m 10.1C 7.4mph | 10m 9.1C 8.9mph | triggers: -
+06:14  GO      2m 10.3C 7.9mph | 10m 9.3C 9.4mph | triggers: -
+06:15  GO      2m 10.5C 8.9mph | 10m 9.5C 10.4mph | triggers: -
+06:16  CAUTION 2m 10.6C 9.1mph | 10m 9.6C 10.7mph | triggers: NEAR_LIMIT | Status changed from GO to CAUTION. NEAR_LIMIT: Wind at 2 m is 9.1 mph, close to the 10 mph maximum.
+06:17  CAUTION 2m 10.6C 9.3mph | 10m 9.7C 10.9mph | triggers: NEAR_LIMIT
+06:18  CAUTION 2m 10.7C 9.4mph | 10m 9.8C 11.2mph | triggers: NEAR_LIMIT
+06:19  CAUTION 2m 10.8C 9.6mph | 10m 9.9C 11.5mph | triggers: NEAR_LIMIT
+06:20  CAUTION 2m 10.9C 9.8mph | 10m 10.0C 11.7mph | triggers: NEAR_LIMIT
+06:21  CAUTION 2m 11.0C 10.0mph | 10m 10.0C 11.9mph | triggers: NEAR_LIMIT
+06:22  STOP    2m 11.1C 10.5mph | 10m 10.2C 12.4mph | triggers: WIND_HIGH | Status changed from CAUTION to STOP. WIND_HIGH: Wind at 2 m is 10.5 mph, above the 10 mph maximum, so spray would blow off target.
+06:23  STOP    2m 11.3C 11.1mph | 10m 10.3C 12.9mph | triggers: WIND_HIGH
+06:24  STOP    2m 11.4C 11.1mph | 10m 10.3C 12.9mph | triggers: WIND_HIGH
+06:25  STOP    2m 11.4C 11.0mph | 10m 10.4C 12.9mph | triggers: WIND_HIGH
+06:26  STOP    2m 11.4C 11.0mph | 10m 10.4C 13.0mph | triggers: WIND_HIGH
+06:27  STOP    2m 11.4C 10.9mph | 10m 10.4C 13.0mph | triggers: WIND_HIGH
+06:28  STOP    2m 11.5C 10.9mph | 10m 10.5C 13.1mph | triggers: WIND_HIGH
+06:29  STOP    2m 11.5C 10.9mph | 10m 10.5C 13.0mph | triggers: WIND_HIGH
+06:30  STOP    2m 11.4C 10.5mph | 10m 10.4C 12.4mph | triggers: WIND_HIGH
+06:31  STOP    2m 11.3C 10.1mph | 10m 10.3C 11.7mph | triggers: WIND_HIGH
+06:32  CAUTION 2m 11.2C 9.9mph | 10m 10.2C 11.5mph | triggers: NEAR_LIMIT | Status changed from STOP to CAUTION. NEAR_LIMIT: Wind at 2 m is 9.9 mph, close to the 10 mph maximum.
+06:33  CAUTION 2m 11.2C 9.7mph | 10m 10.1C 11.3mph | triggers: NEAR_LIMIT
+06:34  CAUTION 2m 11.1C 9.5mph | 10m 10.0C 11.1mph | triggers: NEAR_LIMIT
+06:35  CAUTION 2m 11.0C 9.3mph | 10m 9.9C 10.9mph | triggers: NEAR_LIMIT
+06:36  CAUTION 2m 10.9C 9.1mph | 10m 9.8C 10.8mph | triggers: NEAR_LIMIT
+06:37  GO      2m 10.8C 8.9mph | 10m 9.8C 10.6mph | triggers: - | Status changed from CAUTION to GO. no limits exceeded
+06:38  GO      2m 10.6C 8.0mph | 10m 9.6C 9.5mph | triggers: -
+06:39  GO      2m 10.5C 7.0mph | 10m 9.5C 8.4mph | triggers: -
+06:40  GO      2m 10.4C 6.7mph | 10m 9.4C 8.0mph | triggers: -
+06:41  GO      2m 10.3C 6.3mph | 10m 9.3C 7.6mph | triggers: -
+06:42  GO      2m 10.2C 6.0mph | 10m 9.2C 7.2mph | triggers: -
+06:43  GO      2m 10.0C 5.6mph | 10m 9.0C 6.8mph | triggers: -
+06:44  GO      2m 9.8C 5.1mph | 10m 8.8C 6.4mph | triggers: -
+06:45  GO      2m 9.6C 5.1mph | 10m 9.2C 6.4mph | triggers: -
+06:46  STOP    2m 9.5C 5.0mph | 10m 9.6C 6.3mph | triggers: INVERSION | Status changed from GO to STOP. INVERSION: The air at 10 m is 0.1 °C warmer than at 2 m, which is a temperature inversion.
+06:47  STOP    2m 9.3C 4.9mph | 10m 10.0C 6.3mph | triggers: INVERSION
+06:48  STOP    2m 9.2C 4.9mph | 10m 10.4C 6.2mph | triggers: INVERSION
+06:49  STOP    2m 9.0C 4.8mph | 10m 10.8C 6.2mph | triggers: INVERSION
+06:50  STOP    2m 9.0C 4.8mph | 10m 10.9C 6.2mph | triggers: INVERSION
+06:51  STOP    2m 9.1C 4.8mph | 10m 10.9C 6.2mph | triggers: INVERSION
+06:52  STOP    2m 9.1C 4.8mph | 10m 11.0C 6.2mph | triggers: INVERSION
+06:53  STOP    2m 9.2C 4.8mph | 10m 11.0C 6.2mph | triggers: INVERSION
+06:54  STOP    2m 9.3C 5.0mph | 10m 10.5C 6.4mph | triggers: INVERSION
+06:55  STOP    2m 9.4C 5.2mph | 10m 10.0C 6.7mph | triggers: INVERSION
+06:56  GO      2m 9.5C 5.5mph | 10m 9.5C 6.9mph | triggers: - | Status changed from STOP to GO. no limits exceeded
+06:57  GO      2m 9.6C 5.7mph | 10m 9.0C 7.2mph | triggers: -
+06:58  GO      2m 9.7C 6.1mph | 10m 9.0C 7.4mph | triggers: -
+06:59  GO      2m 9.8C 6.5mph | 10m 9.0C 7.7mph | triggers: -
+07:00  GO      2m 9.9C 6.8mph | 10m 9.0C 8.0mph | triggers: -
+07:01  GO      2m 10.0C 7.1mph | 10m 9.0C 8.3mph | triggers: -
+07:02  GO      2m 10.2C 7.6mph | 10m 9.2C 8.9mph | triggers: -
+07:03  GO      2m 10.3C 8.1mph | 10m 9.3C 9.4mph | triggers: -
+07:04  CAUTION 2m 10.5C 9.1mph | 10m 9.5C 10.5mph | triggers: NEAR_LIMIT | Status changed from GO to CAUTION. NEAR_LIMIT: Wind at 2 m is 9.1 mph, close to the 10 mph maximum.
+07:05  CAUTION 2m 10.6C 9.2mph | 10m 9.6C 10.7mph | triggers: NEAR_LIMIT
+07:06  CAUTION 2m 10.7C 9.3mph | 10m 9.7C 10.9mph | triggers: NEAR_LIMIT
+07:07  CAUTION 2m 10.7C 9.4mph | 10m 9.8C 11.2mph | triggers: NEAR_LIMIT
+07:08  CAUTION 2m 10.8C 9.6mph | 10m 9.8C 11.4mph | triggers: NEAR_LIMIT
+07:09  CAUTION 2m 10.9C 9.8mph | 10m 9.9C 11.6mph | triggers: NEAR_LIMIT
+07:10  CAUTION 2m 11.0C 9.9mph | 10m 10.0C 11.8mph | triggers: NEAR_LIMIT
+07:11  STOP    2m 11.1C 10.4mph | 10m 10.1C 12.4mph | triggers: WIND_HIGH | Status changed from CAUTION to STOP. WIND_HIGH: Wind at 2 m is 10.4 mph, above the 10 mph maximum, so spray would blow off target.
+07:12  STOP    2m 11.3C 10.9mph | 10m 10.3C 13.0mph | triggers: WIND_HIGH
+07:13  STOP    2m 11.3C 10.9mph | 10m 10.3C 13.0mph | triggers: WIND_HIGH
+07:14  STOP    2m 11.4C 11.0mph | 10m 10.3C 13.0mph | triggers: WIND_HIGH
+07:15  STOP    2m 11.4C 11.1mph | 10m 10.4C 13.0mph | triggers: WIND_HIGH
+07:16  STOP    2m 11.5C 11.1mph | 10m 10.4C 13.0mph | triggers: WIND_HIGH
+07:17  STOP    2m 11.5C 11.1mph | 10m 10.5C 13.0mph | triggers: WIND_HIGH
+07:18  STOP    2m 11.5C 11.0mph | 10m 10.5C 13.0mph | triggers: WIND_HIGH
+07:19  STOP    2m 11.4C 10.5mph | 10m 10.4C 12.4mph | triggers: WIND_HIGH
+07:20  CAUTION 2m 11.3C 10.0mph | 10m 10.3C 11.8mph | triggers: NEAR_LIMIT | Status changed from STOP to CAUTION. NEAR_LIMIT: Wind at 2 m is 10 mph, close to the 10 mph maximum.
+07:21  CAUTION 2m 11.2C 9.8mph | 10m 10.2C 11.6mph | triggers: NEAR_LIMIT
+07:22  CAUTION 2m 11.1C 9.6mph | 10m 10.1C 11.4mph | triggers: NEAR_LIMIT
+07:23  CAUTION 2m 11.0C 9.4mph | 10m 10.0C 11.2mph | triggers: NEAR_LIMIT
+07:24  CAUTION 2m 10.9C 9.2mph | 10m 9.9C 10.9mph | triggers: NEAR_LIMIT
+07:25  CAUTION 2m 10.9C 9.1mph | 10m 9.9C 10.8mph | triggers: NEAR_LIMIT
+07:26  GO      2m 10.8C 8.9mph | 10m 9.8C 10.6mph | triggers: - | Status changed from CAUTION to GO. no limits exceeded
+07:27  GO      2m 10.7C 8.0mph | 10m 9.7C 9.5mph | triggers: -
+07:28  GO      2m 10.5C 7.0mph | 10m 9.5C 8.5mph | triggers: -
+07:29  GO      2m 10.4C 6.6mph | 10m 9.4C 8.1mph | triggers: -
+07:30  GO      2m 10.3C 6.3mph | 10m 9.3C 7.7mph | triggers: -
+07:31  GO      2m 10.2C 5.9mph | 10m 9.2C 7.3mph | triggers: -
+07:32  GO      2m 10.0C 5.5mph | 10m 9.0C 6.9mph | triggers: -
+07:33  GO      2m 9.8C 5.1mph | 10m 8.8C 6.5mph | triggers: -
+07:34  GO      2m 9.6C 5.0mph | 10m 9.2C 6.4mph | triggers: -
+07:35  STOP    2m 9.4C 5.0mph | 10m 9.6C 6.3mph | triggers: INVERSION | Status changed from GO to STOP. INVERSION: The air at 10 m is 0.2 °C warmer than at 2 m, which is a temperature inversion.
+07:36  STOP    2m 9.3C 4.9mph | 10m 10.0C 6.2mph | triggers: INVERSION
+07:37  STOP    2m 9.1C 4.8mph | 10m 10.4C 6.1mph | triggers: INVERSION
+07:38  STOP    2m 9.0C 4.7mph | 10m 10.8C 6.0mph | triggers: INVERSION
+07:39  STOP    2m 9.0C 4.7mph | 10m 10.8C 6.0mph | triggers: INVERSION
+07:40  STOP    2m 9.1C 4.7mph | 10m 10.9C 6.0mph | triggers: INVERSION
+07:41  STOP    2m 9.1C 4.7mph | 10m 10.9C 6.1mph | triggers: INVERSION
+07:42  STOP    2m 9.2C 4.8mph | 10m 11.0C 6.1mph | triggers: INVERSION
+07:43  STOP    2m 9.3C 5.1mph | 10m 10.5C 6.4mph | triggers: INVERSION
+07:44  STOP    2m 9.4C 5.4mph | 10m 10.0C 6.7mph | triggers: INVERSION
+07:45  GO      2m 9.5C 5.6mph | 10m 9.5C 6.9mph | triggers: - | Status changed from STOP to GO. no limits exceeded
+07:46  GO      2m 9.6C 5.9mph | 10m 9.0C 7.1mph | triggers: -
+07:47  GO      2m 9.7C 6.2mph | 10m 9.0C 7.3mph | triggers: -
+07:48  GO      2m 9.8C 6.5mph | 10m 9.0C 7.6mph | triggers: -
+07:49  GO      2m 9.9C 6.7mph | 10m 9.0C 8.0mph | triggers: -
+07:50  GO      2m 10.0C 7.0mph | 10m 9.0C 8.4mph | triggers: -
+07:51  GO      2m 10.1C 7.4mph | 10m 9.2C 9.0mph | triggers: -
+07:52  GO      2m 10.3C 7.9mph | 10m 9.3C 9.6mph | triggers: -
+07:53  GO      2m 10.5C 8.9mph | 10m 9.5C 10.6mph | triggers: -
+07:54  CAUTION 2m 10.6C 9.1mph | 10m 9.6C 10.8mph | triggers: NEAR_LIMIT | Status changed from GO to CAUTION. NEAR_LIMIT: Wind at 2 m is 9.1 mph, close to the 10 mph maximum.
+07:55  CAUTION 2m 10.7C 9.3mph | 10m 9.7C 11.0mph | triggers: NEAR_LIMIT
+07:56  CAUTION 2m 10.8C 9.5mph | 10m 9.8C 11.2mph | triggers: NEAR_LIMIT
+07:57  CAUTION 2m 10.9C 9.7mph | 10m 9.9C 11.4mph | triggers: NEAR_LIMIT
+07:58  CAUTION 2m 10.9C 9.9mph | 10m 9.9C 11.6mph | triggers: NEAR_LIMIT
+07:59  CAUTION 2m 11.0C 10.0mph | 10m 10.0C 11.8mph | triggers: NEAR_LIMIT
+08:00  STOP    2m 11.1C 10.5mph | 10m 10.1C 12.4mph | triggers: WIND_HIGH | Status changed from CAUTION to STOP. WIND_HIGH: Wind at 2 m is 10.5 mph, above the 10 mph maximum, so spray would blow off target.
+08:01  STOP    2m 11.3C 11.0mph | 10m 10.3C 13.0mph | triggers: WIND_HIGH
+08:02  STOP    2m 11.3C 11.1mph | 10m 10.3C 13.0mph | triggers: WIND_HIGH
+08:03  STOP    2m 11.4C 11.1mph | 10m 10.4C 12.9mph | triggers: WIND_HIGH
+08:04  STOP    2m 11.4C 11.1mph | 10m 10.4C 12.9mph | triggers: WIND_HIGH
+08:05  STOP    2m 11.5C 11.1mph | 10m 10.5C 12.9mph | triggers: WIND_HIGH
+08:06  STOP    2m 11.5C 11.1mph | 10m 10.5C 12.9mph | triggers: WIND_HIGH
+08:07  STOP    2m 11.5C 11.1mph | 10m 10.5C 13.0mph | triggers: WIND_HIGH
+08:08  STOP    2m 11.4C 10.5mph | 10m 10.4C 12.4mph | triggers: WIND_HIGH
+08:09  CAUTION 2m 11.3C 10.0mph | 10m 10.3C 11.8mph | triggers: NEAR_LIMIT | Status changed from STOP to CAUTION. NEAR_LIMIT: Wind at 2 m is 10 mph, close to the 10 mph maximum.
+08:10  CAUTION 2m 11.3C 9.8mph | 10m 10.2C 11.6mph | triggers: NEAR_LIMIT
+08:11  CAUTION 2m 11.2C 9.6mph | 10m 10.2C 11.4mph | triggers: NEAR_LIMIT
+08:12  CAUTION 2m 11.1C 9.5mph | 10m 10.1C 11.1mph | triggers: NEAR_LIMIT
+08:13  CAUTION 2m 11.0C 9.3mph | 10m 10.0C 10.9mph | triggers: NEAR_LIMIT
+08:14  CAUTION 2m 10.9C 9.1mph | 10m 9.9C 10.7mph | triggers: NEAR_LIMIT
+08:15  GO      2m 10.8C 8.9mph | 10m 9.8C 10.5mph | triggers: - | Status changed from CAUTION to GO. no limits exceeded
+08:16  GO      2m 10.6C 7.9mph | 10m 9.7C 9.4mph | triggers: -
+08:17  GO      2m 10.5C 6.9mph | 10m 9.5C 8.3mph | triggers: -
+08:18  GO      2m 10.4C 6.7mph | 10m 9.4C 7.9mph | triggers: -
+08:19  GO      2m 10.3C 6.4mph | 10m 9.3C 7.6mph | triggers: -
+08:20  GO      2m 10.2C 6.1mph | 10m 9.2C 7.2mph | triggers: -
+08:21  GO      2m 10.0C 5.7mph | 10m 9.0C 6.8mph | triggers: -
+08:22  GO      2m 9.8C 5.3mph | 10m 8.8C 6.4mph | triggers: -
+08:23  GO      2m 9.6C 5.2mph | 10m 9.2C 6.3mph | triggers: -
+08:24  STOP    2m 9.5C 5.1mph | 10m 9.6C 6.3mph | triggers: INVERSION | Status changed from GO to STOP. INVERSION: The air at 10 m is 0.1 °C warmer than at 2 m, which is a temperature inversion.
+08:25  STOP    2m 9.3C 5.0mph | 10m 10.0C 6.2mph | triggers: INVERSION
+08:26  STOP    2m 9.2C 4.9mph | 10m 10.4C 6.2mph | triggers: INVERSION
+08:27  STOP    2m 9.0C 4.8mph | 10m 10.8C 6.1mph | triggers: INVERSION
+08:28  STOP    2m 9.1C 4.8mph | 10m 10.8C 6.1mph | triggers: INVERSION
+08:29  STOP    2m 9.1C 4.8mph | 10m 10.9C 6.1mph | triggers: INVERSION
+08:30  STOP    2m 9.2C 4.9mph | 10m 10.9C 6.1mph | triggers: INVERSION
+08:31  STOP    2m 9.2C 4.9mph | 10m 11.0C 6.2mph | triggers: INVERSION
+08:32  STOP    2m 9.3C 5.2mph | 10m 10.5C 6.4mph | triggers: INVERSION
+08:33  STOP    2m 9.4C 5.4mph | 10m 10.0C 6.7mph | triggers: INVERSION
+08:34  GO      2m 9.5C 5.7mph | 10m 9.5C 6.9mph | triggers: - | Status changed from STOP to GO. no limits exceeded
+08:35  GO      2m 9.6C 5.9mph | 10m 9.0C 7.1mph | triggers: -
+08:36  GO      2m 9.7C 6.2mph | 10m 9.0C 7.5mph | triggers: -
+08:37  GO      2m 9.8C 6.5mph | 10m 9.0C 7.8mph | triggers: -
+08:38  GO      2m 9.9C 6.7mph | 10m 9.0C 8.1mph | triggers: -
+08:39  GO      2m 10.0C 6.9mph | 10m 9.0C 8.4mph | triggers: -
+08:40  GO      2m 10.1C 7.4mph | 10m 9.1C 8.9mph | triggers: -
+08:41  GO      2m 10.3C 7.9mph | 10m 9.3C 9.5mph | triggers: -
+08:42  GO      2m 10.5C 8.9mph | 10m 9.5C 10.5mph | triggers: -
+08:43  CAUTION 2m 10.6C 9.1mph | 10m 9.6C 10.8mph | triggers: NEAR_LIMIT | Status changed from GO to CAUTION. NEAR_LIMIT: Wind at 2 m is 9.1 mph, close to the 10 mph maximum.
+08:44  CAUTION 2m 10.7C 9.3mph | 10m 9.6C 11.0mph | triggers: NEAR_LIMIT
+08:45  CAUTION 2m 10.7C 9.5mph | 10m 9.7C 11.2mph | triggers: NEAR_LIMIT
+08:46  CAUTION 2m 10.8C 9.7mph | 10m 9.8C 11.5mph | triggers: NEAR_LIMIT
+08:47  CAUTION 2m 10.9C 9.9mph | 10m 9.9C 11.7mph | triggers: NEAR_LIMIT
+08:48  CAUTION 2m 11.0C 10.0mph | 10m 10.0C 11.9mph | triggers: NEAR_LIMIT
+08:49  STOP    2m 11.1C 10.6mph | 10m 10.2C 12.5mph | triggers: WIND_HIGH | Status changed from CAUTION to STOP. WIND_HIGH: Wind at 2 m is 10.6 mph, above the 10 mph maximum, so spray would blow off target.
+08:50  STOP    2m 11.3C 11.1mph | 10m 10.3C 13.1mph | triggers: WIND_HIGH
+08:51  STOP    2m 11.3C 11.1mph | 10m 10.3C 13.1mph | triggers: WIND_HIGH
+08:52  STOP    2m 11.4C 11.1mph | 10m 10.3C 13.1mph | triggers: WIND_HIGH
+08:53  STOP    2m 11.4C 11.1mph | 10m 10.4C 13.1mph | triggers: WIND_HIGH
+08:54  STOP    2m 11.4C 11.1mph | 10m 10.4C 13.0mph | triggers: WIND_HIGH
+08:55  STOP    2m 11.5C 11.0mph | 10m 10.4C 12.9mph | triggers: WIND_HIGH
+08:56  STOP    2m 11.5C 11.0mph | 10m 10.5C 12.9mph | triggers: WIND_HIGH
+08:57  STOP    2m 11.4C 10.5mph | 10m 10.4C 12.3mph | triggers: WIND_HIGH
+08:58  CAUTION 2m 11.3C 10.0mph | 10m 10.3C 11.8mph | triggers: NEAR_LIMIT | Status changed from STOP to CAUTION. NEAR_LIMIT: Wind at 2 m is 10 mph, close to the 10 mph maximum.

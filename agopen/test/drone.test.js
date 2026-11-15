@@ -39,7 +39,7 @@ test('fresh drone is docked at home, full, simulated', () => {
   assert.deepEqual(d.tick(1), []);
 });
 
-test('investigate: arrive, hover ~6 s, one report, return, dock', () => {
+test('investigate: arrive, circle the tractor at 22 m for ~14 s, one report, return, dock', () => {
   const d = createDrone();
   const target = { e: 120, n: 50 };
   const id = d.assign({ type: 'investigate', target, subject: 'T2', symptom: 'GO_NOT_MOVING' });
@@ -51,8 +51,8 @@ test('investigate: arrive, hover ~6 s, one report, return, dock', () => {
       minDist = Math.min(minDist, Math.hypot(s.e - target.e, s.n - target.n));
     },
   });
-  assert.ok(minDist < 1);
-  assert.ok(Math.abs(hoverTicks * DT - 6) <= 0.6, `hovered ${hoverTicks * DT}s`);
+  assert.ok(Math.abs(minDist - 22) < 1.5, `closest ${minDist} m`);   // it circles the tractor, it does not sit on top of it
+  assert.ok(Math.abs(hoverTicks * DT - 14) <= 0.6, `circled ${hoverTicks * DT}s`);
   const reports = events.filter((e) => e.type === 'report');
   assert.equal(reports.length, 1);
   const r = reports[0].report;

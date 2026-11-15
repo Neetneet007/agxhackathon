@@ -108,7 +108,7 @@ This covers: show progress on a dashboard or map, and completed work.
 
 ### 2:05 Inject a fault in a tractor's Terminal window (80 seconds)
 
-Choose a tractor that is working and still early in a pass. The check only fires when the tractor is more than 40 m from its target.
+Choose a tractor that is working. The check takes 8 seconds on a pass and 12 seconds during a turn.
 
 Click that tractor's Terminal window ("Tractor T2 telemetry", for example) and type `stuck`, then Return. (`dead` stops it answering completely. The buttons **Inject: GO but not moving** and **Inject: stop responding** on the card do the same.)
 
@@ -160,7 +160,7 @@ Click a field on the map, then press **Map the picked fields** on the "Scout dro
 
 Say: "The drone is simulated and says so. It scans a field for crop status. It looked at the faulted tractor earlier. If it finds pest patches and the weather allows, it spot-sprays them instead of sending the 24 m sprayer."
 
-The judge sees: the simulated camera view, the drone's state and battery, and the scan report when it lands.
+The judge sees: the 3D farm from the drone's camera, looking down at the field, the drone's state and battery, and the scan report when it lands.
 
 ### 4:25 The fuel decision (20 seconds)
 
@@ -170,7 +170,7 @@ Say: "The planner forecasts each tractor's fuel from what it is really burning. 
 
 The judge sees: "needed before <job>: fuel truck" or "depot", with both costs and distances. The trail has the same sentence from the fuel planner. Fuel use is scaled up in the demo so that this comes up.
 
-Be honest: the depot-on-the-way branch has been seen in a live run. The truck meeting a tractor in the field and the hand-over there have not yet been seen end to end in a live run. If the truck is sent, show it driving on the map and say so.
+With the launcher's fuel use (`--fuel-scale 70`), a tractor mowing or tilling a far field such as Ridge 80 runs short part-way through, and the truck is sent about two plan hours into the day (under four minutes). Both branches have been seen in a live run: a refuel at the depot when it is on the tractor's way, and the fuel truck driving out to a tractor that would not finish its job (Ridge 80), stopping alongside, both locked until Good to go, then the tractor carrying on with a full tank and the truck returning.
 
 ### 4:45 Close (15 seconds)
 
@@ -217,7 +217,7 @@ The planner, the tractors, fault detection and the status page keep working. The
 Every pass runs the full length of the field, edge to edge, and the tractor turns outside the boundary. The coverage planner lays parallel passes along the guidance line with the outer passes' implement edge on the boundary and the rest spaced evenly, so nothing outside the field is worked, with no headland lap. The tractor's progress is measured along the route it actually drives, and AgOpenWeb paints the worked ground, which you can see in its window. The gap: we have not compared the planned coverage with AgOpenWeb's painted area, and we have not re-measured coverage since the change to full-length passes.
 
 **Is the fuel truck decision real?**
-The cost comparison is real code with the rates in `scenario.live.json` (diesel at USD 4 a gallon, a tractor's time at USD 120 an hour, the truck's at USD 45). The rates are assumptions. The depot-on-the-way branch has been seen in a live run. The truck driving to a tractor in a field and the hand-over there are implemented but have not yet been seen end to end in a live run.
+The cost comparison is real code with the rates in `scenario.live.json` (diesel at USD 4 a gallon, a tractor's time at USD 120 an hour, the truck's at USD 45). The rates are assumptions. Both branches have been seen in a live run: a refuel at the depot when it is on the tractor's way, and the fuel truck driving out to a tractor that would not finish its job (Ridge 80), stopping alongside, both locked until Good to go, then the tractor carrying on with a full tank and the truck returning.
 
 **How does it decide whether to spray?**
 It reads wind and temperature at 2 m and 10 m. Stop if the air at 10 m is warmer than at 2 m (an inversion), if wind at 2 m is under 3 or over 10 mph, or if the two heights differ by more than 5 mph. Caution within 1 mph of a limit. The reason is in words, every change is logged with a time stamp, and a Stop holds spray jobs until it clears. The feed is simulated.
@@ -229,7 +229,7 @@ The hard rules are never broken: the right implement, fuel above a 10% reserve, 
 On the planner's own simulator, with the same faults and the same farm: on the scripted demo day it completes 13 jobs against 10, 11 on time against 7, and drives 26% less. On the live scenario with a breakdown, 11 of 11 on time against 7 of 11, and the day ends at 15:56 against 17:16. Over 200 random scenarios it is better on on-time value in 168, ties in 22 and worse in 10. These come from the headless planner. The live AgOpenWeb run does not run a baseline.
 
 **How do you detect a fault?**
-From telemetry only. Silence for 3 seconds is `NO_RESPONSE`. A tractor that acknowledges GO but moves less than 5 m in 8 seconds while more than 40 m from its target is `GO_NOT_MOVING`. We inject the fault on stage, but the detection is real. It has blind spots: a stall within 40 m of the target is not caught.
+From telemetry only. Silence for 3 seconds is `NO_RESPONSE`. A tractor that acknowledges GO but moves less than 5 m in 8 seconds (or, close to its target, less than 1.5 m in 12 seconds) is `GO_NOT_MOVING`. We inject the fault on stage, but the detection is real. It has blind spots: a stall within 40 m of the target is not caught.
 
 **Does it reassign without repeating work?**
 A job's route belongs to the job, so the next tractor continues from the same waypoint. From reading the code, the pass that was interrupted is driven again from its start, so at most one pass can be done twice. The planner's own tests check that no acre is lost or counted twice.
@@ -247,4 +247,4 @@ The status page builds the list, removes jobs that have not been sent, presses G
 Not as it is. Fields would come from surveyed boundaries, GPS from real receivers, fuel from tractor data, and the fault checks would need tuning. The structure (one process per machine, a coordinator that sees only telemetry) is meant to carry over.
 
 **What is not finished?**
-The warning gap above, the fuel truck's field hand-over not yet seen live, coverage not compared with AgOpenWeb's painted area, fault checks with blind spots, a launcher that works only on macOS, and no authentication on the API. The README lists these under "What is simulated, and known limits".
+The warning gap above, coverage not compared with AgOpenWeb's painted area, fault checks with blind spots, a launcher that works only on macOS, and no authentication on the API. The README lists these under "What is simulated, and known limits".

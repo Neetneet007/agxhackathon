@@ -25,7 +25,7 @@ LIVE_ARGS="--preset" agopen/start-demo.sh    # options for live.js, here: start 
 | AgOpenWeb of T1, T2, T3 and FUEL | ports 5175, 5176, 5177, 5178 |
 | Telemetry node of T1, T2, T3 and FUEL | ports 6175, 6176, 6177, 6178 |
 
-`live.js` options (`LIVE_ARGS`), with defaults: `--cell` 20, `--sec` 1.8, `--until` none, `--preset` off, `--auto-humans` 0 (off), `--fuel-scale` 25, `--weather` demo (also `calm`, `windy`, `still`), `--truck` 6178, `--script` none, `--page` 5190.
+`live.js` options (`LIVE_ARGS`), with defaults: `--cell` 20, `--sec` 1.8, `--until` none, `--preset` off, `--auto-humans` 0 (off), `--fuel-scale` 25 (the launcher passes 70), `--weather` demo (also `calm`, `windy`, `still`), `--truck` 6178, `--script` none, `--page` 5190.
 
 **What it does**
 
@@ -34,7 +34,7 @@ LIVE_ARGS="--preset" agopen/start-demo.sh    # options for live.js, here: start 
 - **People in the loop.** A refuel or an implement change locks the tractor until a person presses **Good to go** on the status page. An implement change is then written to that tractor's AgOpenWeb (`profile.load`). Nothing is sown before it is plowed.
 - **Fuel truck.** The planner compares the cost in US dollars of a detour via the depot with the fuel truck's round trip (rates in `agopen/scenario.live.json` under `costs`), picks the cheaper and sends the truck so that it arrives as the job ends. Each tractor card shows when its job finishes, when its fuel reaches the reserve, and the next refuel choice with both costs.
 - **Spray or Wait?** Weather at 2 m and 10 m, an inversion check, wind limits (2 m wind 3 to 10 mph, at most 5 mph between heights), and Go, Caution or Stop with a reason. Every change is time-stamped in the log at `GET /weather-log`. A Stop holds spray jobs and releases them when conditions return.
-- **Scout drone (simulated).** Scans a field for crop status (`POST /drone/scan`, or **Map the picked fields** on the status page), is sent to look at a faulted tractor, shows a simulated camera view, and can spot-spray.
+- **Scout drone (simulated).** Scans a field for crop status (`POST /drone/scan`, or **Map the picked fields** on the status page), is sent to look at a faulted tractor, circles it with the camera kept on it, flies above a spraying tractor reading the wind at 10, 30 and 50 m, shows the 3D farm from its own camera, and can spot-spray.
 - **Roundtable of AI managers** (`agopen/roundtable/`, one manager per task for the whole fleet, model `claude-haiku-5-5`, rule-written lines when offline) explain each event. They never move a tractor.
 - **AgOpenWeb patch** (`agopen/agopenweb/agopenweb-multi-instance.patch`), four changes: `AGOPENWEB_PORT`, a single-instance lock named per port, `AGOPENWEB_OPERATOR=Fleet` (only clients named Fleet... can take the controls) and `?embed=1` (a map-only page for the small windows on the status page).
 
@@ -62,7 +62,6 @@ Headline numbers from `agopen/test/TEST_REPORT.md` (breakdown day: T1 breaks at 
 - After a hand-over, the new tractor drives the interrupted pass again from its start.
 - Lanes do not react to a `block_route` event.
 - The 3D view and the roundtable model lines need the internet. Without it, the roundtable uses rule-written lines.
-- Fuel truck: the depot-on-the-way branch has been seen in a live run. The in-field hand-over by the truck is implemented but has not yet been seen end to end in a live run.
 
 ## Run it
 

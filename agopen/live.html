@@ -382,6 +382,7 @@ async function refresh() {
     wxEl.innerHTML = `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
       <div>${esc(wx.reason)}</div>
       <div class="wxgrid"><span></span><b>2 m</b><b>10 m</b><span class="muted">Temperature</span><span>${wx.low.tempC.toFixed(1)} °C</span><span>${wx.high.tempC.toFixed(1)} °C</span><span class="muted">Wind</span><span>${wx.low.windMph.toFixed(1)} mph</span><span>${wx.high.windMph.toFixed(1)} mph</span></div>
+      ${(s.drone && s.drone.wind && s.drone.wind.length) ? `<div>Drone above ${esc(s.drone.wind[0].over)} (simulated): ${s.drone.wind.map(w => `<b>${w.mph.toFixed(1)} mph</b> at ${w.altM} m`).join(' · ')} <span class="muted">last at ${esc(s.drone.wind[s.drone.wind.length - 1].clock)}</span></div>` : ''}
       <div class="${wx.caughtByTwoHeights ? '' : 'muted'}">A single ground station would say: <b>${esc(wx.groundOnly.status === 'GO' ? 'Go' : wx.groundOnly.status === 'STOP' ? 'Stop' : 'Caution')}</b>${wx.caughtByTwoHeights ? '. The second height caught the risk.' : ''}</div>
       <div class="wxlog">${(wx.log || []).map(l => `<div>${esc(l.clock)} ${esc(l.status)}: ${esc(l.note)}</div>`).join('')}</div>
       <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`;
@@ -389,7 +390,7 @@ async function refresh() {
   const d = s.drone, dEl = document.getElementById('droneinfo');
   if (d && dEl) {
     const rep = (d.reports || [])[0];
-    const words = { docked: 'Docked', flying: 'Flying', hovering: 'Hovering', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
+    const words = { docked: 'Docked', flying: 'Flying', hovering: 'Circling a tractor', escorting: 'Reading the wind above a sprayer', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
     dEl.classList.remove('muted');
     dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
       <div class="muted" style="font-size:11px">Camera view above is rendered from the simulation, not a real camera.</div>

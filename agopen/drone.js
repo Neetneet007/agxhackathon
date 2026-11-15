@@ -6,7 +6,9 @@ const CLIMB_M = 15; // climb/descent distance at each end of a flight
 const CHARGE_PCT_PER_SEC = 5;
 const START_MIN_PCT = 30;
 const ABORT_PCT = 20;
-const HOVER_INVESTIGATE_S = 6;
+const HOVER_INVESTIGATE_S = 14;   // time spent circling a faulted tractor: one full orbit
+const ORBIT_RADIUS_M = 22, ORBIT_ALT_M = 24;
+const ESCORT_ALTS_M = [10, 30, 50], ESCORT_DWELL_S = 7, ESCORT_OFFSET_M = 12;   // wind is sampled at each height in turn
 const HOVER_SPRAY_S = 4;
 const EPS = 1e-9;
 
@@ -248,6 +250,7 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
     m.phase = 'go';
     m.hoverLeft = m.type === 'investigate' ? HOVER_INVESTIGATE_S : HOVER_SPRAY_S;
     if (m.type === 'scan') m.onPath = false;
+    if (m.type === 'investigate') m.theta = null;
   };
 
   function airborne(sec) {
@@ -309,7 +312,11 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
   function runMission(m, t, ev) {
     if (m.type === 'investigate') {
       if (m.phase === 'go') {
-        const r = flyTo(m.spec.target, t, 'flying');
+        // Join the circle at the point nearest to where the drone is coming from.
+        const c = m.spec.target, d0 = dist(pos, c) || 1;
+        if (m.theta == null) m.theta = d0 > ORBIT_RADIUS_M ? Math.atan2(pos.n - c.n, pos.e - c.e) : 0;
+        const join = { e: c.e + ORBIT_RADIUS_M * Math.cos(m.theta), n: c.n + ORBIT_RADIUS_M * Math.sin(m.theta) };
+        const r = flyTo(join, t, 'flying');
         if (r.arrived) {
           ev.push({ type: 'arrived', missionId: m.id, at: { ...pos } });
           m.phase = 'hover';
@@ -317,15 +324,36 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
         }
         return r.t;
       }
+      // One slow circle round the tractor, camera on it the whole way.
       status = 'hovering';
       const used = Math.min(t, m.hoverLeft);
       m.hoverLeft -= used;
       airborne(used);
+      m.theta += Math.min(2 * Math.PI / HOVER_INVESTIGATE_S, speedMps / ORBIT_RADIUS_M) * used;   // never faster than the drone flies
+      pos = { e: m.spec.target.e + ORBIT_RADIUS_M * Math.cos(m.theta), n: m.spec.target.n + ORBIT_RADIUS_M * Math.sin(m.theta) };
+      heading = ((Math.atan2(-Math.sin(m.theta), Math.cos(m.theta)) * 180) / Math.PI + 360) % 360;
       if (m.hoverLeft <= EPS) {
         ev.push({ type: 'report', missionId: m.id, report: inspectionReport(m, seed) });
         cur = null;
       }
       return t - used;
+    }
+
+    if (m.type === 'escort') {
+      // Stay just behind a tractor while it sprays, stepping through three heights and reporting each one, so
+      // the wind can be read at more than the two fixed heights of the weather mast. Gives way to any other mission.
+      const at = m.spec.follow();
+      if (!at || m.spec.until() || queue.length) { ev.push({ type: 'escort-ended', missionId: m.id }); cur = null; return t; }
+      const r = flyTo({ e: at.e - ESCORT_OFFSET_M, n: at.n - ESCORT_OFFSET_M }, t, m.phase === 'go' ? 'flying' : 'escorting');
+      m.focus = { e: at.e, n: at.n };
+      if (m.phase === 'go') { if (r.arrived) { m.phase = 'follow'; m.dwell = 0; m.step = 0; ev.push({ type: 'arrived', missionId: m.id, at: { ...pos } }); } return r.arrived ? r.t : 0; }
+      if (r.t > 0) airborne(r.t);                     // holding station still uses the battery
+      m.dwell += t;
+      if (m.dwell >= ESCORT_DWELL_S) {
+        ev.push({ type: 'wind-sample', missionId: m.id, subject: m.spec.subject, altM: ESCORT_ALTS_M[m.step % ESCORT_ALTS_M.length], lastOfCycle: m.step % ESCORT_ALTS_M.length === ESCORT_ALTS_M.length - 1 });
+        m.step++; m.dwell = 0;
+      }
+      return 0;
     }
 
     if (m.type === 'scan') {
@@ -432,14 +460,19 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
     if (mode === 'returning') return [{ ...HOME }];
     if (mode !== 'mission' || !cur) return [];
     if (cur.type === 'investigate') return [{ ...cur.spec.target }];
+    if (cur.type === 'escort') return [];
     if (cur.type === 'scan') return cur.path.slice(cur.wp).map((p) => ({ ...p }));
     return cur.spec.spots.slice(cur.idx).map((s) => ({ e: s.e, n: s.n }));
   }
 
   return {
     state() {
-      const alt = mode === 'docked' ? 0 : altitudeM * Math.min(1, dist(pos, HOME) / CLIMB_M);
+      let alt = mode === 'docked' ? 0 : altitudeM * Math.min(1, dist(pos, HOME) / CLIMB_M);
+      let focus = null;
+      if (mode === 'mission' && cur?.type === 'investigate') { focus = { ...cur.spec.target }; if (cur.phase === 'hover') alt = ORBIT_ALT_M; }
+      if (mode === 'mission' && cur?.type === 'escort' && cur.phase === 'follow') { focus = cur.focus || null; alt = ESCORT_ALTS_M[cur.step % ESCORT_ALTS_M.length]; }
       return {
+        focus,
         e: pos.e,
         n: pos.n,
         altM: alt,
@@ -475,6 +508,9 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
         m.done = 0;
         m.onPath = false;
         if (!m.path.length) throw new TypeError('scan boundary produced no flight path');
+      } else if (spec.type === 'escort') {
+        if (typeof spec.follow !== 'function' || typeof spec.until !== 'function') throw new TypeError('escort needs follow() and until()');
+        m.label = `Wind watch above ${spec.subject}`;
       } else if (spec.type === 'spot-spray') {
         if (!Array.isArray(spec.spots) || !spec.spots.length) throw new TypeError('spot-spray needs spots');
         m.label = `Spot-spray ${spec.field} (${spec.spots.length} spot${spec.spots.length > 1 ? 's' : ''})`;
