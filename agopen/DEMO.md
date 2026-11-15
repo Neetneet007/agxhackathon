@@ -1,5 +1,7 @@
 # Five-minute table demo
 
+> The status page was redesigned as a dashboard after this script was written. Everything named here is still on it, but the fault buttons, GPS detail and the AgOpenWeb mini map for each vehicle are now inside that vehicle's **Detail, AgOpenWeb view and fault test** line (or press **Show all detail** in the Fleet header). You can also type `stuck`, `dead` or `ok` in a tractor's Terminal window.
+
 This script shows the live mode (see [README.md](README.md)) to judges in five minutes, then takes questions. The track is "Run the Fleet": a coordinator that assigns jobs to a small fleet of tractors and re-plans when something breaks. The same run also shows the spray-conditions check ("Spray or Wait?"), a fuel truck and a scout drone.
 
 The point to land: **a real AgOpenWeb instance drives each vehicle, a fault is detected from telemetry, no work is lost, and the new plan is explained in plain language.**
@@ -118,7 +120,7 @@ Wait about 8 to 9 seconds. The judge sees, in order:
 
 1. The tractor's badge turns red: "GO acknowledged, GPS not moving".
 2. The trail ("Messages between agents") shows `fault-detector → planner`, with the ack count and "moved under 5 m in 8 s". It also shows "Drone sent to look at T2." The drone card shows the drone flying to the tractor, and a simulated report follows with an assessment and a recommendation.
-3. A breakdown line, then a re-plan headline, for example "T2 broke down: 4 unfinished job(s) re-assigned, 1 completed job(s) unaffected." The status page shows only this headline.
+3. A breakdown line, then a re-plan headline, for example "T2 broke down: 4 unfinished job(s) re-assigned, 1 completed job(s) unaffected." Under **Latest plan change** (top right) the dashboard lists each job that moved, who has it now, the new finish time and the reason, for example "N1 Till North Field → T2, finish 15:24 (deadline 17:00), keeps 0.3 ac already done, 0.9 ac left; only working tractor with a tiller." Press **Why?** on any job row for the planner's reasons and the alternatives it rejected.
 4. In the coordinator window, one line per moved job with the reason, for example "keeps 4.7 ac already done" and "only working tractor with a seeder". Read one out.
 5. The jobs table: the interrupted job's percent does not go back to zero, and the job shows another tractor.
 6. The roundtable card: the Fault Manager, Fleet Manager and Safety Officer speak, then the Plan Manager decides. If the Plan Manager calls a tool, a line says "Plan Manager called change_priority" or similar.
