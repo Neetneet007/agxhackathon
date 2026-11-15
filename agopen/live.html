@@ -3,187 +3,588 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fleet live status</title>
+<title>Fleet coordinator</title>
 <style>
-  :root { --bg:#f3f1ea; --card:#fff; --ink:#1f2a24; --muted:#6b756e; --line:#dcd8cd; --ok:#2f855a; --warn:#b7791f; --bad:#c0392b; --info:#1c7ed6; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  header { display:flex; align-items:baseline; gap:16px; padding:10px 16px; background:#1f2a24; color:#fff; flex-wrap:wrap; }
-  header h1 { margin:0; font-size:17px; }
-  header #clock { font:600 22px ui-monospace,Menlo,monospace; margin-left:auto; }
-  header small { opacity:.75; }
-  main { padding:12px; display:grid; gap:12px; }
-  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:0; }
-  .card h2 { margin:0 0 6px; font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; color:#fff; background:var(--muted); letter-spacing:.02em; }
-  .WORKING { background:var(--ok); } .DRIVING { background:var(--info); } .SWAP,.REFUEL { background:var(--warn); }
-  .STANDBY { background:var(--muted); } .HOLD { background:#b7791f; } .NO_RESPONSE,.GO_NOT_MOVING,.DOWN { background:var(--bad); }
-  .fault { border-color:var(--bad); background:#fdf1ef; }
-  dl { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; margin:0; font-size:13px; }
-  dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; }
-  iframe { width:100%; height:300px; border:1px solid var(--line); border-radius:6px; margin-top:8px; background:#ddd; }
-  .btns { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
-  button { font:inherit; font-size:12px; border:1px solid var(--line); border-radius:6px; padding:3px 9px; background:#fff; cursor:pointer; }
-  button.bad { color:var(--bad); border-color:#e3b1ab; }
-  table { width:100%; border-collapse:collapse; font-size:12.5px; }
-  th { text-align:left; color:var(--muted); font-size:11px; border-bottom:1px solid var(--line); padding:3px 4px; }
-  td { padding:3px 4px; border-bottom:1px solid #efece4; }
-  .trail { max-height:300px; overflow:auto; font-size:12.5px; }
-  .trail div { padding:3px 0; border-bottom:1px solid #f1eee6; }
-  .trail time { font-family:ui-monospace,Menlo,monospace; color:var(--muted); margin-right:6px; }
-  .trail .who { color:var(--info); font-weight:600; margin-right:6px; }
-  .trail .fault .who, .trail .fault { color:var(--bad); font-weight:600; }
+  :root {
+    --bg:#f4f1ea; --panel:#fcfbf8; --ink:#161c18; --ink2:#3a443e; --muted:#69716b; --line:#d6d1c4; --line2:#e9e5da;
+    --accent:#1e5a3d;
+    --working:#2f8552; --driving:#c47f0c; --person:#1f6fb5; --fault:#bf3a2b; --hold:#8a6b1a; --idle:#7b837d;
+    /* kept for the inline styles in the render code */
+    --ok:#2f8552; --warn:#c47f0c; --bad:#bf3a2b; --info:#1f6fb5;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-padding-top:70px; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-text-size-adjust:100%; }
+  a { color:var(--accent); }
+  b { font-weight:650; }
   .muted { color:var(--muted); }
-  .scroll { overflow-x:auto; }
-  .wx { font-size:13px; display:grid; gap:6px; }
-  .wxpill { display:inline-block; font-weight:800; font-size:18px; padding:4px 16px; border-radius:16px; color:#fff; }
-  .wxpill.GO { background:var(--ok); } .wxpill.CAUTION { background:var(--warn); } .wxpill.STOP { background:var(--bad); }
-  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
-  .wxlog { font-size:12px; color:var(--muted); max-height:86px; overflow:auto; }
-  .dronebox { display:block; font-size:13px; }
-  #dronecam { display:block; width:100%; aspect-ratio:16/9; height:auto; margin:0 0 6px; background:#cfe6f5; border-radius:6px; border:0; }
-  button.small { font-size:12px; padding:2px 8px; float:right; }
-  #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
-  #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
-  /* Roundtable box: grey-blue panel, dark-blue scrollbar, "← newest" read down the right edge. */
-  .rt-wrap { display:grid; grid-template-columns:1fr auto; gap:6px; align-items:stretch; }
-  .roundtable { --rt-panel:#d8e0ea; --rt-track:#c2ccd8; --rt-navy:#1f3a5f; --rt-rule:#bfc9d5;
-    max-height:300px; overflow:auto; display:grid; gap:6px; background:var(--rt-panel); border-radius:8px; padding:8px 10px;
-    scrollbar-color:var(--rt-navy) var(--rt-track); scrollbar-width:thin; }
-  .roundtable::-webkit-scrollbar { width:10px; }
-  .roundtable::-webkit-scrollbar-track { background:var(--rt-track); border-radius:8px; }
-  .roundtable::-webkit-scrollbar-thumb { background:var(--rt-navy); border-radius:8px; border:2px solid var(--rt-track); }
-  .roundtable::-webkit-scrollbar-thumb:hover { background:#16304f; }
-  .roundtable .rt-topic { color:#4f5d70; border-top-color:var(--rt-rule); }
-  .roundtable .rt-meta { color:#56657a; }
-  .rt-newest { writing-mode:vertical-rl; color:#1f3a5f; font-size:11px; font-weight:700; letter-spacing:.04em; user-select:none; }
-  .rt-topic { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; border-top:1px solid var(--line); padding-top:6px; }
-  /* One block per discussion. Topics with a colour get a tinted card with a stronger left edge. */
-  .rt-block { display:grid; gap:6px; }
-  .rt-block[class*="rt-c-"] { border-radius:8px; border-left:4px solid var(--rt-edge); background:var(--rt-bg); padding:6px 8px 8px; }
-  .rt-block[class*="rt-c-"] .rt-topic { margin-top:0; border-top:0; padding-top:0; color:var(--rt-edge); font-weight:700; }
-  .rt-c-resume    { --rt-bg:#eef3e2; --rt-edge:#8aa35c; } /* Spraying may resume: light, dry green */
-  .rt-c-stopped   { --rt-bg:#d6f0d0; --rt-edge:#2e9e44; } /* Spraying stopped by the weather: darker, lively green */
-  .rt-c-refuel    { --rt-bg:#fbe5c8; --rt-edge:#d9822b; } /* Refuel T#: light orange */
-  .rt-c-implement { --rt-bg:#ead6bf; --rt-edge:#8a5a2b; } /* Change T#'s implement: darker brown */
-  .rt-c-newjobs   { --rt-bg:#dcebfb; --rt-edge:#1c7ed6; } /* New job(s) slotted into the plan: blue */
-  .rt-line { display:grid; grid-template-columns:132px 1fr; gap:8px; align-items:start; font-size:13px; }
-  .rt-who { font-weight:700; font-size:12px; padding:2px 8px; border-radius:10px; color:#fff; background:#6b756e; text-align:center; }
-  .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
-  .rt-line.tool .rt-text::before { content:"Tool: "; color:var(--info); }
-  .rt-meta { color:var(--muted); font-size:11px; margin-left:6px; white-space:nowrap; }
-  #peoplecard { border-color:var(--warn); background:#fff8e8; }
-  .task { display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #f0e2bf; flex-wrap:wrap; }
-  .task b { min-width:220px; }
-  button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; font-size:13px; padding:5px 14px; }
-  button.go:disabled { background:#c9d2cc; border-color:#c9d2cc; cursor:default; }
-  header a { color:#bfe3cf; font-size:13px; }
-  #startover { font-size:12px; padding:3px 10px; border-radius:6px; border:1px solid #6b756e; background:#2c3a33; color:#fff; cursor:pointer; }
-  #startovermsg { opacity:.8; }
-  .farm { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:12px; align-items:start; }
-  #map { width:100%; height:auto; max-height:460px; background:#e9e3d2; border-radius:6px; }
-  #map .field { fill:#cfe3b4; stroke:#5f7a45; stroke-width:1.2; cursor:pointer; }
-  #map .field.open { fill:#f6e3a1; } #map .field.active { fill:#9fd3a8; } #map .field.done { fill:#c9d2cc; }
-  #map .field.sel { stroke:#1c7ed6; stroke-width:3.5; }
-  #map .lane { stroke:#b79c6b; stroke-width:3.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
-  #map .gate { fill:#7a5f33; }
-  #map .line { stroke:#8e24aa; stroke-width:1; stroke-dasharray:5 4; fill:none; pointer-events:none; }
-  #map text { font:600 8px sans-serif; fill:#1f2a24; pointer-events:none; text-anchor:middle; }
-  #map text.sub { font:400 6px sans-serif; fill:#4a554e; }
-  #map .tr { stroke:#fff; stroke-width:1.2; }
-  #builder { display:grid; gap:10px; font-size:13px; }
-  #builder label { display:grid; gap:2px; color:var(--muted); font-size:12px; }
-  #builder select, #builder input { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
-  #builder .banner { background:#e7f1fb; border:1px solid #b9d6f2; border-radius:6px; padding:6px 8px; font-size:12.5px; }
-  #builder .step { font-weight:700; font-size:12px; margin-bottom:3px; }
-  #chips { display:flex; gap:6px; flex-wrap:wrap; }
-  #chips button { padding:4px 10px; font-size:13px; border-radius:14px; }
-  #chips button.on { background:var(--info); border-color:var(--info); color:#fff; font-weight:700; }
-  #builder button.add { background:#fff; border-color:var(--info); color:var(--info); font-weight:700; font-size:13px; padding:5px 12px; }
-  #builder button.add:disabled { color:var(--muted); border-color:var(--line); cursor:default; }
-  #draftlist .fgroup { border-top:1px solid var(--line); padding:5px 0; }
-  #draftlist .fname { font-weight:700; }
-  #draftlist .jb { display:flex; align-items:baseline; gap:6px; padding:2px 0; font-size:12.5px; }
+  .num, dd, td, time, #clock, .stat .v, .pct { font-variant-numeric:tabular-nums; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* ---- Top bar ---- */
+  .top { position:sticky; top:0; z-index:20; display:flex; align-items:stretch; background:var(--panel); border-bottom:1px solid var(--ink); padding:0 16px; min-height:56px; }
+  .brand { display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1 1 150px; padding:6px 16px 6px 0; }
+  .brand h1 { margin:0; font-size:15px; font-weight:700; white-space:nowrap; }
+  #scn { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stats { display:flex; }
+  .stat { display:flex; flex-direction:column; justify-content:center; gap:1px; padding:6px 14px; border-left:1px solid var(--line); text-decoration:none; color:inherit; white-space:nowrap; }
+  .k, .stat .k, #daystate { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .stat .v { font-size:15px; font-weight:600; }
+  .stat .v .of, .stat .v .u { font-weight:400; color:var(--muted); }
+  .stat .v .sep { color:var(--line); margin:0 5px; }
+  .stat.alert { background:var(--person); border-left-color:var(--person); }
+  .stat.alert .k, .stat.alert .v { color:#fff; }
+  .c-GO { color:var(--working); } .c-CAUTION { color:var(--driving); } .c-STOP, .c-fault { color:var(--fault); } .c-hold { color:var(--hold); }
+  .clockbox { display:flex; flex-direction:column; justify-content:center; align-items:flex-end; gap:2px; padding:6px 14px; border-left:1px solid var(--line); white-space:nowrap; }
+  #clock { font-size:26px; font-weight:650; line-height:1; letter-spacing:-.01em; }
+  .toplink { align-self:center; margin-left:2px; font-size:13px; white-space:nowrap; padding:6px 10px; border:1px solid var(--line); border-radius:3px; text-decoration:none; color:var(--ink); background:#fff; }
+  .toplink:hover { border-color:var(--ink2); }
+
+  /* ---- Grid ---- */
+  main { display:grid; grid-template-columns:340px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
+  .col { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; min-width:0; align-content:start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:3px; min-width:0; }
+  .phead { display:flex; align-items:baseline; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .phead h2 { margin:0; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink); white-space:nowrap; }
+  .phead small { font-size:12px; color:var(--muted); min-width:0; }
+  .phead button { margin-left:auto; }
+  .pbody { padding:10px 12px; }
+  .note { font-size:11.5px; color:var(--muted); }
+
+  /* ---- Buttons ---- */
+  button { font:inherit; font-size:13px; line-height:1.2; padding:6px 10px; border:1px solid #c4beb0; border-radius:3px; background:#fff; color:var(--ink); cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--ink2); }
+  button:disabled { cursor:default; color:#9aa19b; background:#efece4; border-color:#e3dfd3; }
+  button.small { font-size:12px; padding:3px 8px; }
+  button.go, button.add { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:650; font-size:14px; padding:9px 14px; }
+  button.go:hover:not(:disabled), button.add:hover:not(:disabled) { background:#17472f; border-color:#17472f; }
+  button.go:disabled, button.add:disabled { background:#e6e3d9; border-color:#e6e3d9; color:#979d98; }
+  button.bad, #startover { color:var(--fault); border-color:#dbb4ad; background:transparent; }
+  button.bad:hover:not(:disabled), #startover:hover:not(:disabled) { border-color:var(--fault); background:#fbf0ed; }
+
+  /* ---- Add jobs ---- */
+  #builder { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding:12px; font-size:13px; }
+  #builder .banner { border-left:3px solid var(--accent); background:#edf2ea; padding:7px 10px; font-size:13px; }
+  .step { display:flex; align-items:center; gap:8px; font-weight:650; font-size:13px; margin-bottom:7px; }
+  .step .n { display:inline-grid; place-items:center; width:18px; height:18px; border:1px solid var(--ink); border-radius:50%; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; flex:none; }
+  #chips, #fieldchips, #pickchips { display:flex; gap:5px; flex-wrap:wrap; }
+  #chips button, #fieldchips > button, #pickchips button { padding:6px 9px; font-size:13px; }
+  #chips button { flex:1 1 0; min-width:60px; }
+  #chips button.on, #fieldchips > button.on, #pickchips button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600; }
+  #picked { margin-top:6px; font-size:12.5px; }
+  #stepsum { margin-left:auto; font-size:12.5px; font-weight:400; white-space:nowrap; }
+  .pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:8px; align-items:end; }
+  #builder label { display:grid; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  #builder select, #builder input { font:inherit; font-size:13px; letter-spacing:0; text-transform:none; color:var(--ink); padding:5px 6px; border:1px solid #c4beb0; border-radius:3px; background:#fff; width:100%; min-width:0; height:31px; }
+  #startbtn { width:100%; }
+  #jadd { height:31px; padding:0 14px; white-space:nowrap; }
+  #jmsg:empty, #startmsg:empty, #startovermsg:empty { display:none; }
+  #jmsg, #startmsg { margin-top:6px; font-size:12.5px; }
+  .listhead { display:flex; align-items:baseline; justify-content:space-between; border-top:1px solid var(--line); padding-top:12px; margin-bottom:4px; }
+  #draftlist.muted { font-size:12.5px; }
+  #draftlist .fgroup { padding:6px 0; border-bottom:1px solid var(--line2); }
+  #draftlist .fname { font-weight:650; }
+  #draftlist .jb { display:flex; align-items:baseline; gap:6px; padding:3px 0; }
+  #draftlist .jb > span:first-child { color:var(--muted); font-variant-numeric:tabular-nums; }
   #draftlist .jb .lbl { flex:1; min-width:0; }
   #draftlist .jb small { display:block; color:var(--muted); font-size:11.5px; }
-  #draftlist .jb button { padding:1px 7px; }
-  #startbtn { width:100%; }
-  @media (max-width: 760px) { .farm { grid-template-columns:1fr; } }
+  #draftlist .jb button { padding:2px 7px; font-size:12px; }
+  .resetrow { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:-4px; }
+  .resetrow .note { flex:1; min-width:120px; }
+
+  /* ---- Let the AI drive ---- */
+  .aibox { border-bottom:1px solid var(--line); margin:-12px -12px 0; padding:10px 12px; background:#f6f4ec; }
+  #builder label.switch { display:flex; align-items:center; gap:10px; cursor:pointer; font-size:15px; font-weight:650; letter-spacing:0; text-transform:none; color:var(--ink); }
+  #builder #aidrive { position:absolute; opacity:0; width:1px; height:1px; padding:0; border:0; }
+  .switch .track { position:relative; flex:none; width:38px; height:20px; border:1.5px solid var(--ink2); border-radius:10px; background:#fff; }
+  .switch .track::after { content:""; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--ink2); }
+  #aidrive:checked + .track { background:var(--accent); border-color:var(--accent); }
+  #aidrive:checked + .track::after { left:20px; background:#fff; }
+  #aidrive:focus-visible + .track { outline:2px solid var(--accent); outline-offset:2px; }
+  #aihelp { margin-top:5px; color:var(--ink2); font-size:12.5px; }
+  .dayrow { display:flex; align-items:center; gap:6px; }
+  #aimark { font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:#fff; background:var(--accent); padding:1px 5px; border-radius:2px; }
+
+  /* ---- Field list (step 1): what is on each field, and the picker ---- */
+  .step button { margin-left:auto; font-weight:400; }
+  #fieldcap, #fieldcond, #fscanmsg { margin-bottom:6px; }
+  #fieldcond { color:var(--ink2); }
+  #fscanmsg:empty { display:none; }
+  #fieldchips.flist { display:block; max-height:clamp(300px, calc(100vh - 470px), 640px); overflow-y:auto; border:1px solid var(--line); border-radius:3px; background:#fff; }
+  .fhead { display:flex; justify-content:space-between; position:sticky; top:0; z-index:1; background:#f3f0e7; border-bottom:1px solid var(--line); padding:4px 8px 4px 30px; }
+  #fieldchips .frow { display:block; width:100%; text-align:left; cursor:pointer; border:0; border-bottom:1px solid var(--line2); border-radius:0; background:transparent; padding:7px 8px; font-size:13px; font-weight:400; color:var(--ink); }
+  #fieldchips .frow:last-child { border-bottom:0; }
+  #fieldchips .frow:hover { background:#f6f4ec; }
+  #fieldchips .frow.on { background:#e7eee2; color:var(--ink); font-weight:400; }
+  .frow > span { display:flex; align-items:baseline; gap:7px; min-width:0; }
+  .frow .pick { flex:none; align-self:center; width:14px; height:14px; border:1.5px solid var(--ink2); border-radius:2px; background:#fff; margin-right:1px; }
+  .frow.on .pick { background:var(--ink); border-color:var(--ink); box-shadow:inset 0 0 0 2px #fff; }
+  .fnm { font-weight:650; font-size:14px; white-space:nowrap; }
+  .fst { flex:1; min-width:0; color:var(--muted); font-size:12px; text-align:right; }
+  .fhv { margin-left:auto; white-space:nowrap; font-variant-numeric:tabular-nums; font-size:13px; }
+  .fhv .pm, .mpct .pm { color:var(--muted); font-size:11.5px; }
+  .fhv .ready { color:var(--working); }
+  .frow .fl2, .frow .fl3 { padding-left:22px; margin-top:4px; }
+  .frow .fl2 { align-items:center; }
+  .mat { position:relative; flex:none; width:76px; height:8px; background:#e1ddd0; }
+  .mat i { position:absolute; top:0; height:100%; }
+  .mat .solid { left:0; background:var(--accent); }
+  .mat .band { background:repeating-linear-gradient(135deg, rgba(30,90,61,.5) 0 2px, rgba(30,90,61,.18) 2px 4px); }
+  .mat .tick { top:-2px; height:12px; width:2px; margin-left:-1px; background:var(--ink); }
+  .mpct { flex:none; font-weight:650; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .fstage { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); white-space:nowrap; }
+  .frow .fnext { display:block; padding-left:22px; margin-top:4px; font-size:13px; font-weight:600; color:var(--ink); }
+  #fieldchips .fsum { display:flex; align-items:baseline; gap:8px; width:calc(100% - 22px); margin:4px 0 0 22px; padding:4px 7px; text-align:left; font-size:14.5px; font-weight:650; line-height:1.25; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:3px; }
+  #fieldchips .fsum:hover { border-color:var(--accent); }
+  .fsumt { flex:1; min-width:0; }
+  .frf { flex:none; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+  .frf.sent { color:var(--person); }
+  .fhm { margin-left:auto; font-size:11.5px; color:var(--muted); white-space:nowrap; }
+  .frow > .fconf { display:block; padding-left:22px; margin-top:3px; }
+  #builder label.fsow { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink); }
+  #builder .fsow select { width:auto; height:24px; padding:1px 4px; font-size:12.5px; }
+  #map text.scan { pointer-events:auto; cursor:pointer; }
+  #map text.scan:hover { text-decoration:underline; fill:#161c18; }
+  /* Simple field rows: name + status on line 1, growth bar + one action on line 2 */
+  .fhead { padding-left:8px; }
+  #fieldchips .frow { cursor:default; }
+  #fieldchips .frow:hover { background:transparent; }
+  .frow .fl1 { align-items:flex-start; gap:8px; }
+  #fieldchips .fnm { flex:none; width:96px; padding:5px 0 0; border:0; background:transparent; text-align:left; font-size:14px; font-weight:700; line-height:1.25; white-space:normal; color:var(--ink); cursor:pointer; }
+  #fieldchips .fnm:hover { text-decoration:underline; }
+  #fieldchips .fsum { flex:1; min-width:0; width:auto; margin:0; font-size:13.5px; }
+  .frow .fl2 { padding-left:0; margin-top:6px; gap:8px; flex-wrap:wrap; min-height:26px; }
+  .frow .fl2 .mat { width:64px; }
+  #fieldchips .fdt { padding:0; border:0; background:transparent; font-size:11.5px; color:var(--muted); text-decoration:underline; cursor:pointer; }
+  #fieldchips .fdt:hover { color:var(--ink); }
+  .fr { margin-left:auto; display:flex; align-items:center; gap:6px; min-width:0; }
+  #fieldchips .fact { padding:4px 10px; font-size:13px; font-weight:650; color:var(--accent); border:1px solid var(--accent); background:#fff; white-space:nowrap; }
+  #fieldchips .fact:hover { background:#edf2ea; }
+  .fq { font-size:12px; color:var(--ink2); border:1px dashed #b9b3a4; border-radius:2px; padding:2px 6px; }
+  .frow .fmsg { display:block; margin-top:5px; font-size:12.5px; color:var(--working); font-weight:600; }
+  .frow .fmsg.err { color:var(--fault); }
+  .frow .fdet { display:grid; grid-template-columns:auto minmax(0,1fr); gap:2px 10px; margin-top:7px; padding-top:6px; border-top:1px solid var(--line2); font-size:12.5px; }
+  .fdet .dk { color:var(--muted); white-space:nowrap; }
+  .fdet .low { color:var(--hold); font-weight:600; }
+  .custom { border-top:1px solid var(--line); padding-top:10px; }
+  .custom > summary { cursor:pointer; font-size:13px; font-weight:600; color:var(--ink2); width:max-content; }
+  .custom > summary:hover { color:var(--ink); }
+  .custombody { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; padding-top:10px; }
+  #bbanner { margin-bottom:6px; color:var(--ink2); }
+  .listhead { border-top:0; padding-top:0; }
+  .toplink + .toplink { margin-left:6px; }
+  #map text.sub { font-size:7.2px; }
+  .fconf { flex:1; min-width:0; font-size:11.5px; line-height:1.25; color:var(--muted); }
+  .fconf.low { color:var(--hold); font-weight:600; }
+  .frow .flow { display:block; padding-left:22px; margin-top:3px; font-size:11.5px; font-weight:600; color:var(--hold); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .frow .fl3 { flex-wrap:wrap; gap:4px 5px; font-size:11.5px; }
+  .ftag { display:inline-block; font-size:11px; line-height:1.3; padding:1px 5px; border:1px solid var(--line); border-radius:2px; color:var(--ink2); background:#faf8f2; }
+  .ftag.pest { color:#fff; background:var(--fault); border-color:var(--fault); font-weight:600; }
+  .ftag.q { border-style:dashed; }
+  .startrow.stick { position:sticky; bottom:0; z-index:4; }
+  .startrow { background:var(--panel); border-top:1px solid var(--line); margin:0 -12px; padding:10px 12px; }
+
+  /* ---- Needs a person ---- */
+  #peoplecard { border-color:var(--person); border-left-width:4px; background:#eef4fa; }
+  #peoplecard .phead { border-bottom-color:#c5d8ea; }
+  #peoplecard .phead h2 { color:var(--person); }
+  #people { padding:0 12px; }
+  .task { display:grid; gap:6px; padding:10px 0; border-top:1px solid #c5d8ea; font-size:13px; }
+  .task:first-child { border-top:0; }
+  .task b { font-size:15px; line-height:1.3; }
+  .task button.go { width:100%; font-size:16px; padding:12px 14px; background:var(--person); border-color:var(--person); }
+  .task button.go:hover:not(:disabled) { background:#185a94; border-color:#185a94; }
+  .task button.go:disabled { background:#d5dde4; border-color:#d5dde4; color:#7f8a93; }
+
+  /* ---- Map ---- */
+  #map { display:block; width:100%; height:auto; max-height:min(60vh,680px); background:#e9e4d4; }
+  #map .field { fill:#dde5cb; stroke:#6c8554; stroke-width:1.2; cursor:pointer; }
+  #map .field:hover { stroke:var(--ink); }
+  #map .field.open { fill:#f0e2a6; } #map .field.active { fill:#a5cf9f; } #map .field.done { fill:#cdd1ca; }
+  #map .field.sel { stroke:#161c18; stroke-width:3.5; }
+  #map .lane { stroke:#b9a273; stroke-width:3.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  #map .gate { fill:#7a5f33; }
+  #map .line { stroke:#4a554e; stroke-width:.8; stroke-dasharray:5 4; fill:none; pointer-events:none; opacity:.7; }
+  #map text { font:600 8.5px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#161c18; pointer-events:none; text-anchor:middle; }
+  #map text.sub { font-weight:400; font-size:6.5px; fill:#3a443e; }
+  #map .tr { stroke:#fff; stroke-width:1.2; }
+  #map .drone { fill:#161c18; stroke:#fff; stroke-width:1; }
+  #map .dronepath { stroke:#161c18; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 14px; padding:7px 12px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink2); }
+  .legend span { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .legend .grp { color:var(--muted); font-weight:600; letter-spacing:.08em; text-transform:uppercase; font-size:10.5px; }
+  .sw { display:inline-block; width:12px; height:10px; border:1px solid #6c8554; }
+  .sw.strip { border:0; height:5px; opacity:.6; }
+  .sw.dash { border:0; height:0; border-top:1px dashed #4a554e; width:16px; }
+
+  /* ---- Fleet ---- */
+  .veh { padding:10px 12px 8px 9px; border-top:1px solid var(--line); border-left:3px solid transparent; }
+  .veh:first-child { border-top:0; }
+  .veh.fault { border-left-color:var(--fault); background:#fbf0ed; }
+  .veh-row { display:grid; grid-template-columns:168px minmax(0,1fr) 148px; gap:14px; align-items:start; }
+  .veh-name { font-size:15px; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .veh-name b { font-weight:700; }
+  .badge { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; border-radius:2px; color:#fff; background:var(--idle); }
+  .badge:empty { display:none; }
+  .WORKING { background:var(--working); } .DRIVING { background:var(--driving); } .SWAP, .REFUEL { background:var(--person); }
+  .STANDBY { background:var(--idle); } .HOLD { background:var(--hold); } .NO_RESPONSE, .GO_NOT_MOVING, .DOWN { background:var(--fault); }
+  .veh-task { font-size:14px; font-weight:600; }
+  .veh-task::first-letter { text-transform:uppercase; }
+  .veh-line { font-size:12.5px; color:var(--ink2); margin-top:2px; }
+  .veh-line .gap { display:inline-block; width:14px; }
+  .veh-warn { font-size:12.5px; font-weight:650; color:var(--fault); margin-top:2px; }
+  .veh-lock { font-size:12.5px; font-weight:650; color:var(--person); margin-top:2px; }
+  .fuelhead { display:flex; justify-content:space-between; align-items:baseline; }
+  .fuelhead .pct { font-size:14px; font-weight:650; }
+  .meter { height:5px; background:#e1ddd0; margin:4px 0 5px; }
+  .meter i { display:block; height:100%; background:var(--ink2); }
+  .low .meter i { background:var(--fault); } .low .pct { color:var(--fault); }
+  .impl { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .veh-more { margin-top:6px; }
+  .veh-more summary { font-size:12px; color:var(--muted); cursor:pointer; width:max-content; max-width:100%; }
+  .veh-more summary:hover { color:var(--ink); }
+  .veh-detail { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; padding:10px 0 6px; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; margin:0; font-size:12.5px; }
+  dt { color:var(--muted); white-space:nowrap; } dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+  .btns { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .btns button { font-size:12px; padding:4px 8px; }
+  .faultlbl { margin-top:12px; padding-top:8px; border-top:1px solid var(--line2); }
+  #tractors iframe { display:block; width:100%; height:300px; border:1px solid var(--line); border-radius:3px; background:#dedad0; margin-bottom:4px; }
+
+  /* ---- Jobs ---- */
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); padding:7px 10px; white-space:nowrap; }
+  th:first-child, td:first-child { padding-left:12px; }
+  td.cap { text-transform:capitalize; }
+  td { padding:7px 10px; border-bottom:1px solid var(--line2); vertical-align:middle; }
+  tr:last-child td { border-bottom:0; }
+  td.empty { color:var(--muted); }
+  .prog { display:flex; align-items:center; gap:8px; min-width:96px; }
+  .prog .meter { flex:1; margin:0; }
+  .prog .meter i { background:var(--working); }
+  .prog .pct { width:36px; text-align:right; }
+  .jst { white-space:nowrap; text-transform:capitalize; }
+  .jst::before { content:""; display:inline-block; width:8px; height:8px; margin-right:6px; background:transparent; border:1px solid var(--idle); }
+  .jst.active::before { background:var(--working); border-color:var(--working); }
+  .jst.done::before { background:var(--idle); }
+  .jst.held::before, .jst.hold::before { background:var(--hold); border-color:var(--hold); }
+  .jst.cancelled { color:var(--muted); text-decoration:line-through; }
+
+  /* ---- Spray conditions ---- */
+  .wx { font-size:13px; display:grid; gap:8px; padding:10px 12px; }
+  .wxpill { display:inline-block; font-weight:700; font-size:20px; line-height:1; padding:6px 12px; border-radius:3px; color:#fff; margin-right:6px; }
+  .wxpill.GO { background:var(--working); } .wxpill.CAUTION { background:var(--driving); } .wxpill.STOP { background:var(--fault); }
+  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:3px 14px; font-variant-numeric:tabular-nums; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); padding:6px 0; }
+  .wxgrid b { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .wxlog { font-size:12px; color:var(--muted); max-height:84px; overflow:auto; font-variant-numeric:tabular-nums; }
+
+  /* ---- Drone ---- */
+  .dronebox { display:block; font-size:13px; }
+  #dronecam { display:block; width:100%; aspect-ratio:16/9; height:auto; margin:0; background:#cfe0ea; border:0; border-bottom:1px solid var(--line); }
+  .dronebox .note { padding:5px 12px 0; }
+  #droneinfo { padding:6px 12px 10px; }
+
+  /* ---- Roundtable ---- */
+  .roundtable { max-height:320px; overflow:auto; padding:0 12px 10px; }
+  .roundtable > .muted { padding-top:10px; font-size:13px; }
+  .rt-topic { font-size:11.5px; font-weight:600; color:var(--ink2); margin-top:10px; border-top:1px solid var(--line); padding-top:8px; font-variant-numeric:tabular-nums; }
+  .rt-topic:first-child { border-top:0; margin-top:0; padding-top:10px; }
+  .rt-line { margin-top:7px; font-size:13px; padding-left:8px; border-left:2px solid var(--line2); }
+  .rt-line.decision { border-left-color:var(--accent); }
+  .rt-who { display:block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
+  .rt-line.tool .rt-text::before { content:"Tool: "; color:var(--muted); }
+  .rt-meta { color:var(--muted); font-size:11px; font-weight:400; margin-left:6px; white-space:nowrap; }
+
+  /* ---- Message trail ---- */
+  .trail { max-height:340px; overflow:auto; font-size:12.5px; padding:2px 12px 8px; }
+  .trail > div { display:grid; grid-template-columns:40px minmax(0,1fr); gap:6px; padding:5px 0; border-bottom:1px solid var(--line2); }
+  .trail > div.muted { display:block; border-bottom:0; padding-top:8px; }
+  .trail time { color:var(--muted); }
+  .trail .who { display:block; font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .trail .fault, .trail .fault .who { color:var(--fault); }
+  .trail .fault { font-weight:600; }
+
+  /* ---- Plan explanations ---- */
+  #planchange { padding:10px 12px; font-size:13px; max-height:300px; overflow-y:auto; }
+  .planlines li.warn { color:var(--fault); font-weight:600; }
+  .planhead { display:grid; grid-template-columns:40px minmax(0,1fr); gap:6px; }
+  .planhead time { color:var(--muted); }
+  .planlines { margin:6px 0 0; padding:0 0 0 16px; font-weight:400; }
+  .planlines li { margin:3px 0; }
+  #planchange .planlines, #planchange .planfoot { margin-left:46px; }
+  .planfoot { margin-top:6px; font-size:12.5px; color:var(--muted); font-weight:400; }
+  .planpanel { border-left:4px solid var(--accent); }
+  .trail > div.plan { border-left:2px solid var(--accent); padding-left:8px; margin-left:-10px; }
+  .trail .planlines { color:var(--ink2); }
+  .whycell { text-align:right; width:1%; white-space:nowrap; }
+  .whyrow td { background:#f3f0e7; border-left:3px solid var(--accent); padding:9px 12px 10px; }
+  .whyrow .planlines { margin-top:4px; }
+  .dronerep { margin-top:8px; padding-top:8px; border-top:1px solid var(--line2); }
+
+  /* ---- Today's jobs (left) ---- */
+  #planbtn { width:100%; font-size:14px; font-weight:650; padding:9px 14px; margin-bottom:6px; }
+  .tj { display:grid; grid-template-columns:10px minmax(0,1fr) auto; gap:2px 8px; align-items:baseline; padding:6px 0; border-bottom:1px solid var(--line2); font-size:13px; }
+  .tj:last-child { border-bottom:0; }
+  .tj.done { color:var(--muted); }
+  .tj .tjm { grid-column:2 / 3; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .tj .jst { grid-row:1 / 3; grid-column:3; align-self:center; font-size:12px; }
+  .pdot { width:9px; height:9px; border-radius:50%; border:1.5px solid var(--ink); background:var(--ink); align-self:center; }
+  .pdot.medium { background:#9aa19b; border-color:#9aa19b; } .pdot.low { background:transparent; border-color:#9aa19b; }
+  .late { color:var(--fault); font-weight:650; }
+
+  /* ---- Plan jobs dialog ---- */
+  .modal { position:fixed; inset:0; z-index:50; background:rgba(22,28,24,.5); display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; }
+  .modal[hidden] { display:none; }
+  .dialog { width:min(1100px,100%); max-height:90vh; display:flex; flex-direction:column; background:var(--panel); border:1px solid var(--ink); border-radius:4px; }
+  .dhead { display:flex; align-items:baseline; gap:12px; padding:10px 14px; border-bottom:1px solid var(--line); }
+  .dhead h2 { margin:0; font-size:16px; font-weight:700; }
+  .dhead button { margin-left:auto; }
+  .dbody { overflow-y:auto; padding:0 14px 16px; }
+  .dbody h3 { margin:14px 0 6px; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; }
+  .dbody section + section { border-top:1px solid var(--line); margin-top:14px; }
+  #prinote:empty { display:none; }
+  #prinote { margin-bottom:6px; color:var(--ink); font-size:13px; border-left:3px solid var(--accent); padding-left:8px; }
+  #plantasks select { font:inherit; font-size:13px; padding:3px 4px; border:1px solid #c4beb0; border-radius:3px; background:#fff; }
+  #plantasks tr.donerow td { color:var(--muted); }
+  #plantasks th:first-child, #plantasks td:first-child { padding-left:0; }
+  #fieldchips.flist { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; max-height:none; overflow:visible; border:0; background:transparent; }
+  #fieldchips .frow, #fieldchips .frow:last-child { border:1px solid var(--line); border-radius:3px; background:#fff; padding:8px; }
+  .dbody .custom { margin-top:12px; }
+  .dbody .custombody { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; }
+  .dbody #builderless { display:none; }
+  .dbody label { display:grid; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .dbody .pair select, .dbody .pair input { font:inherit; font-size:13px; letter-spacing:0; text-transform:none; color:var(--ink); padding:5px 6px; border:1px solid #c4beb0; border-radius:3px; background:#fff; width:100%; min-width:0; height:31px; }
+  .dbody label.fsow { display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; letter-spacing:0; text-transform:none; color:var(--ink); }
+  .dbody .fsow select { font:inherit; font-size:12.5px; height:24px; padding:1px 4px; border:1px solid #c4beb0; border-radius:3px; background:#fff; }
+  /* Schedule */
+  #gantt { font-size:12px; }
+  .gaxis, .glane { display:grid; grid-template-columns:92px minmax(0,1fr); align-items:center; }
+  .gticks { position:relative; height:18px; }
+  .gt { position:absolute; top:0; transform:translateX(-50%); font-size:10.5px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .gt.first { transform:none; } .gt.last { transform:translateX(-100%); }
+  .glane { border-top:1px solid var(--line2); }
+  .gname { font-size:13px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gtrack { position:relative; height:36px; background:#fff; border-left:1px solid var(--line); border-right:1px solid var(--line); }
+  .gg { position:absolute; top:0; bottom:0; width:1px; background:var(--line2); }
+  .gb { position:absolute; top:7px; height:22px; min-width:2px; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:11.5px; line-height:22px; padding:0 5px; color:#fff; background:var(--ink2); border-radius:2px; }
+  .gb.till { background:#6d4c41; } .gb.seed { background:#2e7d32; } .gb.spray { background:#4f7186; } .gb.mow { background:#7d7a2a; }
+  .gb.travel, .gb.travel-depot { top:15px; height:6px; padding:0; border-radius:0; background:#c9c3b3; }
+  .gb.swap, .gb.refuel { padding:0; background:repeating-linear-gradient(135deg, #a8841f 0 3px, #dcc277 3px 6px); }
+  .gnow { position:absolute; top:-3px; bottom:-3px; width:2px; margin-left:-1px; background:var(--fault); z-index:2; }
+  .gleg { display:flex; flex-wrap:wrap; gap:4px 14px; margin-top:8px; font-size:11.5px; color:var(--ink2); }
+  .gleg span { display:inline-flex; align-items:center; gap:5px; }
+  .gleg i { display:inline-block; width:14px; height:9px; }
+  @media (max-width:1000px) { #fieldchips.flist, .dbody .custombody { grid-template-columns:minmax(0,1fr); } }
+
+  @media (min-width:1700px) { main { grid-template-columns:360px minmax(0,1fr) 400px; } body { font-size:15px; } }
+  @media (max-width:1320px) {
+    .top { flex-wrap:wrap; }
+    .brand { order:1; } .clockbox { order:2; } .toplink { order:3; }
+    .stats { order:4; flex:1 0 100%; flex-wrap:wrap; border-top:1px solid var(--line); margin:0 -16px; padding:0 16px; }
+    .stat:first-child { border-left:0; padding-left:0; }
+    html { scroll-padding-top:110px; }
+  }
+  @media (max-width:1180px) {
+    main { grid-template-columns:340px minmax(0,1fr); }
+    .col.right { grid-column:1 / -1; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  }
+  @media (max-width:860px) {
+    .top { position:static; }
+    main { grid-template-columns:minmax(0,1fr); padding:10px; }
+    .col.right { grid-template-columns:minmax(0,1fr); }
+    .veh-row { grid-template-columns:minmax(0,1fr) 140px; }
+    .veh-now { grid-column:1 / -1; grid-row:2; }
+    .veh-detail { grid-template-columns:minmax(0,1fr); }
+    .stat { padding:6px 10px; }
+  }
 </style>
+<!-- Map-only view (?map=1): just the farm map, for embedding above the assistant's chat. -->
+<style>
+  html.maponly header.top, html.maponly .col.left, html.maponly .col.right, html.maponly .col.centre > section:not(:first-child), html.maponly .col.centre > section:first-child > *:not(#map) { display: none !important; }
+  html.maponly, html.maponly body { margin: 0; height: 100%; overflow: hidden; }
+  html.maponly main { display: block !important; padding: 0 !important; margin: 0 !important; max-width: none !important; }
+  html.maponly .col.centre { display: block !important; }
+  html.maponly .col.centre > section:first-child { border: 0 !important; margin: 0 !important; padding: 0 !important; background: transparent !important; }
+  html.maponly #map { display: block; width: 100vw !important; height: 100vh !important; max-height: none !important; }
+</style>
+<script>if (new URLSearchParams(location.search).has('map')) document.documentElement.classList.add('maponly');</script>
 </head>
 <body>
-<header>
-  <h1>Fleet live status</h1><small id="scn"></small> <a href="/3d" target="_blank">Open 3D view</a>
-  <button id="startover" type="button">Start over</button><small id="startovermsg"></small>
-  <span id="clock">--:--</span>
+<header class="top">
+  <div class="brand"><h1>Fleet coordinator</h1><span id="scn"></span></div>
+  <div class="stats">
+    <div class="stat"><span class="k">Jobs done</span><span class="v" id="st-jobs">–</span></div>
+    <div class="stat"><span class="k">Tractors</span><span class="v" id="st-tr">–</span></div>
+    <a class="stat" id="st-peoplebox" href="#peoplecard"><span class="k">Needs a person</span><span class="v" id="st-people">–</span></a>
+    <div class="stat"><span class="k">Spray</span><span class="v" id="st-spray">–</span></div>
+    <div class="stat"><span class="k">Fuel truck</span><span class="v" id="st-truck">–</span></div>
+    <div class="stat"><span class="k">Drone</span><span class="v" id="st-drone">–</span></div>
+  </div>
+  <div class="clockbox"><span id="clock">--:--</span><span class="dayrow"><span id="aimark" hidden>AI driving</span><span id="daystate">Connecting</span></span></div>
+  <a class="toplink" href="/chat">Ask the assistant</a>
+  <a class="toplink" href="/3d" target="_blank">Open 3D view</a>
 </header>
 <main>
-  <div class="card">
-    <h2>Farm <small class="muted" id="farmsrc"></small></h2>
-    <div class="farm">
-      <svg id="map" role="img" aria-label="Farm map"></svg>
+  <div class="col left">
+    <section class="panel" id="peoplecard" hidden>
+      <div class="phead"><h2>Needs a person at the depot</h2><small>A tractor being serviced is locked and cannot move until you press Good to go.</small></div>
+      <div id="people"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Today's jobs</h2></div>
       <div id="builder">
-        <div class="banner" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
-        <div><div class="step">1. Pick fields</div><div id="picked" class="muted">Click fields on the map.</div></div>
-        <div><div class="step">2. Pick operations in order</div>
-          <div id="chips">
-            <button type="button" data-type="till">Plow</button>
-            <button type="button" data-type="seed">Sow</button>
-            <button type="button" data-type="spray">Spray</button>
-            <button type="button" data-type="mow">Mow</button>
-          </div>
-          <div id="stepsum" class="muted" style="margin-top:4px">None chosen yet.</div>
+        <div class="aibox">
+          <label class="switch" for="aidrive"><input type="checkbox" id="aidrive"><span class="track"></span><span class="swl">Let the AI drive</span></label>
+          <div class="note" id="aihelp">Manual: you pick the fields and the work.</div>
         </div>
-        <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
-        <label>Finish by <input id="jdl" type="time" value="17:00"></label>
-        <button type="button" class="add" id="jadd" disabled>Add to list</button>
-        <div id="jmsg" class="muted"></div>
-        <div><div class="step">Today's job list</div><div id="draftlist" class="muted">No jobs yet.</div></div>
         <div>
-          <button type="button" class="go" id="startbtn" disabled>Start the day</button>
-          <div id="startmsg" class="muted" style="margin-top:4px"></div>
+          <div id="todaylist" hidden></div>
+          <div id="draftlist" class="muted">No jobs yet. Use Plan jobs to add work.</div>
         </div>
-        <div class="muted" style="font-size:11px">Solid outline: field boundary. Dashed: its guidance line. Both are read from AgOpenWeb's field files.</div>
+        <div class="startrow">
+          <div class="note" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
+          <button type="button" id="planbtn">Plan jobs</button>
+          <button type="button" class="go" id="startbtn" disabled>Start the day</button>
+          <div id="startmsg" class="muted"></div>
+        </div>
+        <div class="resetrow">
+          <button id="startover" type="button">Start over</button>
+          <span class="note">Sends every tractor home and clears the day.</span>
+          <small id="startovermsg" class="muted"></small>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
-  <div class="card">
-    <h2>Roundtable <small class="muted" id="rtmeta">the managers discuss each event; the tractors have already acted</small></h2>
-    <div class="rt-wrap"><div id="roundtable" class="roundtable"></div><span class="rt-newest" aria-hidden="true">&larr; newest</span></div>
+
+  <div class="col centre">
+    <section class="panel">
+      <div class="phead"><h2>Farm</h2><small id="farmsrc"></small></div>
+      <svg id="map" role="img" aria-label="Farm map"></svg>
+      <div class="legend">
+        <span class="grp">Fields</span>
+        <span><i class="sw" style="background:#dde5cb"></i>No work</span>
+        <span><i class="sw" style="background:#f0e2a6"></i>Queued</span>
+        <span><i class="sw" style="background:#a5cf9f"></i>In work</span>
+        <span><i class="sw" style="background:#cdd1ca"></i>Done</span>
+        <span><i class="sw" style="border:2px solid #161c18"></i>Picked</span>
+        <span><i class="sw dash"></i>Guidance line</span>
+        <span class="grp">Worked</span>
+        <span><i class="sw strip" style="background:#6d4c41"></i>Plowed</span>
+        <span><i class="sw strip" style="background:#2e7d32"></i>Sown</span>
+        <span><i class="sw strip" style="background:#1f6f8b"></i>Sprayed</span>
+        <span><i class="sw strip" style="background:#c99700"></i>Mown</span>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Fleet</h2><small>Each vehicle is its own AgOpenWeb instance.</small><button type="button" class="small" id="vehtoggle">Show all detail</button></div>
+      <div id="tractors"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Jobs</h2></div>
+      <div class="scroll"><table id="jobs"></table></div>
+    </section>
   </div>
-  <div class="row">
-    <div class="card">
-      <h2>Spray conditions <small class="muted">weather at two heights, simulated feed</small></h2>
+
+  <div class="col right">
+    <section class="panel planpanel">
+      <div class="phead"><h2>Latest plan change</h2><small>What moved and why</small></div>
+      <div id="planchange"><div class="muted">No plan change yet. When the plan changes, what moved and why is listed here.</div></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Spray conditions</h2><small>Weather at two heights, simulated feed</small></div>
       <div id="wx" class="wx muted">Starts with the day.</div>
-    </div>
-    <div class="card">
-      <h2>Scout drone <small class="muted">fully simulated</small> <button id="dscan" type="button" class="small">Map the picked fields</button></h2>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Scout drone</h2><small>Fully simulated</small><button id="dscan" type="button" class="small">Map the picked fields</button></div>
       <div class="dronebox">
         <!-- Static element: created once, never re-rendered, so the 3D view is not reloaded on each refresh. -->
         <iframe id="dronecam" src="/3d?drone=1" title="Simulated drone camera" loading="lazy"></iframe>
-        <div class="muted" style="font-size:11px">Drone camera (simulated): the 3D farm seen from the drone</div>
+        <div id="dronetabs" style="display:flex;gap:6px;margin:6px 0 2px">
+          <button type="button" data-view="rgb" class="on">Camera</button><button type="button" data-view="thermal">Thermal</button><button type="button" data-view="lidar">LiDAR</button><button type="button" data-view="mosaic">Stitched photo</button>
+        </div>
+        <style>#dronetabs button{font:inherit;font-size:12px;padding:3px 9px;border:1px solid rgba(0,0,0,.25);background:transparent;border-radius:3px;cursor:pointer}#dronetabs button.on{background:#2f5d3a;border-color:#2f5d3a;color:#fff}</style>
+        <script>document.getElementById('dronetabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-view]'); if (!b) return; for (const x of e.currentTarget.children) x.classList.toggle('on', x === b); document.getElementById('dronecam').src = '/3d?drone=1' + (b.dataset.view === 'rgb' ? '' : '&view=' + b.dataset.view); });</script>
+        <div class="note">Drone camera, rendered from the simulation, not a real camera.</div>
         <div id="droneinfo" class="muted">Docked.</div>
       </div>
-    </div>
-  </div>
-  <div class="card" id="peoplecard" hidden>
-    <h2>Needs a person at the depot <small class="muted">a tractor being serviced is locked and cannot move until you press Good to go</small></h2>
-    <div id="people"></div>
-  </div>
-  <div class="row" id="tractors"></div>
-  <div class="row">
-    <div class="card"><h2>Messages between agents <small class="muted">newest first</small></h2><div class="trail" id="trail"></div></div>
-    <div class="card"><h2>Jobs</h2><div class="scroll"><table id="jobs"></table></div></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Roundtable</h2><small id="rtmeta">The managers discuss each event; the tractors have already acted.</small></div>
+      <div id="roundtable" class="roundtable"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Messages between agents</h2><small>Newest first</small></div>
+      <div class="trail" id="trail"></div>
+    </section>
   </div>
 </main>
+<!-- Plan jobs dialog. Its containers are static; only their contents are re-rendered. -->
+<div id="planmodal" class="modal" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="planttl">
+    <div class="dhead"><h2 id="planttl">Plan jobs</h2><span class="muted" id="plansub"></span><button type="button" id="planclose">Close</button></div>
+    <div class="dbody">
+      <section>
+        <h3>Tasks, most urgent first</h3>
+        <div class="note" id="prinote"></div>
+        <div class="scroll"><table id="plantasks"></table></div>
+      </section>
+      <section>
+        <h3>Add work</h3>
+        <div class="note" id="fieldcap">What is on each field. Click a status to send the drone for a fresh look.</div>
+        <div id="fieldchips"></div>
+        <details class="custom" id="customjob">
+          <summary>Custom job</summary>
+          <div class="custombody">
+            <div>
+              <div class="step"><span class="n">1</span>Pick fields<button type="button" class="small" id="fscan">Scan picked fields</button></div>
+              <div id="pickchips"></div>
+              <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
+              <div class="note" id="fscanmsg"></div>
+            </div>
+            <div>
+              <div class="step"><span class="n">2</span>Pick the work, in order<span id="stepsum" class="muted">None chosen yet.</span></div>
+              <div id="chips">
+                <button type="button" data-type="till">Plow</button>
+                <button type="button" data-type="seed">Sow</button>
+                <button type="button" data-type="spray">Spray</button>
+                <button type="button" data-type="mow">Mow</button>
+              </div>
+            </div>
+            <div>
+              <div class="step"><span class="n">3</span>Add to the list</div>
+              <div class="pair">
+                <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
+                <label>Finish by <input id="jdl" type="time" value="17:00"></label>
+                <button type="button" class="add" id="jadd" disabled>Add to list</button>
+              </div>
+              <div id="jmsg" class="muted"></div>
+            </div>
+          </div>
+        </details>
+      </section>
+      <section>
+        <h3>Schedule today</h3>
+        <div id="gantt"></div>
+      </section>
+    </div>
+  </div>
+</div>
 <script>
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const cmd = (c) => fetch('/cmd/' + encodeURIComponent(c), { method: 'POST' });
 let built = false;
 
 let farm = null, picked = new Set(), lastState = null;
-const TR_COLOR = ['#d9480f', '#1c7ed6', '#862e9c', '#0b7285'];
+const TR_INK = '#161c18';
+const FAULT_CODES = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'];
+// Replace an element's markup only when it changed, so a click is never lost to a re-render between mouse down and up.
+const htmlCache = new WeakMap();
+function setHTML(el, html) {
+  if (!el || htmlCache.get(el) === html) return;
+  el.innerHTML = html; htmlCache.set(el, html);
+}
 function proj(lat, lon) {
   const r = Math.PI / 180, h = farm.home;
   return [(lon - h.lon) * (111412.84 * Math.cos(lat * r) - 93.5 * Math.cos(3 * lat * r)), -(lat - h.lat) * (111132.92 - 559.82 * Math.cos(2 * h.lat * r))];
@@ -193,7 +594,128 @@ async function loadFarm() {
   document.getElementById('farmsrc').textContent = `${farm.fields.length} fields read from AgOpenWeb's field folder`;
   drawFarm();
 }
+let lastChipKey = null;
+// "Refresh" on a field: send the drone to survey just that field. The short note it leaves
+// ("Drone sent") is kept here by field name so the one-second re-render does not wipe it.
+const scanSent = new Map();
+const scanNote = (name) => { const v = scanSent.get(name); return v && Date.now() - v.at < 4000 ? v.text : ''; };
+async function refreshField(name) {
+  if (!name) return;
+  scanSent.set(name, { at: Date.now(), text: 'Sending' });
+  drawFarm();
+  let text = 'Not sent';
+  try {
+    const res = await fetch('/drone/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: [name] }) });
+    if (res.ok) text = 'Drone sent';
+  } catch {}
+  scanSent.set(name, { at: Date.now(), text });
+  drawFarm();
+}
+// While the pointer is down on the map or the field list, their markup is left alone, so the
+// click that follows always lands on the element that was pressed.
+let pressAt = 0;
+const pressing = () => Date.now() - pressAt < 1500;
+document.addEventListener('pointerdown', (e) => { if (e.target.closest && e.target.closest('#map, #fieldchips, #plantasks')) pressAt = Date.now(); }, true);
+window.addEventListener('pointerup', () => { pressAt = 0; }, true);
+window.addEventListener('pointercancel', () => { pressAt = 0; }, true);
+document.addEventListener('click', (e) => {
+  const b = e.target.closest && e.target.closest('[data-refresh]');
+  if (b) refreshField(b.getAttribute('data-refresh'));
+});
+document.addEventListener('change', async (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-sow]');
+  if (!sel || !sel.value) return;
+  try { await fetch('/field/crop', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ field: sel.getAttribute('data-sow'), crop: sel.value }) }); } catch {}
+  sel.blur();
+  refresh();
+});
+// Rows whose detail is open, and short per-row notes; both live here so re-renders keep them.
+const openRows = new Set(), rowMsg = new Map();
+const rowNote = (name) => { const v = rowMsg.get(name); return v && Date.now() - v.at < 6000 ? v : null; };
+const fieldRec = (name) => (lastState && Array.isArray(lastState.fields) ? lastState.fields.find(x => x && x.name === name) : null);
+// One click on a field's suggested work adds it to today's list.
+async function addSuggested(name) {
+  const f = fieldRec(name), steps = f && f.suggest && Array.isArray(f.suggest.steps) ? f.suggest.steps : [];
+  if (!steps.length) return;
+  rowMsg.set(name, { at: Date.now(), text: 'Adding', ok: true });
+  drawFarm();
+  let text = 'Added to today\'s list.', ok = true;
+  try {
+    const res = await fetch('/draft', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fields: [name], steps, priority: 'medium', deadline: '17:00' }) });
+    if (!res.ok) { ok = false; text = `Not added: ${await reasonOf(res)}`; }
+  } catch { ok = false; text = 'Not added: the runner is not reachable.'; }
+  rowMsg.set(name, { at: Date.now(), text, ok });
+  refresh();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!t.closest) return;
+  const d = t.closest('[data-detail]');
+  if (d) { const n = d.getAttribute('data-detail'); openRows.has(n) ? openRows.delete(n) : openRows.add(n); pressAt = 0; drawFarm(); return; }
+  const a = t.closest('[data-suggest]');
+  if (a) { pressAt = 0; addSuggested(a.getAttribute('data-suggest')); }
+});
+// One row of the field list: two lines, with everything else behind "Details".
+// Every value is optional; anything missing is simply left out.
+function fieldRowInner(f) {
+  const name = String(f.name), sent = scanNote(name), open = openRows.has(name), low = f.confidence === 'low';
+  const head = f.summaryText || f.statusText || f.ground || 'No record';
+  let h = `<span class="fl1"><button type="button" class="fnm" data-detail="${esc(name)}" aria-expanded="${open}">${esc(name)}</button><button type="button" class="fsum" data-refresh="${esc(name)}" title="Send the drone to survey ${esc(name)} again"><span class="fsumt">${esc(head)}</span><span class="frf${sent ? ' sent' : ''}">${esc(sent || 'Refresh')}</span></button></span>`;
+  let left = '';
+  if (f.standing && typeof f.maturityPct === 'number' && isFinite(f.maturityPct)) {
+    const m = Math.max(0, Math.min(100, f.maturityPct)), g = Math.max(0, Number(f.marginPct) || 0), lo = Math.max(0, m - g), hi = Math.min(100, m + g);
+    left += `<span class="mat" title="How far along the crop is; the hatched band is the uncertainty"><i class="solid" style="width:${lo}%"></i><i class="band" style="left:${lo}%;width:${hi - lo}%"></i><i class="tick" style="left:${m}%"></i></span><span class="mpct">${Math.round(m)}%${g ? ` <span class="pm">± ${Math.round(g)}</span>` : ''}</span>`;
+  }
+  if (Number(f.pests) > 0) left += `<span class="ftag pest">${esc(f.pests)} pest patch${Number(f.pests) === 1 ? '' : 'es'}</span>`;
+  left += `<button type="button" class="fdt" data-detail="${esc(name)}">${open ? 'Hide details' : 'Details'}</button>`;
+  let right = '';
+  if (f.ground === 'plowed' && Array.isArray(f.cropOptions) && f.cropOptions.length)
+    right += `<label class="fsow">Sow: <select data-sow="${esc(name)}">${f.cropChoice ? '' : '<option value="" disabled selected>pick a plant</option>'}${f.cropOptions.map(c => `<option value="${esc(c)}"${c === f.cropChoice ? ' selected' : ''}>${esc(c)}</option>`).join('')}</select></label>`;
+  if (f.queuedText) right += `<span class="fq">${esc(f.queuedText)}</span>`;
+  else if (f.suggest && f.suggest.label && Array.isArray(f.suggest.steps) && f.suggest.steps.length) right += `<button type="button" class="fact" data-suggest="${esc(name)}">${esc(f.suggest.label)}</button>`;
+  h += `<span class="fl2">${left}<span class="fr">${right}</span></span>`;
+  const note = rowNote(name);
+  if (note) h += `<span class="fmsg${note.ok ? '' : ' err'}">${esc(note.text)}</span>`;
+  if (open) {
+    const rows = [['Now', f.statusText], ['Stage', f.stage], ['Harvest', f.harvestText], ['Stand', f.standPct != null ? f.standPct + '%' : ''], ['Soil moisture', f.moisturePct != null ? f.moisturePct + '%' : ''],
+      ['Weather', f.conditionsText], ['Today', f.todayText], ['Planted', f.plantedOn ? f.plantedOn + (f.plantedSource ? ' (' + f.plantedSource + ')' : '') : ''], ['Size', f.acres != null ? f.acres + ' acres' : ''], ['Next', f.nextText]]
+      .filter(r => r[1]).map(r => `<span class="dk">${r[0]}</span><span>${esc(r[1])}</span>`);
+    if (f.confidenceText || low) rows.splice(Math.min(rows.length, 3), 0, `<span class="dk">Drone survey</span><span class="${low ? 'low' : ''}">${esc(f.confidenceText || '')}${low ? (f.confidenceText ? ' · ' : '') + 'scan again' : ''}</span>`);
+    h += `<span class="fdet">${rows.join('') || '<span class="muted">No more on record.</span>'}</span>`;
+  }
+  return h;
+}
+function renderFieldChips() {
+  const fl = lastState && Array.isArray(lastState.fields) ? lastState.fields.filter(f => f && f.name) : [];
+  // Plain chips for the custom job: same class and data-name as the map polygons, so the one
+  // existing click handler picks from both.
+  const pc = document.getElementById('pickchips');
+  const names = farm && Array.isArray(farm.fields) ? farm.fields.map(f => f.name) : fl.map(f => f.name);
+  if (pc && names.length) setHTML(pc, names.map(n => `<button type="button" class="field${picked.has(n) ? ' on' : ''}" data-name="${esc(n)}">${esc(n)}</button>`).join(''));
+  const el = document.getElementById('fieldchips');
+  if (!el) return;
+  const cap = document.getElementById('fieldcap');
+  if (cap) cap.hidden = !fl.length;
+  if (!fl.length) { if (lastChipKey !== 'none') { lastChipKey = 'none'; el.className = ''; el.innerHTML = ''; } return; }
+  // The row elements are built once and only their contents are refreshed.
+  const key = 'list#' + fl.map(f => f.name).join('|');
+  if (key !== lastChipKey) {
+    lastChipKey = key;
+    el.className = 'flist';
+    el.innerHTML = fl.map(f => `<div class="frow" data-row="${esc(f.name)}"></div>`).join('');
+  }
+  const rows = el.querySelectorAll('.frow');
+  const held = pressing(), ae = document.activeElement;
+  fl.forEach((f, i) => {
+    const r = rows[i];
+    if (!r) return;
+    // Leave a row alone while it is being pressed or its Sow menu is open.
+    if (held || (ae && ae.tagName === 'SELECT' && r.contains(ae))) return;
+    try { setHTML(r, fieldRowInner(f)); } catch {}
+  });
+}
 function drawFarm() {
+  try { renderFieldChips(); } catch {}
   if (!farm || !farm.home) return;
   const svg = document.getElementById('map');
   let x0 = -40, x1 = 40, y0 = -40, y1 = 40;
@@ -201,7 +723,7 @@ function drawFarm() {
   for (const p of polys) for (const [x, y] of p.pts) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   svg.setAttribute('viewBox', `${x0 - 25} ${y0 - 25} ${x1 - x0 + 50} ${y1 - y0 + 50}`);
   const jobs = lastState && Array.isArray(lastState.jobs) ? lastState.jobs : [];
-  let h = '';
+  let h = '<defs><radialGradient id="heatPest"><stop offset="0" stop-color="#c1121f" stop-opacity=".85"/><stop offset=".55" stop-color="#e85d04" stop-opacity=".5"/><stop offset="1" stop-color="#ffba08" stop-opacity="0"/></radialGradient><radialGradient id="heatGrow"><stop offset="0" stop-color="#e85d04" stop-opacity=".8"/><stop offset=".55" stop-color="#ffba08" stop-opacity=".45"/><stop offset="1" stop-color="#ffe169" stop-opacity="0"/></radialGradient></defs>';
   // Farm lanes first, so fields and tractors draw on top. Lanes are in metres from the depot (east, north).
   for (const lane of farm.lanes || []) h += `<polyline class="lane" points="${lane.map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
   for (const g of farm.gates || []) h += `<circle class="gate" cx="${g.e.toFixed(0)}" cy="${(-g.n).toFixed(0)}" r="2"></circle>`;
@@ -212,30 +734,47 @@ function drawFarm() {
     const cls = mine.some(j => j.status === 'active') ? 'active' : (pending || mine.some(j => j.status !== 'done' && j.status !== 'cancelled')) ? 'open' : mine.length ? 'done' : '';
     const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length, cy = pts.reduce((a, p) => a + p[1], 0) / pts.length;
     h += `<polygon class="field ${cls} ${picked.has(f.name) ? 'sel' : ''}" data-name="${esc(f.name)}" points="${pts.map(p => p.map(v => v.toFixed(0)).join(',')).join(' ')}"></polygon>`;
+    // Heatmap of problem areas from the last drone survey of this field (pests red, poor growth orange).
+    try {
+      const fsx = lastState && Array.isArray(lastState.fields) ? lastState.fields.find(x => x.name === f.name) : null;
+      for (const p of (fsx && fsx.problems) || []) h += `<circle cx="${Number(p.e).toFixed(0)}" cy="${(-Number(p.n)).toFixed(0)}" r="${(Number(p.radiusM) * 1.6).toFixed(0)}" fill="url(#${p.kind === 'pests' ? 'heatPest' : 'heatGrow'})" style="pointer-events:none"><title>${esc(f.name + ': ' + (p.text || p.kind))}</title></circle>`;
+    } catch {}
     for (const t of f.tracks) h += `<polyline class="line" points="${t.line.map(([lon, lat]) => proj(lat, lon).map(v => v.toFixed(0)).join(',')).join(' ')}"></polyline>`;
-    h += `<text x="${cx.toFixed(0)}" y="${(cy - 1).toFixed(0)}">${esc(f.name)}</text>`;
+    h += `<text x="${cx.toFixed(0)}" y="${(cy - 3).toFixed(0)}">${esc(f.name)}</text>`;
     const open = mine.filter(j => j.status !== 'done' && j.status !== 'cancelled').map(j => `${j.id} ${j.type} ${j.pct}%`).join(' · ');
     const gnd = lastState && lastState.ground && lastState.ground[f.name];
-    h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
+    const rec = lastState && Array.isArray(lastState.fields) ? lastState.fields.find(x => x && x.name === f.name) : null;
+    const xs = pts.map(q => q[0]), cap = Math.max(10, Math.floor((Math.max(...xs) - Math.min(...xs) - 6) / 3.5));
+    const cut = (v) => { const u = String(v ?? ''); return u.length > cap ? u.slice(0, cap - 1).trimEnd() + '…' : u; };
+    if (rec && (rec.summaryText || rec.statusText)) {
+      const full = rec.summaryText || rec.statusText, note = scanNote(f.name);
+      const ls = []; let cur = '';
+      for (const w of String(note || full).split(/\s+/)) { if (cur && (cur + ' ' + w).length > cap) { ls.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; }
+      if (cur) ls.push(cur);
+      if (ls.length > 3) { ls.length = 3; ls[2] = cut(ls[2] + '…'); }
+      h += `<text class="sub scan" data-refresh="${esc(f.name)}" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}"><title>${esc(full)}. Click to send the drone to survey this field again.</title>${ls.map((l, k) => `<tspan x="${cx.toFixed(0)}" dy="${k ? 7.6 : 0}">${esc(cut(l))}</tspan>`).join('')}</text>`;
+      if (open) h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7 + ls.length * 7.6).toFixed(0)}">${esc(cut(open))}</text>`;
+    } else h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
   }
   // Ground already worked, as strips one implement-width wide.
-  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#7b1fa2', mow: '#c99700' };
+  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#1f6f8b', mow: '#c99700' };
   for (const c of (lastState && lastState.coverage) || []) for (const [e0, n0, e1, n1] of c.segs)
     h += `<line x1="${e0}" y1="${-n0}" x2="${e1}" y2="${-n1}" stroke="${COVER[c.type] || '#555'}" stroke-opacity="0.55" stroke-width="${c.widthM}" stroke-linecap="butt" pointer-events="none"></line>`;
-  h += `<rect x="-17" y="4" width="34" height="14" fill="#3d4a43"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
+  h += `<rect x="-17" y="4" width="34" height="14" fill="#3a443e"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
   if (lastState) lastState.tractors.forEach((t, i) => {
     if (!t.tel || t.tel.lat == null) return;
     const [x, y] = proj(t.tel.lat, t.tel.lon);
-    const bad = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
-    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#c0392b' : TR_COLOR[i % 4]}"></circle><text x="${x.toFixed(0)}" y="${(y + 2.8).toFixed(1)}" style="fill:#fff">${esc(t.id)}</text>`;
+    const bad = FAULT_CODES.includes(t.state.code);
+    const lbl = String(t.id ?? '');
+    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#bf3a2b' : TR_INK}"></circle><text x="${x.toFixed(0)}" y="${(y + (lbl.length > 2 ? 1.8 : 2.8)).toFixed(1)}" style="fill:#fff${lbl.length > 2 ? ';font-size:4.6px' : ''}">${esc(lbl)}</text>`;
   });
   const dr = lastState && lastState.drone;
   if (dr) {
-    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#7b1fa2" fill-opacity="0.45" pointer-events="none"></circle>`;
+    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#1f6f8b" fill-opacity="0.45" pointer-events="none"></circle>`;
     if (dr.path && dr.path.length > 1) h += `<polyline class="dronepath" points="${[{ e: dr.e, n: dr.n }, ...dr.path].map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
-    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#111" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#111" stroke-width="1.2"></line></g>`;
+    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#161c18" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#161c18" stroke-width="1.2"></line></g>`;
   }
-  svg.innerHTML = h;
+  if (!pressing()) setHTML(svg, h);
 }
 // ---- Job list builder ----
 const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
@@ -246,7 +785,8 @@ const modeOf = (s) => (s && s.mode === 'building' ? 'building' : 'running');
 const $ = (id) => document.getElementById(id);
 
 function renderPicked() {
-  $('picked').textContent = [...picked].join(', ') || 'Click fields on the map.';
+  $('picked').textContent = [...picked].join(', ') || 'Click fields on the map, or pick them here.';
+  const cj = $('customjob'); if (cj && picked.size) cj.open = true;
   updateAdd();
 }
 function renderSteps() {
@@ -277,7 +817,7 @@ function renderBuilder(s) {
   const key = JSON.stringify([building, list]);
   if (key === lastListKey) return;
   lastListKey = key;
-  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet.'; return; }
+  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet. Use Plan jobs to add work.'; return; }
   const byField = new Map();
   for (const j of list) { if (!byField.has(j.field)) byField.set(j.field, []); byField.get(j.field).push(j); }
   const STATUS = { draft: 'Not started', waiting: 'Waiting', released: 'Sent to the planner' };
@@ -295,6 +835,7 @@ async function reasonOf(res) { try { return (await res.text()).trim() || `Error 
 document.addEventListener('click', async (e) => {
   const t = e.target;
   if (!t.closest) return;
+  if (t.closest('[data-refresh], .fsow')) return; // Refresh and the Sow menu do not pick the field
   const el = t.closest('.field');
   if (el) {
     const n = el.dataset.name;
@@ -350,39 +891,281 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+// ---- "Why?" for a job: the planner's reasons, kept in a variable so they survive the one-second re-render ----
+let why = null; // { id, loading, lines, label, note }
+const NO_WHY = 'No explanation available yet.';
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest && e.target.closest('button[data-why]');
+  if (!b) return;
+  const id = b.dataset.why;
+  if (why && why.id === id) { why = null; renderJobs(lastState); return; }
+  const mine = why = { id, loading: true, lines: [], label: '', note: '' };
+  renderJobs(lastState);
+  try {
+    const res = await fetch(`/why/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (res.ok) {
+      const d = await res.json();
+      mine.lines = Array.isArray(d && d.lines) ? d.lines.map(String) : [];
+      mine.label = String((d && d.label) || '');
+      if (!mine.lines.length) mine.note = NO_WHY;
+    } else mine.note = NO_WHY;
+  } catch { mine.note = NO_WHY; }
+  mine.loading = false;
+  if (why === mine) renderJobs(lastState);
+});
+function whyRow(j) {
+  if (!why || why.id !== j.id) return '';
+  const body = why.loading ? '<span class="muted">Asking the planner.</span>'
+    : why.lines.length ? `<ul class="planlines">${why.lines.map(l => `<li>${esc(String(l).replace(/^\s*[•·]\s*/, ''))}</li>`).join('')}</ul>`
+    : `<span class="muted">${esc(why.note || NO_WHY)}</span>`;
+  return `<tr class="whyrow"><td colspan="7"><div class="k">Why this plan for ${esc(why.label || j.label || j.id)}</div>${body}</td></tr>`;
+}
+function renderJobs(s) {
+  const jobs = s && Array.isArray(s.jobs) ? s.jobs : [];
+  setHTML(document.getElementById('jobs'), '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th><th></th></tr>' +
+    (jobs.map(j => {
+      const p = Math.max(0, Math.min(100, Number(j.pct) || 0));
+      return `<tr><td><b>${esc(j.label)}</b></td><td class="cap">${esc(j.priority)}</td><td>${esc(j.deadline)}</td><td>${esc(j.tractor || '–')}</td><td><div class="prog"><div class="meter"><i style="width:${p}%"></i></div><span class="pct">${esc(j.pct)}%</span></div></td><td><span class="jst ${esc(j.status)}">${esc(j.status)}</span></td><td class="whycell"><button type="button" class="small" data-why="${esc(j.id)}" aria-expanded="${why && why.id === j.id ? 'true' : 'false'}">${why && why.id === j.id ? 'Hide' : 'Why?'}</button></td></tr>${whyRow(j)}`;
+    }).join('') || '<tr><td class="empty" colspan="7">No jobs with the planner yet. Add jobs on the left, then start the day.</td></tr>'));
+}
+// Plain-language reasons attached to a re-plan message (optional fields).
+function planLines(r) {
+  const lines = r && Array.isArray(r.lines) ? r.lines : [];
+  // Lines the planner marks with a warning sign are shown as warnings, without the sign.
+  const li = (l) => { const t = String(l ?? '').replace(/^\s*[•·]\s*/, ''), w = /^\s*\u26a0\ufe0f?\s*/.test(t); return `<li${w ? ' class="warn"' : ''}>${esc(t.replace(/^\s*\u26a0\ufe0f?\s*/, ''))}</li>`; };
+  return (lines.length ? `<ul class="planlines">${lines.map(li).join('')}</ul>` : '') + (r && r.footer ? `<div class="planfoot">${esc(r.footer)}</div>` : '');
+}
+function renderPlanChange(s) {
+  const el = document.getElementById('planchange');
+  if (!el) return;
+  const r = (Array.isArray(s.trail) ? s.trail : []).find(x => x && x.type === 'plan');
+  setHTML(el, r ? `<div class="planhead"><time>${esc(r.clock)}</time><b>${esc(r.text)}</b></div>${planLines(r) || '<div class="muted planfoot">No job moved to another tractor or time.</div>'}`
+    : '<div class="muted">No plan change yet. When the plan changes, what moved and why is listed here.</div>');
+}
+
+// ---- Let the AI drive: the switch follows the state, except while its own request is in flight ----
+let aiBusy = false;
+const AI_HELP_OFF = 'Manual: you pick the fields and the work.';
+const AI_HELP_ON = 'The crop manager reads each field\'s status, queues the plowing, sowing and surveys it needs, and starts the day. You can still add jobs yourself.';
+function renderAi(s) {
+  const cb = document.getElementById('aidrive'), on = !!(s && s.ai && s.ai.on);
+  if (cb) {
+    if (!aiBusy) cb.checked = on;
+    const help = document.getElementById('aihelp');
+    if (help) help.textContent = cb.checked ? AI_HELP_ON : AI_HELP_OFF;
+  }
+  const mk = document.getElementById('aimark');
+  if (mk) mk.hidden = !on;
+}
+document.getElementById('aidrive').addEventListener('change', async (e) => {
+  const cb = e.target;
+  aiBusy = true;
+  document.getElementById('aihelp').textContent = cb.checked ? AI_HELP_ON : AI_HELP_OFF;
+  try { await fetch('/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ on: cb.checked }) }); } catch { /* not live yet, or the runner is away: the next refresh puts the switch back */ }
+  aiBusy = false;
+  refresh();
+});
+
+// ---- Plan jobs: today's list in the left panel, and the planning dialog ----
+let planOpen = false, priNote = null;
+const planOf = (s) => (s && s.plan && typeof s.plan === 'object' ? s.plan : null);
+const planTasks = (s) => { const p = planOf(s); return p && Array.isArray(p.tasks) ? p.tasks.filter(t => t && t.id != null) : []; };
+const capWord = (w) => { const t = String(w ?? ''); return t.charAt(0).toUpperCase() + t.slice(1); };
+const taskTitle = (t) => (t.step || t.field ? `<b>${esc(t.step || '')}</b> ${esc(t.field || '')}` : `<b>${esc(t.label || t.id)}</b>`);
+function setPlanOpen(v) {
+  planOpen = !!v;
+  const m = document.getElementById('planmodal');
+  if (m) m.hidden = !planOpen;
+  document.body.style.overflow = planOpen ? 'hidden' : '';
+  if (planOpen && lastState) { try { renderPlan(lastState); } catch {} }
+}
+function renderToday(s) {
+  const el = document.getElementById('todaylist'), old = document.getElementById('draftlist'), has = !!planOf(s);
+  if (!el) return;
+  el.hidden = !has;
+  if (old) old.hidden = has; // the earlier job list stays as the fallback until the plan is in the state
+  if (!has) return;
+  const ts = planTasks(s), live = ts.filter(t => t.status !== 'done'), done = ts.filter(t => t.status === 'done');
+  setHTML(el, [...live, ...done].map(t => `<div class="tj ${t.status === 'done' ? 'done' : ''}"><i class="pdot ${esc(t.priority || '')}" title="${esc(capWord(t.priority))} priority"></i><span>${taskTitle(t)}</span><span class="jst ${esc(t.status)}">${esc(t.status)}${t.status === 'active' && t.pct != null ? ' ' + Math.round(Number(t.pct) || 0) + '%' : ''}</span><span class="tjm">${esc(t.tractor || 'No tractor yet')}${t.end ? ` · finishes <span class="${t.late ? 'late' : ''}">${esc(t.end)}${t.late ? ' late' : ''}</span>` : ''}</span></div>`).join('')
+    || '<div class="muted">No jobs today yet. Use Plan jobs to add work.</div>');
+}
+function renderPlanTasks(s) {
+  const el = document.getElementById('plantasks');
+  if (!el) return;
+  const note = document.getElementById('prinote');
+  if (note) note.textContent = priNote && Date.now() - priNote.at < 6000 ? priNote.text : '';
+  const ae = document.activeElement;
+  if (pressing() || (ae && ae.tagName === 'SELECT' && el.contains(ae))) return; // do not rebuild under an open menu or a click
+  const ts = planTasks(s), live = ts.filter(t => t.status !== 'done'), done = ts.filter(t => t.status === 'done');
+  setHTML(el, '<tr><th>Priority</th><th>Task</th><th>Tractor</th><th>Starts</th><th>Finishes</th><th>Deadline</th><th>Status</th><th></th></tr>' +
+    ([...live, ...done].map(t => {
+      const isDone = t.status === 'done', canDel = t.status === 'draft' || t.status === 'waiting';
+      return `<tr class="${isDone ? 'donerow' : ''}"><td><select data-pri="${esc(t.id)}" aria-label="Priority of ${esc(t.id)}"${isDone ? ' disabled' : ''}>${['high', 'medium', 'low'].map(p => `<option value="${p}"${p === t.priority ? ' selected' : ''}>${capWord(p)}</option>`).join('')}</select></td>` +
+        `<td><span class="muted">${esc(t.id)}</span> ${taskTitle(t)}${t.after ? ` <span class="muted">after ${esc(t.after)}</span>` : ''}</td><td>${esc(t.tractor || '–')}</td><td>${esc(t.start || '–')}</td><td class="${t.late ? 'late' : ''}">${esc(t.end || '–')}${t.late ? ' late' : ''}</td><td>${esc(t.deadline || '–')}</td>` +
+        `<td><span class="jst ${esc(t.status)}">${esc(t.status)}${t.status === 'active' && t.pct != null ? ' ' + Math.round(Number(t.pct) || 0) + '%' : ''}</span></td><td class="whycell">${canDel ? `<button type="button" class="small" data-del="${esc(t.id)}">Remove</button>` : ''}</td></tr>`;
+    }).join('') || '<tr><td class="empty" colspan="8">No tasks yet. Add work below: one click on a field\'s suggested work, or a custom job.</td></tr>'));
+}
+function renderGantt(s) {
+  const el = document.getElementById('gantt');
+  if (!el) return;
+  const p = planOf(s), lanes = p && Array.isArray(p.schedule) ? p.schedule.filter(Boolean) : [];
+  if (!lanes.some(l => Array.isArray(l.items) && l.items.length)) { setHTML(el, '<div class="muted">The schedule appears once the day has started and the planner has placed the jobs.</div>'); return; }
+  const end = Math.max(60, Number(p.dayEndMin) || 660), now = Number(p.nowMin);
+  const pos = (m) => Math.max(0, Math.min(100, (Number(m) || 0) / end * 100));
+  let ticks = '', grid = '';
+  for (let m = 0; m <= end; m += 60) {
+    ticks += `<span class="gt${m === 0 ? ' first' : m + 60 > end ? ' last' : ''}" style="left:${pos(m)}%">${String(6 + m / 60).padStart(2, '0')}:00</span>`;
+    grid += `<i class="gg" style="left:${pos(m)}%"></i>`;
+  }
+  const nowLine = isFinite(now) && now >= 0 && now <= end ? `<i class="gnow" style="left:${pos(now)}%" title="Now"></i>` : '';
+  const typeOf = (l) => (/plow|till/i.test(l) ? 'till' : /sow|seed/i.test(l) ? 'seed' : /spray/i.test(l) ? 'spray' : /mow/i.test(l) ? 'mow' : '');
+  setHTML(el, `<div class="gaxis"><span></span><div class="gticks">${ticks}</div></div>` + lanes.map(l => {
+    const bars = (Array.isArray(l.items) ? l.items : []).filter(Boolean).map(it => {
+      const a = pos(it.startMin), w = Math.max(0.15, pos(it.endMin) - a), label = String(it.label || it.kind || ''), work = it.kind === 'work';
+      const text = work ? (w > 9 ? label : w > 3 ? String(it.job || '') : '') : '';
+      return `<div class="gb ${esc(it.kind || '')} ${work ? (['till', 'seed', 'spray', 'mow'].includes(it.type) ? it.type : typeOf(label)) : ''}" style="left:${a}%;width:${w}%" title="${esc(label)} · ${esc(it.start || '')} to ${esc(it.end || '')}">${esc(text)}</div>`;
+    }).join('');
+    return `<div class="glane"><div class="gname"><b>${esc(l.tractor || '')}</b> ${esc(l.name || '')}</div><div class="gtrack">${grid}${bars}${nowLine}</div></div>`;
+  }).join('') + '<div class="gleg"><span><i style="background:#6d4c41"></i>Plow</span><span><i style="background:#2e7d32"></i>Sow</span><span><i style="background:#4f7186"></i>Spray</span><span><i style="background:#7d7a2a"></i>Mow</span><span><i style="background:#c9c3b3;height:5px"></i>Driving</span><span><i style="background:repeating-linear-gradient(135deg,#a8841f 0 3px,#dcc277 3px 6px)"></i>Implement change or refuel</span><span><i style="background:var(--fault);width:2px;height:12px"></i>Now</span></div>');
+}
+function renderPlan(s) {
+  try { renderToday(s); } catch {}
+  const pb = document.getElementById('planbtn'), sb = document.getElementById('startbtn');
+  if (pb && sb) pb.classList.toggle('go', !!sb.disabled); // one primary button: Start the day while it can be pressed, otherwise Plan jobs
+  if (!planOpen) return;
+  const sub = document.getElementById('plansub');
+  if (sub) sub.textContent = s && s.clock ? `Plan clock ${s.clock}. The schedule rebuilds whenever a task or a priority changes.` : '';
+  try { renderPlanTasks(s); } catch {}
+  try { renderGantt(s); } catch {}
+}
+document.addEventListener('click', async (e) => {
+  const t = e.target;
+  if (!t.closest) return;
+  if (t.closest('#planbtn')) { setPlanOpen(true); return; }
+  if (t.closest('#planclose') || t.id === 'planmodal') { setPlanOpen(false); return; }
+  const del = t.closest('#plantasks button[data-del]');
+  if (del) {
+    del.disabled = true;
+    let msg = '';
+    try { const res = await fetch('/draft/' + encodeURIComponent(del.getAttribute('data-del')), { method: 'DELETE' }); if (!res.ok) msg = `Not removed: ${await reasonOf(res)}`; }
+    catch { msg = 'Not removed: the runner is not reachable.'; }
+    priNote = msg ? { at: Date.now(), text: msg } : null;
+    pressAt = 0;
+    refresh();
+  }
+});
+document.addEventListener('change', async (e) => {
+  const sel = e.target.closest && e.target.closest('select[data-pri]');
+  if (!sel) return;
+  let note = '';
+  try {
+    const res = await fetch('/job/priority', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ job: sel.getAttribute('data-pri'), priority: sel.value }) });
+    if (res.ok) { try { note = String((await res.json()).note || ''); } catch {} } else note = `Not changed: ${await reasonOf(res)}`;
+  } catch { note = 'Not changed: the runner is not reachable.'; }
+  priNote = note ? { at: Date.now(), text: note } : null;
+  sel.blur();
+  refresh();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && planOpen) setPlanOpen(false); });
+
+// ---- At-a-glance counters in the top bar, all computed from the same state ----
+const DRONE_SHORT = { docked: 'Docked', flying: 'Flying', hovering: 'Circling', escorting: 'Wind watch', scanning: 'Mapping', spraying: 'Spraying', returning: 'Returning', charging: 'Charging' };
+function renderSummary(s) {
+  const jobs = Array.isArray(s.jobs) ? s.jobs : [];
+  const queued = backlogOf(s).filter(b => b && b.status !== 'released' && !jobs.some(j => j && j.id === b.id)).length;
+  setHTML($('st-jobs'), `${jobs.filter(j => j && j.status === 'done').length} <span class="of">of ${jobs.length + queued}</span>`);
+  const all = Array.isArray(s.tractors) ? s.tractors : [];
+  const trs = all.filter(t => t && t.kind !== 'fuel-truck');
+  const n = (codes) => trs.filter(t => codes.includes(t.state && t.state.code)).length;
+  const depot = n(['SWAP', 'REFUEL']), hold = n(['HOLD']), fault = n(FAULT_CODES);
+  const part = (v, w, c) => `<span class="${c || ''}">${v}</span> <span class="u">${w}</span>`;
+  setHTML($('st-tr'), [part(n(['WORKING', 'DRIVING']), 'working'), part(n(['STANDBY']), 'idle'), depot ? part(depot, 'at depot') : '', hold ? part(hold, 'on hold', 'c-hold') : '', part(fault, 'fault', fault ? 'c-fault' : '')].filter(Boolean).join('<span class="sep">|</span>'));
+  const people = Array.isArray(s.tasks) ? s.tasks.length : 0;
+  $('st-peoplebox').className = 'stat' + (people ? ' alert' : '');
+  setHTML($('st-people'), people ? `${people} waiting` : 'None');
+  const w = s.weather && s.weather.status;
+  setHTML($('st-spray'), w ? `<span class="c-${esc(w)}">${w === 'GO' ? 'Go' : w === 'STOP' ? 'Stop' : 'Caution'}</span>` : '<span class="u">Not started</span>');
+  const truck = all.find(t => t && t.kind === 'fuel-truck');
+  setHTML($('st-truck'), truck && truck.state ? `<span class="${FAULT_CODES.includes(truck.state.code) ? 'c-fault' : ''}">${esc(truck.state.text)}</span>` : '<span class="u">None</span>');
+  const d = s.drone;
+  setHTML($('st-drone'), d ? `${esc(DRONE_SHORT[d.status] || d.status)} <span class="u">${Math.round(Number(d.batteryPct) || 0)}%</span>` : '<span class="u">None</span>');
+  $('daystate').textContent = s.finished ? 'Day ended' : modeOf(s) === 'building' ? 'Building the job list' : 'Day running';
+}
+
+// ---- Fleet rows: the scannable part of each vehicle ----
+function vehNow(t) {
+  const e = t.eta || {}, fp = e.fuelPlan, m = t.tel || {};
+  let h = `<div class="veh-task">${esc(t.task || 'No task')}</div>`;
+  const bits = [];
+  if (e.jobDoneAt) bits.push(`Job finishes <b>${esc(e.jobDoneAt)}</b> <span class="muted">in ${esc(e.jobDoneInMin)} min</span>`);
+  if (e.jobDoneAt && e.fuelToReserveAt) bits.push(`Fuel to reserve <b>${esc(e.fuelToReserveAt)}</b> <span class="muted">in ${esc(e.fuelToReserveInMin)} min</span>`);
+  if (bits.length) h += `<div class="veh-line">${bits.join('<span class="gap"></span>')}</div>`;
+  if (e.runsShortBeforeJobEnds) h += '<div class="veh-warn">Fuel runs short before this job ends.</div>';
+  if (e.jobDoneAt && fp) h += `<div class="veh-line">Next refuel: ${fp.needsFuelFirst ? `<b>${fp.choice ? (fp.choice === 'truck' ? 'fuel truck' : 'depot') : 'needed'}</b> before ${esc(fp.next)}` : `not needed, enough for ${esc(fp.next)} too`}</div>`;
+  if (m.service) h += '<div class="veh-lock">Locked for service until a person presses Good to go.</div>';
+  const q = Array.isArray(t.queue) ? t.queue : [];
+  if (q.length) h += `<div class="veh-line muted">Queue: ${esc(q.join(' → '))}</div>`;
+  return h;
+}
+function vehFuel(t) {
+  const p = Math.max(0, Math.min(100, Number(t.fuelPct) || 0));
+  return `<div class="${p < 20 ? 'low' : ''}"><div class="fuelhead"><span class="k">${t.kind === 'fuel-truck' ? 'Tank' : 'Fuel'}</span><span class="pct">${esc(t.fuelPct ?? '–')}%</span></div><div class="meter"><i style="width:${p}%"></i></div></div><div class="impl">${esc(t.mounted || '')}</div>`;
+}
+
 function build(s) {
   // Built once so the embedded AgOpenWeb views are not reloaded on every refresh.
   document.getElementById('tractors').innerHTML = s.tractors.map(t => `
-    <div class="card" id="card-${t.id}">
-      <h2>${esc(t.id)} ${esc(t.name)} <span class="badge" id="badge-${t.id}"></span></h2>
-      <dl id="dl-${t.id}"></dl>
-      <div class="btns">
-        <button class="bad" onclick="cmd('fault ${t.id} stuck')">Inject: GO but not moving</button>
-        <button class="bad" onclick="cmd('fault ${t.id} dead')">Inject: stop responding</button>
-        <button onclick="cmd('fault ${t.id} ok').then(() => setTimeout(() => cmd('repair ${t.id}'), 1500))">Clear fault</button>
+    <div class="veh" id="card-${t.id}">
+      <div class="veh-row">
+        <div class="veh-id"><div class="veh-name">${t.kind === 'fuel-truck' ? `<b>${esc(t.name)}</b>` : `<b>${esc(t.id)}</b> ${esc(t.name)}`}</div><span class="badge" id="badge-${t.id}"></span></div>
+        <div class="veh-now" id="now-${t.id}"></div>
+        <div class="veh-fuel" id="fuel-${t.id}"></div>
       </div>
-      <iframe src="http://localhost:${t.agopenPort}/?embed=1" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
-      <div class="muted" style="font-size:11px">AgOpenWeb on port ${t.agopenPort} (view only; this tractor is driven by its own process)</div>
+      <details class="veh-more">
+        <summary>Detail, AgOpenWeb view and fault test</summary>
+        <div class="veh-detail">
+          <div>
+            <dl id="dl-${t.id}"></dl>
+            <div class="faultlbl k">Fault test</div>
+            <div class="btns">
+              <button class="bad" onclick="cmd('fault ${t.id} stuck')">Inject: GO but not moving</button>
+              <button class="bad" onclick="cmd('fault ${t.id} dead')">Inject: stop responding</button>
+              <button onclick="cmd('fault ${t.id} ok').then(() => setTimeout(() => cmd('repair ${t.id}'), 1500))">Clear fault</button>
+            </div>
+          </div>
+          <div>
+            <iframe src="http://localhost:${t.agopenPort}/?embed=1" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
+            <div class="note">AgOpenWeb on port ${t.agopenPort} (view only; this tractor is driven by its own process)</div>
+          </div>
+        </div>
+      </details>
     </div>`).join('');
   built = true;
 }
 
 async function refresh() {
   let s;
-  try { s = await (await fetch('/state', { cache: 'no-store' })).json(); } catch { document.getElementById('clock').textContent = 'runner offline'; return; }
+  try { s = await (await fetch('/state', { cache: 'no-store' })).json(); } catch { document.getElementById('clock').textContent = 'runner offline'; const ds = document.getElementById('daystate'); if (ds) ds.textContent = 'Not connected'; return; }
   lastState = s;
   if (!built) { build(s); loadFarm(); }
   drawFarm();
   try { renderBuilder(s); } catch {}
-  document.getElementById('scn').textContent = s.scenario;
+  try { document.querySelector('.startrow').classList.toggle('stick', modeOf(s) === 'building'); } catch {}
+  try { renderSummary(s); } catch {}
+  try { renderAi(s); } catch {}
+  try { renderPlan(s); } catch {}
+  const scn = document.getElementById('scn'), scTxt = String(s.scenario ?? '');
+  scn.textContent = scTxt.includes(': ') ? scTxt.slice(scTxt.indexOf(': ') + 2) : scTxt;
+  scn.title = scTxt;
   document.getElementById('clock').textContent = s.clock + (s.finished ? ' · ended' : '');
   for (const t of s.tractors) {
-    const faulty = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
+    const faulty = FAULT_CODES.includes(t.state.code);
     document.getElementById('card-' + t.id).classList.toggle('fault', faulty);
     const b = document.getElementById('badge-' + t.id);
     b.textContent = t.state.text; b.className = 'badge ' + t.state.code;
+    try { setHTML(document.getElementById('now-' + t.id), vehNow(t)); setHTML(document.getElementById('fuel-' + t.id), vehFuel(t)); } catch {}
     const m = t.tel || {};
-    document.getElementById('dl-' + t.id).innerHTML = `
+    setHTML(document.getElementById('dl-' + t.id), `
       <dt>Task</dt><dd>${esc(t.task || '–')}</dd>
       <dt>Next jobs</dt><dd>${esc(t.queue.join(' → ') || '–')}</dd>
       <dt>Implement</dt><dd>${esc(t.mounted)} · fuel ${t.fuelPct}%</dd>
@@ -394,18 +1177,18 @@ async function refresh() {
       <dt>GPS</dt><dd>${m.lat != null ? m.lat.toFixed(6) + ', ' + m.lon.toFixed(6) : '–'}</dd>
       <dt>Speed</dt><dd>${m.speedKph ?? '–'} km/h · heading ${m.headingDeg ?? '–'}°</dd>
       <dt>Last heard</dt><dd>${t.heardAgoMs == null ? 'never' : (t.heardAgoMs / 1000).toFixed(1) + ' s ago'} · command ack ${m.ack ?? '–'}</dd>
-      <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`;
+      <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`);
   }
   const wx = s.weather, wxEl = document.getElementById('wx');
   if (wx) {
     wxEl.classList.remove('muted');
-    wxEl.innerHTML = `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
+    setHTML(wxEl, `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
       <div>${esc(wx.reason)}</div>
       <div class="wxgrid"><span></span><b>2 m</b><b>10 m</b><span class="muted">Temperature</span><span>${wx.low.tempC.toFixed(1)} °C</span><span>${wx.high.tempC.toFixed(1)} °C</span><span class="muted">Wind</span><span>${wx.low.windMph.toFixed(1)} mph</span><span>${wx.high.windMph.toFixed(1)} mph</span></div>
-      ${(s.drone && s.drone.wind && s.drone.wind.length) ? `<div>Drone above ${esc(s.drone.wind[0].over)} (simulated): ${s.drone.wind.map(w => `<b>${w.mph.toFixed(1)} mph</b> at ${w.altM} m`).join(' · ')} <span class="muted">last at ${esc(s.drone.wind[s.drone.wind.length - 1].clock)}</span></div>` : ''}
+      ${(s.drone && s.drone.wind && s.drone.wind.length) ? `<div>Drone above ${esc(s.drone.wind[0].over)} (simulated): ${s.drone.wind.map(w => `${w.altM} m: <b>${w.mph.toFixed(1)} mph</b>${w.tempC != null ? ', <b>' + Number(w.tempC).toFixed(1) + ' °C</b>' : ''}`).join(' · ')} <span class="muted">last at ${esc(s.drone.wind[s.drone.wind.length - 1].clock)}</span></div>` : ''}
       <div class="${wx.caughtByTwoHeights ? '' : 'muted'}">A single ground station would say: <b>${esc(wx.groundOnly.status === 'GO' ? 'Go' : wx.groundOnly.status === 'STOP' ? 'Stop' : 'Caution')}</b>${wx.caughtByTwoHeights ? '. The second height caught the risk.' : ''}</div>
       <div class="wxlog">${(wx.log || []).map(l => `<div>${esc(l.clock)} ${esc(l.status)}: ${esc(l.note)}</div>`).join('')}</div>
-      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`;
+      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`);
   }
   const d = s.drone, dEl = document.getElementById('droneinfo');
   if (d && dEl) {
@@ -413,45 +1196,46 @@ async function refresh() {
     const words = { docked: 'Docked', flying: 'Flying', hovering: 'Circling a tractor', escorting: 'Reading the wind above a sprayer', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
     dEl.classList.remove('muted');
     dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
-      <div class="muted" style="font-size:11px">Camera view above is rendered from the simulation, not a real camera.</div>
-      ${rep ? `<div style="margin-top:6px"><b>${esc(rep.clock)} ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</b><br>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
+      ${rep ? `<div class="dronerep"><div class="k">${esc(rep.clock)} · ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</div>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
   }
   document.getElementById('peoplecard').hidden = !s.tasks.length;
-  document.getElementById('people').innerHTML = s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
+  setHTML(document.getElementById('people'), s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
     <span class="muted">${k.state === 'waiting' ? 'Tractor is parked and locked. Do the work, then confirm.' : 'Tractor is on its way to the depot.'} Asked at ${k.since}.</span>
-    <button class="go" ${k.state === 'waiting' ? '' : 'disabled'} onclick="fetch('/human/${k.id}/go', { method: 'POST' })">Good to go</button></div>`).join('');
-  const RT_COLOR = { 'Plan Manager': '#2f6f4f', 'Fleet Manager': '#1c7ed6', 'Fault Manager': '#c0392b', 'Route Manager': '#8e24aa', 'Depot Manager': '#b7791f', 'Safety Officer': '#0b7285', 'Weather Manager': '#5c7cfa' };
+    <button class="go" ${k.state === 'waiting' ? '' : 'disabled'} onclick="fetch('/human/${k.id}/go', { method: 'POST' })">Good to go</button></div>`).join(''));
   const rtEl = document.getElementById('roundtable');
   const rtKey = (s.roundtable || []).length + ':' + ((s.roundtable || [])[0] || {}).id;
   if (rtEl.dataset.key !== rtKey) {
     rtEl.dataset.key = rtKey;
-    // Colour a discussion by its topic title (refuel and implement changes share one type, so the title decides).
-    const rtColour = (t = '') => /^Spraying may resume/i.test(t) ? 'rt-c-resume'
-      : /^Spraying stopped/i.test(t) ? 'rt-c-stopped'
-      : /implement to/i.test(t) ? 'rt-c-implement'
-      : /^Refuel T\d|^Fuel truck to T\d|^Fuel for T\d/i.test(t) ? 'rt-c-refuel'
-      : /new job\(s\) slotted into the plan/i.test(t) ? 'rt-c-newjobs' : '';
     let lastTopic = null, out = '';
     for (const l of (s.roundtable || [])) {
-      if (l.topicId !== lastTopic) {
-        if (lastTopic !== null) out += '</div>';
-        out += `<div class="rt-block ${rtColour(l.topic)}"><div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`;
-        lastTopic = l.topicId;
-      }
-      out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who" style="background:${RT_COLOR[l.agent] || '#6b756e'}">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
+      if (l.topicId !== lastTopic) { out += `<div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`; lastTopic = l.topicId; }
+      out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
     }
-    if (lastTopic !== null) out += '</div>';
     rtEl.innerHTML = out || '<div class="muted">Nothing to discuss yet. The managers speak when the day starts, a tractor faults, a job finishes, or work is held.</div>';
   }
   if (s.roundtableStats) document.getElementById('rtmeta').textContent = `${s.roundtableStats.lines || 0} lines · ${s.roundtableStats.modelCalls || 0} model calls · ${s.roundtableStats.toolCalls || 0} tool calls · ${s.roundtableStats.fallbacks || 0} rule-written`;
-  document.getElementById('trail').innerHTML = s.trail.map(r =>
-    `<div class="${r.type === 'fault' ? 'fault' : ''}"><time>${r.clock}</time><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}</div>`).join('') || '<div class="muted">No messages yet.</div>';
-  document.getElementById('jobs').innerHTML = '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th></tr>' +
-    s.jobs.map(j => `<tr><td>${esc(j.label)}</td><td>${esc(j.priority)}</td><td>${j.deadline}</td><td>${esc(j.tractor || '–')}</td><td>${j.pct}%</td><td>${esc(j.status)}</td></tr>`).join('');
+  try { renderPlanChange(s); } catch {}
+  setHTML(document.getElementById('trail'), s.trail.map(r =>
+    `<div class="${r.type === 'fault' ? 'fault' : r.type === 'plan' ? 'plan' : ''}"><time>${r.clock}</time><div><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}${planLines(r)}</div></div>`).join('') || '<div class="muted">No messages yet. Agents start talking when the day starts.</div>');
+  renderJobs(s);
 }
-document.getElementById('dscan').addEventListener('click', async () => {
-  const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
-  document.getElementById('droneinfo').textContent = res.ok ? 'Drone sent.' : await res.text();
+// One handler for both scan buttons (drone card and field list).
+async function scanPicked() {
+  let msg;
+  try {
+    const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
+    msg = res.ok ? 'Drone sent.' : await res.text();
+  } catch { msg = 'Drone not sent: the runner is not reachable.'; }
+  document.getElementById('droneinfo').textContent = msg;
+  const fm = document.getElementById('fscanmsg');
+  if (fm) fm.textContent = msg;
+}
+document.getElementById('dscan').addEventListener('click', scanPicked);
+document.getElementById('fscan').addEventListener('click', scanPicked);
+document.getElementById('vehtoggle').addEventListener('click', () => {
+  const ds = [...document.querySelectorAll('#tractors details')], open = ds.some(x => !x.open);
+  ds.forEach(x => { x.open = open; });
+  document.getElementById('vehtoggle').textContent = open ? 'Hide all detail' : 'Show all detail';
 });
 // Start over needs two clicks, so it cannot be hit by accident.
 const so = document.getElementById('startover'), soMsg = document.getElementById('startovermsg');

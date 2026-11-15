@@ -343,7 +343,9 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
       // Stay just behind a tractor while it sprays, stepping through three heights and reporting each one, so
       // the wind can be read at more than the two fixed heights of the weather mast. Gives way to any other mission.
       const at = m.spec.follow();
-      if (!at || m.spec.until() || queue.length) { ev.push({ type: 'escort-ended', missionId: m.id }); cur = null; return t; }
+      // It ends when the spraying stops, when a fault needs looking at, or after two rounds of the three heights
+      // (so surveys waiting in the queue still get flown).
+      if (!at || m.spec.until() || queue.some(q => q.type === 'investigate') || (m.step || 0) >= 2 * ESCORT_ALTS_M.length) { ev.push({ type: 'escort-ended', missionId: m.id }); cur = null; return t; }
       const r = flyTo({ e: at.e - ESCORT_OFFSET_M, n: at.n - ESCORT_OFFSET_M }, t, m.phase === 'go' ? 'flying' : 'escorting');
       m.focus = { e: at.e, n: at.n };
       if (m.phase === 'go') { if (r.arrived) { m.phase = 'follow'; m.dwell = 0; m.step = 0; ev.push({ type: 'arrived', missionId: m.id, at: { ...pos } }); } return r.arrived ? r.t : 0; }
@@ -469,6 +471,7 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
     state() {
       let alt = mode === 'docked' ? 0 : altitudeM * Math.min(1, dist(pos, HOME) / CLIMB_M);
       let focus = null;
+      if (mode === 'mission' && cur?.type === 'scan' && cur.phase === 'path') alt = 18;      // survey lines are flown low
       if (mode === 'mission' && cur?.type === 'investigate') { focus = { ...cur.spec.target }; if (cur.phase === 'hover') alt = ORBIT_ALT_M; }
       if (mode === 'mission' && cur?.type === 'escort' && cur.phase === 'follow') { focus = cur.focus || null; alt = ESCORT_ALTS_M[cur.step % ESCORT_ALTS_M.length]; }
       return {
@@ -530,6 +533,13 @@ export function createDrone({ home = { e: 0, n: 0 }, speedMps = 12, altitudeM = 
           queue.splice(at + 1, 0, cur);
           cur = null;
         }
+      } else if (spec.type === 'escort') {
+        // A tractor is spraying now: this goes ahead of surveys (but behind any fault inspection), and a survey
+        // in progress is put back in the queue to be flown afterwards.
+        let at = 0;
+        while (at < queue.length && queue[at].type === 'investigate') at++;
+        queue.splice(at, 0, m);
+        if (mode === 'mission' && cur && cur.type !== 'investigate' && cur.type !== 'escort') { resetPhase(cur); queue.splice(at + 1, 0, cur); cur = null; }
       } else {
         queue.push(m);
       }

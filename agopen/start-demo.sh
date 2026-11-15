@@ -19,6 +19,9 @@ if [ ! -x "$MULTI/bin/AgOpenWeb.Desktop" ]; then echo "No patched AgOpenWeb buil
 
 echo "1/5 Stopping anything left from an earlier run..."
 stop_all
+# Fields remember their status between runs (crop-record.json in each field's AgOpenWeb folder, and the last drone
+# surveys). FRESH=1 puts the farm back to its starting mix and forgets the surveys and the AI-drive switch.
+if [ -n "${FRESH:-}" ]; then rm -f "$MULTI"/data-5175/AgOpenWeb/Fields/*/crop-record.json "$REPO"/agopen/out/field-memory.json "$REPO"/agopen/out/ai-drive.json; fi
 echo "2/5 Writing the farm and implement profiles into each AgOpenWeb copy..."
 (cd "$REPO" && node agopen/build-farm.js) || exit 1
 echo "3/5 Starting four AgOpenWeb copies (three tractors and the fuel truck)..."

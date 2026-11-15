@@ -228,6 +228,31 @@ Fuelling and implement changes are done by a person. The tractor does not move w
 
 Job order is also a rule: nothing is sown before it is plowed (see [Build a job list](#build-a-job-list-and-start-the-day)).
 
+## Field status, the crop manager and "Let the AI drive"
+
+**What is on each field.** Every field has a record, `crop-record.json`, kept in that field's own AgOpenWeb folder next to its boundary: a growing crop and its planting date, stubble after a harvest, or plowed soil, and since when. The record is updated when plowing or sowing finishes, so the farm remembers between runs. The Add jobs panel lists every field with its status, how far along the crop is, when it should be ready, and what needs doing next. `FRESH=1 agopen/start-demo.sh` puts the farm back to its starting mix (four fields growing, three in stubble, two plowed) and forgets the surveys.
+
+**How far along, and how sure.** Growth figures come from the last drone survey of the field. The margin on them widens by a point every 20 plan minutes since that survey, and after four plan hours the survey counts as out of date. A field that has never been surveyed is worked out from its planting date alone, with a margin of 20 points. Surveys are remembered between runs in `agopen/out/field-memory.json`. Temperature comes from the weather mast; humidity is derived from it (the simulated mast has no humidity sensor), and both scale the growth rate used for the harvest date. The crop itself, like the drone, is simulated.
+
+**Crop manager.** Once the day is running it goes through the fields every 20 plan minutes. A standing crop that has never been surveyed, or not for four plan hours, gets the drone, with the reason in the log ("corn planted 107 days ago, about 89% along, never surveyed"). After the survey it reports the stage, stand, soil moisture and pests, and the next step; pest patches are spot-sprayed by the drone when spraying is allowed.
+
+**Let the AI drive.** A switch at the top of the Add jobs panel (`POST /ai {"on": true}`). Off, the operator builds the job list. On, the crop manager reads every field's record, queues the work each one needs (plowed soil: sow; stubble: plow, then sow), nearest and ready-to-sow fields first and no more than five jobs open at a time, and starts the day. Growing fields are left alone. The operator can still add or remove jobs, and every tractor still waits for Good to go at the depot.
+
+
+## Drone sensors, stitched photo and the problem heatmap
+
+All simulated, and derived from the same field model so the views agree with each other. On a survey the drone flies its lines at 18 m looking straight down. Under the drone camera on the dashboard: **Camera**, **Thermal** (false colour: canopy cooler than bare ground), **LiDAR** (points coloured by height) and **Stitched photo** (the field appears tile by tile as the drone covers it). Each survey also records the LiDAR canopy height and the thermal canopy temperature against the air (a canopy warmer than the air is read as water stress, and the next step becomes "irrigate"), and a list of problem areas: the pest patches, plus patches where the crop is behind the rest of the field with a likely cause. Those are drawn as a heatmap on the map (pests red, poor growth orange) and named in the crop manager's review. With **Let the AI drive** on, the first thing it does is send the drone round every field, nearest first; hay and alfalfa that a survey shows far enough along are queued for mowing. A fresh farm (`FRESH=1`) is a random mix: four fields growing, three in stubble, two plowed.
+
+
+## Farm assistant (chat)
+
+http://localhost:5190/chat is a plain chat with the farm assistant (`agopen/chat.js`): one language model (`claude-haiku-5-5`, or `CHAT_MODEL`) with a short instruction text and plain-code tools, the same functions the dashboard's buttons call. It can read the farm (`farm_overview`, `field_report`), add and remove jobs, start the day, change a priority, explain any assignment (`why_job`), switch AI drive, pick a crop, and send the drone. Asking what a field is like answers from the field's record and sends the drone there; its camera is shown under the answer. The rules stay in the tools: it cannot sow before plowing, cannot release a tractor locked at the depot, and cannot lift a weather stop. It needs internet and `ANTHROPIC_API_KEY`; without them a question that names a field still gets the record and the drone, and anything else gets a plain "could not reach the model". Both sides of each exchange are written to the message trail.
+
+## Planning jobs: ranked tasks and the day's schedule
+
+**Plan jobs** on the dashboard opens the planner: every task ranked by urgency, the fields with one suggested action each, and each tractor's schedule for the day (drive, work, refuel, implement change) drawn from the planner's own plan, so it redraws when a task or a priority changes. A job that has to happen first is always at least as urgent as the job that waits for it: raising a sowing job raises its plowing, and lowering the plowing lowers the sowing (`POST /job/priority {"job","priority"}`; the reply says what else was changed and why). `/state` carries this as `plan.tasks` and `plan.schedule`.
+
+
 ## Fuel truck
 
 The fuel truck "FUEL" is a fourth AgOpenWeb vehicle, on port 5178. It carries fuel to a tractor that is working in a field, when that is cheaper than the tractor driving to the depot and back. If no truck node is running, the option is not offered and every refuel is at the depot.
@@ -351,6 +376,7 @@ The coordinator serves everything on port 5190. There is no authentication, and 
 | GET | `/dashboard/...`, `/src/...` | Static files from the repo for the original dashboard. |
 | POST | `/draft` | Add jobs to the list. Body: `{"fields": ["Ridge 80"], "steps": ["till", "seed"], "priority": "high", "deadline": "17:00"}`. Steps are `till`, `seed`, `spray` or `mow`. Returns `{"added": [ids]}`, or 409 with the reason in plain text. |
 | POST | `/jobs` | The same for one step. Body: `{"fields": [...], "type": "spray", "priority": "medium", "deadline": "17:00"}`. |
+| GET | `/why/<job id>` | Why this job is with this tractor: the planner's own reasons, with the alternatives it rejected. The **Why?** button on each job row shows it. |
 | DELETE | `/draft/<job id>` | Remove a job that has not been sent to the planner, and any job that waits for it. |
 | POST | `/drone/scan` | Send the drone to map fields. Body: `{"fields": ["Ridge 80"]}`. 409 with a reason if no field is given. |
 | POST | `/start` | Start the day. 409 if it is already running or the list is empty. |
@@ -481,7 +507,6 @@ The same file lists ten injected-fault cases, all passing in the copy generated 
 | A hand-over restarts the interrupted pass | A job's route is kept when another tractor takes over, but the new tractor drives the interrupted pass again from its start. The code comment says nothing is repeated. By my reading of `live.js`, one pass can be driven twice. I did not watch it. |
 | Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go and is not opening a field. Within 5 m of its target a tractor counts as arrived, so one that stalls there is not caught until its next leg. |
 | Lanes do not react to `block_route` | The lane network is built once. A `block_route` event changes the planner's travel times but not where the tractors drive. I did not test this. |
-| The status page shows only the re-plan headline | The line for each moved job and its reason is printed in the coordinator's Terminal window, not on the status page. |
 | Weather and drone are simulated | The weather feed is a scripted day and the drone's readings are generated from the field's name. Neither reads a real sensor. |
 | Give-way is simple | It stops one tractor when two moving tractors come within 9 m. It does not plan around a tractor that is standing still in the lane. |
 | No persistence | The job list, the trail and the roundtable lines live in memory. Start over, or a restart, loses them. `out/trail.jsonl` is emptied at each start. |

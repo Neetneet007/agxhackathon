@@ -11,6 +11,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TOOLS as TOOL, kindOf } from './rig.js';
+import { fieldTruth } from './drone.js';
+
+// Days from planting to harvest, by crop (typical figures; hay and alfalfa are days to the next cut).
+const SEASON_DAYS = { corn: 120, soybeans: 110, wheat: 110, hay: 60, alfalfa: 45, orchard: 200 };
+// A planting date for the field's record. It is set so the calendar roughly agrees with the crop the drone
+// will find there, give or take a week or so: a record a farmer kept, not a measurement.
+function plantedOn(name, crop) {
+  const season = SEASON_DAYS[crop] || 100;
+  const truth = fieldTruth(name, 'not plowed', 1, crop);
+  let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % 997;
+  const days = Math.max(5, Math.round(truth.maturityPct / 100 * season) + (h % 15) - 7);
+  return new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+}
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -57,7 +70,7 @@ for (const f of scenario.fields) {
     type: 'FeatureCollection',
     features: [
       { type: 'Feature', geometry: { type: 'Point', coordinates: [centre.lon, centre.lat] },
-        properties: { role: 'metadata', formatVersion: 1, name: f.name, originLatitude: centre.lat, originLongitude: centre.lon, convergence: 0, areaHectares: hectares, createdDate: now, lastModifiedDate: now } },
+        properties: { role: 'metadata', formatVersion: 1, name: f.name, crop: f.crop || null, plantedOn: f.crop ? plantedOn(f.name, f.crop) : null, originLatitude: centre.lat, originLongitude: centre.lon, convergence: 0, areaHectares: hectares, createdDate: now, lastModifiedDate: now } },
       { type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] },
         properties: { role: 'outer-boundary', isDriveThrough: false, isHard: false, areaHectares: hectares } },
       { type: 'Feature', geometry: { type: 'LineString', coordinates: [[A.lon, A.lat, heading], [B.lon, B.lat, heading]] },

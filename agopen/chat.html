@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Farm assistant</title>
+<style>
+:root{--bg:#f6f4ee;--ink:#1c1c19;--muted:#6b6a62;--rule:#d9d5c7;--green:#2f5d3a;--tint:#e4ece1}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;flex-direction:column}
+a{color:var(--green)}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;border-bottom:1px solid var(--rule);flex:0 0 auto}
+header h1{font-size:15px;font-weight:600;margin:0;flex:1}
+header .st{font-size:12.5px;color:var(--muted)}
+header a,header button{font-size:12.5px}
+.quiet{background:none;border:1px solid var(--rule);border-radius:4px;color:var(--muted);padding:3px 9px;cursor:pointer;font-family:inherit}
+.quiet:hover{color:var(--ink);border-color:var(--muted)}
+#mapwrap{flex:0 0 38vh;min-height:220px;border-bottom:1px solid rgba(0,0,0,.14);background:#efece3}
+#farmmap{display:block;width:100%;height:100%;border:0}
+#scroll{flex:1 1 auto;overflow-y:auto;padding:20px 16px 12px}
+#col{max-width:760px;margin:0 auto}
+.msg{margin:0 0 20px}
+.msg.user{display:flex;justify-content:flex-end}
+.msg.user .body{background:var(--tint);border:1px solid #cfdccb;border-radius:4px;padding:8px 12px;max-width:85%;white-space:pre-wrap;overflow-wrap:anywhere}
+.lbl{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+.msg.assistant .body{white-space:pre-wrap;overflow-wrap:anywhere}
+.msg.assistant .body ul{margin:6px 0;padding-left:20px;white-space:normal}
+.msg.assistant .body p{margin:0 0 6px;white-space:pre-wrap}
+.did{margin-top:10px;border-left:2px solid var(--green);padding-left:10px;font-size:12.5px;color:var(--muted)}
+.did b{display:block;font-weight:600;color:var(--ink);font-size:12px}
+.did div{line-height:1.5}
+.drone{margin-top:12px}
+.drone iframe{display:block;width:100%;max-width:640px;aspect-ratio:16/9;border:0;border-radius:4px;background:#1c1c19}
+.cap,.dst,.ended{font-size:12.5px;color:var(--muted);margin-top:4px}
+.ended{border:1px solid var(--rule);border-radius:4px;padding:6px 10px;max-width:640px}
+#wait{max-width:760px;margin:0 auto 12px;color:var(--muted);font-size:13px;display:none}
+footer{flex:0 0 auto;border-top:1px solid var(--rule);background:var(--bg);padding:10px 16px 14px}
+#in{max-width:760px;margin:0 auto}
+#chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+#chips button{font:inherit;font-size:13px;background:none;border:1px solid var(--rule);border-radius:4px;padding:4px 10px;cursor:pointer;color:var(--ink)}
+#chips button:hover{border-color:var(--green);color:var(--green)}
+#row{display:flex;gap:8px;align-items:flex-end}
+textarea{flex:1;font:inherit;resize:none;border:1px solid var(--rule);border-radius:4px;background:#fffdf8;color:var(--ink);padding:8px 10px;max-height:160px;min-height:40px;outline:none}
+textarea:focus{border-color:var(--green)}
+#send{font:inherit;background:var(--green);color:#fff;border:0;border-radius:4px;padding:9px 18px;cursor:pointer}
+#send:disabled{opacity:.5;cursor:default}
+</style>
+</head>
+<body>
+<header>
+  <h1>Farm assistant</h1>
+  <span class="st" id="st"></span>
+  <button class="quiet" id="reset" type="button">New chat</button>
+  <a href="/">Back to dashboard</a>
+</header>
+<div id="mapwrap"><iframe id="farmmap" src="/?map=1" title="Farm map, live"></iframe></div>
+<div id="scroll"><div id="col"></div></div>
+<div id="wait"></div>
+<footer>
+  <div id="in">
+    <div id="chips"></div>
+    <div id="row">
+      <textarea id="ta" rows="1" placeholder="Ask about the farm or tell me what to change"></textarea>
+      <button id="send" type="button">Send</button>
+    </div>
+  </div>
+</footer>
+<script>
+(function(){
+  var NA = "The assistant is not available right now.";
+  var col = document.getElementById("col"), scroller = document.getElementById("scroll");
+  var ta = document.getElementById("ta"), sendBtn = document.getElementById("send");
+  var chips = document.getElementById("chips"), waitEl = document.getElementById("wait");
+  var stEl = document.getElementById("st");
+  var msgs = [], busy = false, timer = null, t0 = 0;
+  var lastDrone = null; // msg object holding the live iframe
+  var CHIPS = ["What is North Field like?","What needs doing today?","Plow and sow Creek Pasture","Why is T2 doing that job?","Let the AI drive"];
+
+  function el(tag, cls, text){ var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function str(v){ return v == null ? "" : String(v); }
+
+  function renderText(body, text){
+    var lines = str(text).split("\n"), list = null, para = [];
+    function flush(){ if (para.length){ body.appendChild(el("p", null, para.join("\n"))); para = []; } }
+    lines.forEach(function(l){
+      var m = /^\s*- (.*)$/.exec(l);
+      if (m){ flush(); if (!list){ list = el("ul"); body.appendChild(list); } list.appendChild(el("li", null, m[1])); }
+      else { list = null; if (l.trim() === "" ) flush(); else para.push(l); }
+    });
+    flush();
+  }
+
+  function build(m){
+    var wrap = el("div", "msg " + (m.role === "user" ? "user" : "assistant"));
+    m.node = wrap;
+    if (m.role === "user"){
+      wrap.appendChild(el("div", "body", str(m.text)));
+      return wrap;
+    }
+    wrap.appendChild(el("div", "lbl", "Assistant"));
+    var body = el("div", "body"); renderText(body, m.text); wrap.appendChild(body);
+    if (m.actions && m.actions.length){
+      var d = el("div", "did"); d.appendChild(el("b", null, "What I did"));
+      m.actions.forEach(function(a){ d.appendChild(el("div", null, str(a && (a.summary || a.tool)))); });
+      wrap.appendChild(d);
+    }
+    if (m.drone){
+      var dr = el("div", "drone"); m.droneBox = dr; wrap.appendChild(dr);
+    }
+    return wrap;
+  }
+
+  function fillDrone(m){
+    var dr = m.droneBox; if (!dr) return;
+    dr.textContent = "";
+    if (m === lastDrone){
+      if (!m.iframe){ m.iframe = document.createElement("iframe"); m.iframe.src = "/3d?drone=1"; m.iframe.setAttribute("title","Drone camera"); }
+      dr.appendChild(m.iframe);
+      dr.appendChild(el("div", "cap", "Drone camera, live (simulated): flying to " + str(m.drone && m.drone.field)));
+      m.statusEl = el("div", "dst", ""); dr.appendChild(m.statusEl);
+    } else {
+      m.iframe = null; m.statusEl = null;
+      dr.appendChild(el("div", "ended", "Drone footage ended"));
+    }
+  }
+
+  function pickLive(){
+    var prev = lastDrone, cur = null;
+    for (var i = msgs.length - 1; i >= 0; i--){ if (msgs[i].role === "assistant" && msgs[i].drone){ cur = msgs[i]; break; } }
+    lastDrone = cur;
+    msgs.forEach(function(m){
+      if (!m.droneBox) return;
+      if (m === cur){ if (!m.iframe) fillDrone(m); }
+      else if (m === prev || m.iframe || !m.droneBox.firstChild) fillDrone(m);
+    });
+  }
+
+  function addMsg(raw){
+    var m = {role: raw && raw.role === "user" ? "user" : "assistant", text: raw && raw.text, actions: raw && raw.actions, drone: raw && raw.drone};
+    msgs.push(m);
+    col.appendChild(build(m));
+    pickLive();
+    updateChips();
+    scrollDown();
+    return m;
+  }
+
+  function scrollDown(){ scroller.scrollTop = scroller.scrollHeight; }
+  function updateChips(){ chips.style.display = msgs.length ? "none" : "flex"; }
+
+  function setBusy(b){
+    busy = b; sendBtn.disabled = b;
+    if (b){
+      t0 = Date.now(); waitEl.style.display = "block"; waitEl.textContent = "Working… 0s";
+      timer = setInterval(function(){ waitEl.textContent = "Working… " + Math.floor((Date.now()-t0)/1000) + "s"; }, 500);
+    } else { clearInterval(timer); waitEl.style.display = "none"; }
+    try { ta.focus(); } catch(e){}
+  }
+
+  function send(text){
+    text = str(text).trim();
+    if (!text || busy) return;
+    ta.value = ""; autosize();
+    addMsg({role: "user", text: text});
+    setBusy(true);
+    fetch("/chat", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({text: text})})
+      .then(function(r){ if (!r.ok) throw new Error("bad"); return r.json(); })
+      .then(function(j){ j = j || {}; if (!j.role) j.role = "assistant"; addMsg(j); })
+      .catch(function(){ addMsg({role: "assistant", text: NA}); })
+      .then(function(){ setBusy(false); });
+  }
+
+  function autosize(){ ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; }
+
+  function loadHistory(){
+    fetch("/chat/history").then(function(r){ if (!r.ok) throw new Error("bad"); return r.json(); })
+      .then(function(j){
+        var list = (j && j.messages) || [];
+        msgs = []; col.textContent = ""; lastDrone = null;
+        list.forEach(function(x){ if (x) addMsg(x); });
+        updateChips(); scrollDown();
+      })
+      .catch(function(){ updateChips(); });
+  }
+
+  function poll(){
+    fetch("/state").then(function(r){ return r.json(); }).then(function(s){
+      s = s || {};
+      var parts = [];
+      if (s.clock) parts.push("Plan clock " + s.clock);
+      if (s.mode) parts.push(str(s.mode));
+      stEl.textContent = parts.join(" - ");
+      var d = s.drone;
+      if (lastDrone && lastDrone.statusEl && d){
+        var bits = [];
+        if (d.status) bits.push("Drone " + str(d.status));
+        if (d.mission && d.mission.label) bits.push(str(d.mission.label));
+        if (d.batteryPct != null) bits.push("battery " + Math.round(Number(d.batteryPct)) + "%");
+        lastDrone.statusEl.textContent = bits.join(" - ");
+      }
+    }).catch(function(){});
+  }
+
+  CHIPS.forEach(function(c){
+    var b = el("button", null, c); b.type = "button";
+    b.addEventListener("click", function(){ send(c); });
+    chips.appendChild(b);
+  });
+  sendBtn.addEventListener("click", function(){ send(ta.value); });
+  ta.addEventListener("keydown", function(e){
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); send(ta.value); }
+  });
+  ta.addEventListener("input", autosize);
+  document.getElementById("reset").addEventListener("click", function(){
+    fetch("/chat/reset", {method: "POST"}).catch(function(){}).then(function(){
+      msgs = []; lastDrone = null; col.textContent = ""; updateChips(); try { ta.focus(); } catch(e){}
+    });
+  });
+
+  updateChips(); loadHistory(); poll(); setInterval(poll, 1000);
+  try { ta.focus(); } catch(e){}
+})();
+</script>
+</body>
+</html>
