@@ -10,14 +10,16 @@ const ALLOWED = [
   ['GET', /^\/farm$/],
   ['POST', /^\/hold$/],
   ['DELETE', /^\/hold\/[A-Za-z0-9._-]+$/],
+  ['POST', /^\/recall$/],
+  ['DELETE', /^\/recall\/[A-Za-z0-9._-]+$/],
   ['POST', /^\/agent\/say$/],
   ['POST', /^\/event$/],
 ];
-const EVENT_TYPES_ALLOWED = new Set(['priority_change']);
+const EVENT_TYPES_ALLOWED = new Set(['priority_change', 'cancel_job', 'block_route', 'unblock_route']);
 
 export function checkAllowed(method, url, body) {
   if (!ALLOWED.some(([m, re]) => m === method && re.test(url))) return `${method} ${url} is not in the integration contract`;
-  if (url === '/event' && !EVENT_TYPES_ALLOWED.has(body?.type)) return `POST /event with type "${body?.type}" is not allowed (only priority_change)`;
+  if (url === '/event' && !EVENT_TYPES_ALLOWED.has(body?.type)) return `POST /event with type "${body?.type}" is not allowed (allowed: priority_change, cancel_job, block_route, unblock_route; breakdown and repair belong to the fault detector)`;
   return null;
 }
 
@@ -48,6 +50,8 @@ export class RunnerClient {
   getFarm() { return this.request('GET', '/farm'); }
   postHold(hold) { return this.request('POST', '/hold', hold); }
   deleteHold(id) { return this.request('DELETE', `/hold/${encodeURIComponent(id)}`); }
+  postRecall(r) { return this.request('POST', '/recall', r); }
+  deleteRecall(id) { return this.request('DELETE', `/recall/${encodeURIComponent(id)}`); }
   say(msg) { return this.request('POST', '/agent/say', msg); }
   postEvent(evt) { return this.request('POST', '/event', evt); }
 }

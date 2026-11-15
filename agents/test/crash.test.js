@@ -35,7 +35,7 @@ test('5b. kill -9 mid-run after the hold: restart posts no second hold and still
   fs.writeFileSync(scriptFile, JSON.stringify([{ at: '06:00', ...CALM_INVERSION }]));
   try {
     const a = startServer({ dataDir, runnerUrl: fake.url, scriptFile });
-    await waitFor(() => logEntries(dataDir).some(e => e.kind === 'effect_done' && e.id === 'weather:t1:hold'), { what: 'hold sent' });
+    await waitFor(() => logEntries(dataDir).some(e => e.kind === 'effect_done' && e.id === 'wm:t1:hold:wm-spray'), { what: 'hold sent' });
     fake.clock = '06:05';
     await kill(a);
     assert.equal(fake.holdPosts().length, 1);
@@ -44,8 +44,8 @@ test('5b. kill -9 mid-run after the hold: restart posts no second hold and still
     const api = await waitFor(() => b.apiUrl(), { what: 'API up' });
     for (const c of ['06:06', '06:07', '06:08']) { fake.clock = c; await new Promise(r => setTimeout(r, 300)); }
     const mem = await (await fetch(`${api}/memory`)).json();
-    assert.equal(mem.memory['weather.hold'].value.active, true);
-    assert.equal(mem.memory['weather.spray'].value.status, 'Stop');
+    assert.deepEqual(Object.keys(mem.memory['weather.actions'].value.holds), ['wm-spray']);
+    assert.equal(mem.memory['weather.status'].value.level, 'Stop');
     assert.equal(fake.holdPosts().length, 1, 'no second hold');
     assert.equal(fake.says().length, 1, 'no second message');
     await kill(b);
@@ -65,15 +65,15 @@ test('5c. killed while the hold call was in flight: on restart it is retried exa
     await waitFor(() => fake.holdPosts().length === 1, { what: 'hold call in flight' });
     await kill(a);
     const before = logEntries(dataDir);
-    assert.ok(before.some(e => e.kind === 'effect_start' && e.id === 'weather:t1:hold'));
-    assert.ok(!before.some(e => e.kind === 'effect_done' && e.id === 'weather:t1:hold'), 'recorded as started, not finished');
+    assert.ok(before.some(e => e.kind === 'effect_start' && e.id === 'wm:t1:hold:wm-spray'));
+    assert.ok(!before.some(e => e.kind === 'effect_done' && e.id === 'wm:t1:hold:wm-spray'), 'recorded as started, not finished');
 
     fake.hold = 'ok';
     const b = startServer({ dataDir, runnerUrl: fake.url, scriptFile });
-    await waitFor(() => logEntries(dataDir).some(e => e.kind === 'effect_done' && e.id === 'weather:t1:hold'), { what: 'hold retried' });
+    await waitFor(() => logEntries(dataDir).some(e => e.kind === 'effect_done' && e.id === 'wm:t1:hold:wm-spray'), { what: 'hold retried' });
     await new Promise(r => setTimeout(r, 600));
     assert.equal(fake.holdPosts().length, 2, 'the interrupted call plus exactly one retry');
-    assert.ok(fake.holds.has('weather-agent-spray'));
+    assert.ok(fake.holds.has('wm-spray'));
     await kill(b);
     assert.deepEqual(fake.forbidden, []);
   } finally {

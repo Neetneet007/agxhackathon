@@ -15,8 +15,8 @@ const FORBIDDEN = [
 ];
 
 // opts.hold: 'ok' | '404' | 'hang'; opts.say: 'ok' | '404'
-export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', say = 'ok' } = {}) {
-  const fake = { calls: [], forbidden: [], holds: new Map(), trail: [], clock, hold, say, hanging: [] };
+export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', say = 'ok', tractors = [], jobs = null, tasks = [] } = {}) {
+  const fake = { calls: [], forbidden: [], holds: new Map(), recalls: new Map(), blocked: new Set(), events: [], trail: [], clock, hold, say, hanging: [], tractors, tasks, jobs: jobs ?? [{ id: 'J1', type: 'spray', status: 'pending', field: 'North Field', priority: 'medium', deadline: '12:00', pct: 0 }] };
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', c => { body += c; });
@@ -31,7 +31,7 @@ export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', 
         return send(403, { error: 'forbidden' });
       }
       if (req.method === 'GET' && url === '/state') {
-        return send(200, { clock: fake.clock, secPerMin: 1, mode: 'running', tractors: [], jobs: [{ id: 'J1', type: 'spray', status: 'pending', field: 'North Field' }], holds: [...fake.holds.values()], trail: fake.trail.slice(0, 40) });
+        return send(200, { clock: fake.clock, secPerMin: 1, mode: 'running', tractors: fake.tractors, jobs: fake.jobs, tasks: fake.tasks, holds: [...fake.holds.values()], recalls: [...fake.recalls.values()], trail: fake.trail.slice(0, 40) });
       }
       if (req.method === 'GET' && url === '/farm') return send(200, { home: { lat: 32.62, lon: -114.68 }, fields: [{ name: 'North Field', boundary: [] }] });
       if (req.method === 'POST' && url === '/hold') {
@@ -48,7 +48,15 @@ export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', 
         fake.trail.unshift({ clock: fake.clock, ...json });
         return send(200);
       }
-      if (req.method === 'POST' && url === '/event') return send(200);
+      if (req.method === 'POST' && url === '/recall') { fake.recalls.set(json.id, json); return send(200); }
+      const rm = req.method === 'DELETE' && url.match(/^\/recall\/(.+)$/);
+      if (rm) { fake.recalls.delete(decodeURIComponent(rm[1])); return send(200); }
+      if (req.method === 'POST' && url === '/event') {
+        fake.events.push(json);
+        if (json.type === 'block_route') fake.blocked.add(json.name);
+        if (json.type === 'unblock_route') fake.blocked.delete(json.name);
+        return send(200);
+      }
       return send(404, { error: 'not found' });
     });
   });
@@ -58,18 +66,23 @@ export async function startFakeRunner({ port = 0, clock = '06:00', hold = 'ok', 
   fake.holdPosts = () => fake.calls.filter(c => c.method === 'POST' && c.url === '/hold');
   fake.holdDeletes = () => fake.calls.filter(c => c.method === 'DELETE' && c.url.startsWith('/hold/'));
   fake.says = () => fake.calls.filter(c => c.method === 'POST' && c.url === '/agent/say');
+  fake.recallPosts = () => fake.calls.filter(c => c.method === 'POST' && c.url === '/recall');
+  fake.recallDeletes = () => fake.calls.filter(c => c.method === 'DELETE' && c.url.startsWith('/recall/'));
+  fake.writes = () => fake.calls.filter(c => c.method !== 'GET');
   fake.stop = () => new Promise(r => { for (const h of fake.hanging) h.destroy(); server.closeAllConnections?.(); server.close(() => r()); });
   return fake;
 }
 
 export function tmpDir() { return fs.mkdtempSync(path.join(os.tmpdir(), 'agents-test-')); }
 
-export async function makeRuntime({ dataDir = tmpDir(), runnerUrl, script, model, env = {} }) {
-  const weather = await loadAgent(path.join(AGENTS_DIR, 'weather'));
+export const ALL_AGENTS = ['depot', 'fault', 'fleet', 'plan', 'records', 'route', 'safety', 'weather'];
+export async function makeRuntime({ dataDir = tmpDir(), runnerUrl, script, day, model, env = {}, agents = ['weather'] }) {
+  const loaded = [];
+  for (const a of agents) loaded.push(await loadAgent(path.join(AGENTS_DIR, a)));
   return new Runtime({
-    dataDir, agents: [weather], runnerUrl, quiet: true,
+    dataDir, agents: loaded, runnerUrl, quiet: true,
     model: model || new Model({ env }),       // env {} → no API key → rule-only
-    config: { weatherScript: script },
+    config: { weatherScript: script, weatherDay: day },
   });
 }
 

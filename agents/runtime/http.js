@@ -13,8 +13,21 @@ export function startApi(rt, { port = 5200, host = '127.0.0.1' } = {}) {
     try {
       if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST' }); return res.end(); }
       if (req.method === 'POST') {
+        // A person reports something done (e.g. an inspection). No agent tool can call this.
+        const pm = p.match(/^\/people\/([^/]+)\/([^/]+)$/);
+        if (pm) {
+          let body = '';
+          req.on('data', c => { body += c; if (body.length > 10_000) req.destroy(); });
+          req.on('end', async () => {
+            let b = {};
+            try { b = body ? JSON.parse(body) : {}; } catch { return json(res, 400, { error: 'bad JSON' }); }
+            const r = await rt.person(pm[1], pm[2], b);
+            json(res, r.ok ? 200 : 400, r);
+          });
+          return;
+        }
         const m = p.match(/^\/agents\/([^/]+)\/wake$/);
-        if (!m) return json(res, 405, { error: 'read-only API; the only POST is /agents/<name>/wake' });
+        if (!m) return json(res, 405, { error: 'read-only API; the only POSTs are /agents/<name>/wake and the person actions under /people/' });
         if (!rt.requestWake(m[1])) return json(res, 404, { error: `no agent ${m[1]}` });
         return json(res, 202, { queued: true, agent: m[1], note: 'wakes on the next poll' });
       }

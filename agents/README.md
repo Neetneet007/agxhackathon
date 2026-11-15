@@ -1,108 +1,193 @@
-# Agents
+# Agents: the team that runs the farm
 
-A durable agent runtime (`agents/runtime/`) and the first agent on it, the weather agent (`agents/weather/`). Everything here lives under `agents/`; nothing else in the repo is touched.
+Eight agents on one durable runtime. Each agent is a language model plus an instructions file, doing one job for the whole farm. It calls plain-code tools, shares memory, and speaks at the operator's roundtable. Everything here lives under `agents/`; nothing else in the repo is touched.
 
 ```bash
-node agents/server.js                    # rule-only, API on http://127.0.0.1:5200
-ANTHROPIC_API_KEY=sk-ant-... node agents/server.js   # model in the loop (needs npm install in the repo root for @anthropic-ai/sdk)
-node --test agents/test/                 # 15 tests against a fake live runner; no demo needed
+node agents/server.js                                   # all eight agents, rule-only, API on http://127.0.0.1:5200
+WEATHER_DAY=monsoon node agents/server.js               # or hurricane; default calm
+ANTHROPIC_API_KEY=sk-ant-... node agents/server.js      # model in the loop (needs npm install in the repo root for @anthropic-ai/sdk)
+node --test agents/test/                                # 28 tests against a fake live runner; no demo needed
 ```
-
-It starts cleanly when the live runner is not up and keeps retrying quietly (one log line, then silence until it comes back).
 
 | Variable | Default | |
 |---|---|---|
 | `AGENTS_PORT` | `5200` | API port (reserved ports are refused) |
 | `RUNNER_URL` | `http://127.0.0.1:5190` | live runner; must be a local address |
-| `AGENTS_DATA` | `agents/data` | durable log and journals (git-ignored) |
+| `AGENTS_DATA` | `agents/data` | durable log, journals, day summaries (git-ignored) |
 | `AGENTS` | all | comma list of agent folders to run |
 | `POLL_MS` | `1000` | how often `GET /state` is polled (real ms) |
 | `AGENT_MODEL` | `claude-haiku-5-5` | any Claude model id, or `off` for rule-only |
-| `WEATHER_SOURCE` | `sim` | `nws` for the National Weather Service (internet; off by default) |
-| `WEATHER_SCRIPT` | — | JSON file of readings `[{ "at": "HH:MM", "t2C", "t10C", "wind2Mph", "wind10Mph" }]` |
+| `WEATHER_DAY` | `calm` | `calm`, `monsoon` or `hurricane` (all simulated) |
+| `WEATHER_SOURCE` | `sim` | `nws` for National Weather Service forecasts and alerts (internet; off by default) |
+| `WEATHER_SCRIPT` | — | JSON file of snapshots `[{ "at": "HH:MM", "t2C", "t10C", "wind2Mph", "wind10Mph", "gustMph", "alerts": [], ... }]` |
 
-## How an agent is defined
+## The team
 
-An agent is a folder with two files. The runtime finds every folder under `agents/` that has both, so an observer, a failure agent or an initiator is a new folder, not a runtime change.
+| Folder | Speaks as | One job | Wakes when | Never |
+|---|---|---|---|---|
+| `plan` | Plan Manager (chair) | Owns today's plan; decides what gives | a request from another agent, a stop/recall/fault to close, a job running late | moves a tractor; overrides a safety or weather stop |
+| `fleet` | Fleet Manager | Knows every tractor | a tractor drops below 25 % fuel; asked to fuel the fleet | releases a tractor from the depot |
+| `fault` | Fault Manager | Is a tractor really in trouble? | a symptom lasts 3 checks in a row (silent, GO but not moving, off its line) | declares a fault from one reading; repairs anything |
+| `route` | Route Manager | Coverage and lane routes | a job starts | sends a tractor across a field that is not its job |
+| `depot` | Depot Manager | People's work: fuel, implements, inspections | a request arrives; a task waits 10+ plan minutes | releases a locked tractor; marks an inspection done |
+| `weather` | Weather Manager | What the weather allows, now / today and tomorrow / days ahead | the playbook's decision changes; hourly | lifts a stop it did not place |
+| `safety` | Safety Officer | Checks plans and recalls; watches spacing | two tractors under 15 m apart for 2 checks; a tractor working against a stop | is overruled by another agent |
+| `records` | Record Keeper | The day's record | each job done, each stop, end of day (18:00) | changes a record after the fact |
 
-- `AGENT.md`: the instructions, plain prose, sent as the system prompt.
-- `tools.js`: `export default { tools, schedule, sense, plan, ruleOnly }`
-  - `tools`: `[{ name, description, input_schema, handler(input, ctx) }]`. Every agent also gets `memory_get`, `memory_set` (own `<agent>.` keys only) and `send_message`.
-  - `schedule: { everyPlanMinutes }`: a scheduled wake-up on the plan clock.
-  - `sense(ctx)`: cheap plain code, run on every poll. Takes readings; returns a reason string when a rule fires, which wakes the agent.
-  - `plan(ctx, { reason, inbox })`: on a wake-up, is there anything to decide? `null` ends the wake with **no model call**; otherwise `{ prompt }`.
-  - `ruleOnly(ctx, task)`: the same actions without a model, with a templated explanation. It also runs after every model run as a safety net: it does nothing if the model already acted, and completes the action if the model did not.
+The live runner has its own model voices for some roles on the same roundtable. These agents speak only when they hold new facts for the role, so the two don't say the same thing twice.
+
+A discussion looks like this. The agent that noticed speaks first; the agents affected add a line; the Plan Manager closes with the decision. Monsoon day, abridged, rule-only:
+
+```
+Weather Manager → Plan Manager: Now: Holding spray work, recalling the fleet to the depot. Rules drift-wind and lightning both apply;
+                                 the more cautious wins (lightning). Lightning within 10 miles ... [rule drift-wind (...), lightning (National Weather Service +1)] (simulated weather)
+Weather Manager → Depot Manager: Nobody works at the depot until further notice: ... [rule lightning (National Weather Service +1)]
+Depot Manager → operator:        Nobody should work at the depot now; fuelling, re-fitting and inspections wait until it is safe.
+Plan Manager → operator:         Decision: the plan pauses while the fleet is recalled; jobs resume in priority order when the recall ends.
+```
+
+## How every agent works
+
+An agent is a folder: `AGENT.md` (the instructions) and `tools.js` (`export default { displayName, sense, plan, act, tools, people? }`). A new agent is a new folder; the runtime needs no change.
+
+1. **`sense(ctx)`** runs on every poll. It is cheap plain code: it reads `/state`, keeps its part of shared memory current, and returns a reason when its trigger fires.
+2. **`plan(ctx)`** checks whether there is anything to decide. `null` ends the wake-up with **no model call**.
+3. **`act(ctx)`** is the fast path, also plain code: holds, recall, closed bridges, priority changes. These go out at once, before any model is asked; `fastMs` on each run shows how long it took (a few ms).
+4. **The model** gets the agent's `AGENT.md`, its tools, and the statements the rules produced. It writes the words with `speak` and may call the agent's other allowed tools. A tool refuses anything the rules don't allow.
+5. **Templates.** Every statement the model did not write goes out as its template sentence. With no key, no network, a timeout or an error, steps 1–3 and 5 still happen, so the actions are identical.
 
 ## What the runtime guarantees
 
-- **Durable log.** `agents/data/runtime.jsonl`, one JSON object per line, fsync'd before the runtime acts on it: every wake-up, model call and result, tool call and result, message, memory write, side effect start/done/failure. On start the runtime replays it to rebuild memory, messages, pending side effects, agent state, runs and counters. A line torn by a crash is ignored.
-- **No repeated side effects.** Each call that changes something outside the runtime (hold, lift, message mirror, event) has a stable id and is written in the same log entry as the memory change that caused it. Done → never sent again. Started but not finished (process killed mid-call) → retried once on restart. Failed because the runner is down or the endpoint returns 404 → kept and retried with back-off, in order per resource (a lift never overtakes its hold). Any other 4xx → marked failed.
-- **Shared memory.** Key-value with history (last 200 revisions per key), readable by every agent (`memory_get`, `GET /memory`); an agent writes only keys under its own name.
-- **Messages.** `send_message` logs the message, delivers it on the recipient agent's next wake-up (an unread message is itself a wake rule) and mirrors it to the operator's trail with `POST /agent/say`. One per wake-up.
-- **Cheap waking.** Agents wake on a schedule, on a rule from `sense`, on a message, or on `POST /agents/<name>/wake`. `GET /agents` counts senses, wake-ups, wake-ups that led to a model call and idle wake-ups.
-- **Model use.** Claude chooses tools and writes the explanation. Thresholds, arithmetic and the Go/Caution/Stop decision are plain code; a tool refuses a status that disagrees with the rules. No key, no SDK, no network, a timeout (20 s), a refusal or an API error → the rule-only path takes the same actions. The demo never depends on the internet.
-- **Safety.** The live-runner client is an allowlist: `GET /state`, `GET /farm`, `POST /hold`, `DELETE /hold/<id>`, `POST /agent/say`, and `POST /event` with type `priority_change` only. Everything else (`/human/*/go`, `/cmd/*`, `/start`, `/draft`, breakdown/repair events, …) is refused before any network traffic. Only local runner addresses are accepted.
+- **Durable log.** `agents/data/runtime.jsonl` is fsync'd before anything is acted on. It holds every wake-up, model call and result, tool call and result, message, memory write, side effect start/done/failure, and person action. On start the runtime replays it to rebuild its state.
+- **No repeated side effects.** Every call that changes something outside the runtime has a stable id and is committed together with the memory change that caused it.
+  - Done: never sent again.
+  - In flight at a crash: retried once on restart.
+  - Runner down or 404: kept and retried, in order per resource.
+- **Shared memory** is key-value with history. Every agent can read every key; an agent writes only `<its-folder>.*`.
+- **Messages** are delivered on the recipient's next wake-up and mirrored to `POST /agent/say` under the role's display name.
+- **Allowlist.** Only these calls can leave the process; everything else is refused before any network traffic.
 
-## API (port 5200, read-only except wake)
+  | Allowed | Notes |
+  |---|---|
+  | `GET /state`, `GET /farm` | |
+  | `POST /hold`, `DELETE /hold/<id>` | |
+  | `POST /recall`, `DELETE /recall/<id>` | |
+  | `POST /agent/say` | |
+  | `POST /event` | only `priority_change`, `cancel_job`, `block_route`, `unblock_route` |
+
+  Refused includes `/human/*/go`, `/cmd/*`, `/start`, `/draft`, and `breakdown`/`repair` events.
+- **People keep the final say.** `POST /people/depot/inspection_done {"id": "I3", "by": "Sam"}` is the only way an inspection is marked done. No agent tool can call it, the model is refused, and the action is logged with the person's name.
+
+## API (port 5200)
 
 | | |
 |---|---|
 | `GET /health` | runner reachability, plan clock, model on/off and why, log size |
-| `GET /agents` | each agent: status, last run, counts (`senses`, `wakes`, `wakesWithModelCall`, `idleWakes`, `modelCallRatio`, …), pending side effects |
-| `GET /agents/<name>` | the same plus its instructions and tool list |
-| `GET /agents/<name>/runs?limit=50` | wake-ups, newest first, each with its steps (model calls, tool calls and results) |
-| `GET /messages?since=<n>` | messages after number `n`; `next` is the number to pass next time |
+| `GET /agents` | each agent: display name, job, status, last run (with `fastMs`), counts (`senses`, `wakes`, `wakesWithModelCall`, `idleWakes`, `modelCallRatio`), pending side effects |
+| `GET /agents/<name>` | the same plus its instructions and tools |
+| `GET /agents/<name>/runs?limit=50` | wake-ups, newest first, with every step (model calls, tool calls, results) |
+| `GET /messages?since=<n>` | the roundtable after message `n` |
 | `GET /memory`, `GET /memory?key=<k>` | current values; one key with its history |
 | `GET /effects` | every side effect and its state |
 | `POST /agents/<name>/wake` | wake an agent on the next poll |
+| `POST /people/depot/inspection_done` | a person reports an inspection done: `{ "id" or "key", "by" }` |
 
-## The weather agent
+## The Weather Manager and its playbook
 
-One task: decide whether spraying may go ahead on this farm right now, say why, and tell the coordinator.
+The rules are data: `weather/playbook.json`. Each rule has the following fields:
+- `id`, `hazard` and `phase` (before / during / after)
+- `scale`: now, today, or days
+- `trigger`: a condition on readings, forecast, alerts or history
+- `actions`
+- `explain`: a sentence template
+- `source[]`: title, publisher, URL and date read
+- `verified`
 
-**Readings**, one per plan minute (minutes skipped by a fast clock are back-filled, up to 30): temperature and wind at 2 m (boom height) and 10 m.
+**A rule with no source, or `verified: false`, may only advise.** It can post a Caution. It cannot place a hold, recall the fleet, close a route or change the plan. Every action message ends with the rule ids and their publishers, so the operator can always ask "says who?".
 
-**Rules** (`weather/rules.js`):
+Actions the playbook can take:
 
-| Rule | Threshold | Result |
-|---|---|---|
-| Inversion | 10 m temperature higher than 2 m temperature | Stop |
-| Wind too low | 2 m wind below 3 mph | Stop |
-| Wind too high | 2 m wind above 10 mph | Stop |
-| Near the limit | 2 m wind above 8 mph | Caution |
-| Shear | \|10 m wind − 2 m wind\| above 5 mph | Caution |
-
-The worst result wins.
-
-**Actions**, only when the status changes:
-- Stop: `POST /hold` `{ id: "weather-agent-spray", jobTypes: ["spray"], fields: null, reason, by: "weather-agent" }`, plus one message to the coordinator.
-- Go or Caution after a Stop: `DELETE /hold/weather-agent-spray`. Caution means "no hold", so a Stop → Caution change lifts the hold too.
-- Caution: one message to the operator.
-- The first Go of the day is recorded but not announced.
-
-**Shared memory keys**
-
-| Key | Value |
+| Action | What it does |
 |---|---|
-| `weather.spray` | `{ status, reason, triggers[], reading, since, transition, previous }`: the current decision and why |
-| `weather.reading` | the latest reading `{ clock, minute, t2C, t10C, wind2Mph, wind10Mph, source, rules }` |
-| `weather.hold` | `{ id, active, since }` |
+| `hold_spray`, `hold_types`, `hold_all`, `hold_low_fields` | `POST /hold` with ids `wm-spray`, `wm-types`, `wm-all`, `wm-lowfields` |
+| `recall` | `POST /recall` with id `wm-recall` |
+| `block_bridges` | `block_route` events for North bridge `[15,4]` and South bridge `[15,15]` |
+| `reprioritise*` | a request to the Plan Manager, who decides |
+| `fuel_all` | a request to the Fleet Manager, who asks the Depot Manager |
+| `tell_depot`, `secure_depot`, `no_depot_tasks` | requests to the Depot Manager |
+| `inspections` | an inspection round for people |
 
-**Record.** `agents/data/weather.jsonl` has every reading (with the rule result) and every status change with its triggers, readings, text and whether the model or the rules wrote it.
+Two or more rules asking for different levels of action resolve to the most cautious, and the message names both rules. The Weather Manager lifts only holds and recalls it recorded placing itself. It never touches `safety-stop` or anything a person placed.
 
-**Two heights.** From 06:32 to 08:46 in the simulated day the 2 m reading alone looks fine (3–5 mph), but the 10 m air is warmer: an inversion, so spraying stays stopped and the message says so. Test 1 checks the same case.
+**After a flood or a storm nothing restarts by itself.** The "after" rule opens inspections through the Depot Manager: every machine, lane and bridge, and the low fields (flood) or every field (storm). While any machine, lane or bridge inspection is open, the recall and the bridge closures stay. Each field's hold is lifted when a person clears that field.
+
+### Playbook rules and their sources (read 2026-11-15)
+
+The sources were found through web search on 2026-11-15. Pesticide pages could not be opened by the page reader (it refused them), so those were checked through search excerpts. Every rule's `checked` field says how it was read.
+
+| Rule | Hazard | Can act? | Source |
+|---|---|---|---|
+| `drift-wind` | Spray drift: wind | **yes** | [Washington State University Tree Fruit (product label)](https://treefruit.wsu.edu/?p=10273), [University of Minnesota Extension](https://extension.umn.edu/agriculture/crop-production/weed-management/avoiding-herbicide-drift) |
+| `drift-inversion` | Spray drift: inversion | **yes** | [North Dakota State University Extension](https://www.ndsu.edu/agriculture/extension/publications/understanding-air-temperature-inversions-relating-pesticide-drift), [Virginia Cooperative Extension](https://www.pubs.ext.vt.edu/SPES/spes-827-understanding-temperature-inversions-protecting-against-pesticide-drift-during-aerial-drone-spray-applications.html) |
+| `drift-shear` | Wind shear between 2 m and 10 m | no (advice only) | none: 5 mph is a farm choice |
+| `drift-wind-near-limit` | Wind near the upper limit | no (advice only) | none: 8 mph is a farm choice |
+| `rain-after-spray` | Rain soon after spraying | no (advice only) | [University of Missouri IPM](https://ipm.missouri.edu/MEG/2018/3/rainfastness_pesticides/): the rain-free period must come from the product label |
+| `rain-before-dry-job` | Rain before a dry-ground job | no (advice only) | none found |
+| `wet-soil` | Wet or saturated soil | no (advice only) | none: the machinery limit is farm- and soil-specific |
+| `freeze-warning` | Frost or freeze | **yes** | [National Weather Service](https://www.weather.gov/abr/FallFrostFreezeDSSPage) |
+| `extreme-heat` | Heat for people at the depot | no (advice only) | [OSHA, archived page](https://webarchive.library.unt.edu/web/20121016220915/http://www.osha.gov/SLTC/heatillness/heat_index/index.html): current page not confirmed |
+| `dust-storm` | Dust storm | **yes** | [NWS definitions](https://www.weather.gov/otx/Watch_Warning_Advisory_Definitions), [NWS SCN 18-90](https://weather.gov/media/notification/pdfs/scn18-90swq_dsw_oper_aaa.pdf) |
+| `lightning` | Thunderstorm and lightning | **yes** | [NWS lightning safety](https://www.weather.gov/media/owlie/LightningSafety-OnePager-11-29-18.pdf), [NOAA JetStream](https://noaa.gov/jetstream/lightning/lightning-safety) |
+| `high-wind` | High wind | **yes** | [National Weather Service](https://www.weather.gov/dtx/noPrecip_defs) |
+| `wind-advisory` | Strong wind below warning level | **yes** | [National Weather Service](https://www.weather.gov/dtx/noPrecip_defs) |
+| `flood-watch` | Flood watch | **yes** | [National Weather Service](https://www.weather.gov/safety/flood-watch-warning) |
+| `flood-warning` | Flood warning | **yes** | [NWS](https://www.weather.gov/safety/flood-watch-warning), [NWS glossary](https://forecast.weather.gov/glossary.php?word=Flash+Flood) |
+| `creek-gauge` | Creek gauge over the farm's limit | no (advice only) | none: 1.5 m is a placeholder; the official warning triggers the closures |
+| `after-flood` | After a flood | **yes** | [FDA flood-affected food crops guidance](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/guidance-industry-evaluating-safety-flood-affected-food-crops-human-consumption) |
+| `tropical-watch` | Hurricane / tropical storm watch | **yes** | [NOAA National Hurricane Center](https://www.nhc.noaa.gov/watchwarn_changes.shtml) |
+| `tropical-warning` | Hurricane / tropical storm warning | **yes** | [NOAA National Hurricane Center](https://www.nhc.noaa.gov/watchwarn_changes.shtml) |
+| `storm-conditions` | During the storm | **yes** | [NOAA National Hurricane Center](https://www.nhc.noaa.gov/watchwarn_changes.shtml) |
+| `after-storm` | After the storm | **yes** | [NOAA](https://noaa.gov/node/11994), [CDC](https://www.cdc.gov/hurricanes/safety/how-to-safely-stay-safe-after-a-hurricane-or-other-tropical-storm.html) |
+| `wildfire-evacuation` | Evacuation order | **yes** | [Ready.gov (FEMA)](https://www.ready.gov/wildfires) |
+| `smoke-aqi` | Heavy smoke | no (advice only) | [Cal/OSHA](https://dir.ca.gov/dosh/wildfire/worker-protection-from-wildfire-smoke.html): California rule, not Arizona |
+| `unknown-signal` | Missing or impossible reading | **yes** | the farm's own policy (see below) |
+
+Where sources gave a range, the more cautious value is used and the rule's `note` says so. For example, labels allow 3–10 mph and only ask for an inversion check below 3 mph; this farm stops below 3 mph outright.
+
+<a id="unknown-signals"></a>**Unknown signals.** A missing or impossible reading holds all work and asks a person to check the station. This rule's authority is the farm's own operating policy (ground rule 7 of the team brief), not an outside body, and the rule says so.
+
+**Farm facts** in `weather/farm-risk.json` are this farm's own judgement and should be confirmed by a person:
+- Low fields: Creek Pasture, Bottomland and South Flats.
+- Bridges: North `[15,4]` and South `[15,15]`, from `scenario.json`.
+
+### Shared memory keys
+
+| Key | Owner | Value |
+|---|---|---|
+| `weather.status` | weather | `{ level: Go/Caution/Stop/Recall, fired: [ruleIds], since, summary }` |
+| `weather.reading` | weather | latest `{ clock, minute, reading, forecast, alerts }` |
+| `weather.actions` | weather | holds, recall and closures this agent placed (the only ones it may lift) |
+| `weather.episode` | weather | open after-flood / after-storm inspection round |
+| `depot.inspections` | depot | `[{ id, key, kind, what, where, status, by, doneAt }]` |
+| `depot.requests`, `depot.paused` | depot | requests from other agents; whether depot work is paused |
+| `fleet.tractors` | fleet | brief state of every tractor |
+| `fault.verdicts`, `fault.history` | fault | current verdict per tractor; all verdicts |
+| `plan.deferred`, `plan.atRisk` | plan | jobs deferred to tomorrow; jobs flagged at risk |
+| `route.jobs` | route | route facts per started job |
+| `safety.stop` | safety | its own stop, if in force |
+| `records.jobs`, `records.stops`, `records.summaryWritten` | records | append-only day record |
 
 ### What is simulated
 
-- The weather. The default feed is a scripted day on the live runner's plan clock: 06:00 calm with an inversion (Stop), 06:32 wind reaches 3 mph but the inversion holds (Stop), 08:46 the inversion breaks (Go), 13:06 wind passes 8 mph (Caution), 13:50 wind passes 10 mph (Stop).
-- With `WEATHER_SOURCE=nws`, the NWS hourly forecast for the depot in `GET /farm` gives the 2 m temperature and the 10 m wind. The 10 m temperature and the 2 m wind are **estimated** (log wind profile; an inversion is assumed on calm nights) and each reading lists them in `estimated`.
+- **The weather.** All three scripted days are simulated, and every weather statement from them is labelled "(simulated weather)".
+- **NWS mode.** `WEATHER_SOURCE=nws` uses real NWS forecasts and alerts. NWS gives one height only, so the 10 m temperature and 2 m wind are estimated, and each reading lists them under `estimated`.
+- **Route figures.** Coverage and lane lengths come from `agopen/coverage.js` and `agopen/lanes.js`, imported read-only, when the checkout has them; otherwise the tools say "not available".
 
-## Integration contract with the live runner (port 5190)
+## Contract with the live runner (port 5190), as found
 
-Polled, never pushed. Read: `GET /state` (`clock`, `secPerMin`, optional `mode` and `holds`, `tractors[]`, `jobs[]`, `trail[]`) and `GET /farm` (`home`, `fields[]`). Write: `POST /hold`, `DELETE /hold/<id>`, `POST /agent/say` and, sparingly, `POST /event` with `priority_change`. Until the write endpoints exist, a 404 is logged once and the call is kept and retried.
-
-Checked against `agopen/live.js` in this checkout:
-- `/hold`, `DELETE /hold/<id>` and `/agent/say` are not there yet.
-- `GET /state` has no `mode` and no `holds`.
-
-The runtime works without all of these (tests 8b and 8).
+Checked against `agopen/live.js` on `agopen-bridge` at `22b4768`:
+- **Present:** `/hold`, `/recall` and `/agent/say`, plus `holds`, `recalls`, `tasks` and `mode` in `/state`.
+- **Different from the contract:**
+  - `DELETE /hold/<id>` lifts **any** hold, whoever placed it. Our agents enforce "only lift your own"; the runner does not.
+  - The runner keeps 400 characters of each spoken line. The runtime trims the words, never the rule tag.
+- **Not yet on `main`:** that commit isn't merged, so this PR (based on `main`) cannot import `coverage.js` or `lanes.js`. The Route Manager says "not available" there.

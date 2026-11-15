@@ -8,7 +8,7 @@
 //   AGENTS=weather              comma list; default is every folder with AGENT.md + tools.js
 //   POLL_MS=1000                how often to poll GET /state (real milliseconds)
 //   AGENT_MODEL=claude-haiku-5-5  or "off" for rule-only; needs ANTHROPIC_API_KEY
-//   WEATHER_SOURCE=sim|nws      WEATHER_SCRIPT=path/to/readings.json (see agents/weather/feed.js)
+//   WEATHER_DAY=calm|monsoon|hurricane   WEATHER_SOURCE=sim|nws   WEATHER_SCRIPT=path/to/readings.json (see agents/weather/feed.js)
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Runtime, discoverAgents } from './runtime/runtime.js';
@@ -28,7 +28,7 @@ const rt = new Runtime({
   agents,
   runnerUrl: env.RUNNER_URL || 'http://127.0.0.1:5190',
   pollMs: Number(env.POLL_MS || 1000),
-  config: { weatherSource: env.WEATHER_SOURCE || 'sim', weatherScript: env.WEATHER_SCRIPT || null },
+  config: { weatherSource: env.WEATHER_SOURCE || 'sim', weatherScript: env.WEATHER_SCRIPT || null, weatherDay: env.WEATHER_DAY || 'calm' },
 });
 const server = await startApi(rt, { port });
 const addr = server.address();

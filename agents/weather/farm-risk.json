@@ -1,0 +1,10 @@
+{
+  "about": "Farm facts the playbook needs. Low fields and bridges are read from scenario.json (Mill Creek runs down column x=15; the bridges are the only crossings). Which fields count as low is this farm's own judgement from the field names and their position by the creek: a person should confirm it.",
+  "lowFields": ["Creek Pasture", "Bottomland", "South Flats"],
+  "bridges": [
+    { "name": "North bridge", "cells": [[15, 4]] },
+    { "name": "South bridge", "cells": [[15, 15]] }
+  ],
+  "lanes": ["Farm lanes"],
+  "fields": ["North Field", "Creek Pasture", "Home Quarter", "Orchard Strip", "Ridge 80", "East Meadow", "Long Acre", "South Flats", "Bottomland"]
+}

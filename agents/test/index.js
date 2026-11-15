@@ -2,3 +2,5 @@
 // argument to its index.js instead of scanning it. `node --test "agents/test/*.test.js"` also works.
 await import('./weather.test.js');
 await import('./crash.test.js');
+await import('./team.test.js');
+await import('./agents.test.js');
