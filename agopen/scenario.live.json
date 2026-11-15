@@ -344,14 +344,6 @@
    "fieldId": "F3",
    "priority": "medium",
    "deadline": 510
-  },
-  {
-   "id": "J12",
-   "type": "seed",
-   "fieldId": "F7",
-   "acres": 16,
-   "priority": "low",
-   "deadline": 690
   }
  ],
  "events": [],

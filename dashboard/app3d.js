@@ -27,11 +27,12 @@ async function liveSync() {
   let r;
   try { r = await (await fetch('/replay', { cache: 'no-store' })).json(); } catch { return; }
   let stepped = false;
-  const stepTo = (t) => { while (sim.time < t && !sim.finished) { sim.step(); stepped = true; } };
+  const stepTo = (t) => { while (sim.time < t) { sim.finished = false; sim.step(); stepped = true; } };
   for (; liveApplied < r.entries.length; liveApplied++) {
     const en = r.entries[liveApplied];
     stepTo(en.t);
-    if (en.kind === 'event') { injected.push(en.event); sim.inject(structuredClone(en.event)); }
+    if (en.kind === 'event') { injected.push(en.event); sim.finished = false; sim.inject(structuredClone(en.event)); }
+    else if (en.kind === 'progress') { const j = sim.jobs.get(en.job); if (j && j.status !== 'done') j.remaining = en.remaining; }
     else { const a = sim.tractor(en.tractor)?.action; if (a && (a.kind === 'refuel' || a.kind === 'swap')) a.left = en.kind === 'hold' ? en.left : 1; }
     stepped = true;
   }
