@@ -339,6 +339,7 @@ The coordinator serves everything on port 5190. There is no authentication, and 
 | GET | `/dashboard/...`, `/src/...` | Static files from the repo for the original dashboard. |
 | POST | `/draft` | Add jobs to the list. Body: `{"fields": ["Ridge 80"], "steps": ["till", "seed"], "priority": "high", "deadline": "17:00"}`. Steps are `till`, `seed`, `spray` or `mow`. Returns `{"added": [ids]}`, or 409 with the reason in plain text. |
 | POST | `/jobs` | The same for one step. Body: `{"fields": [...], "type": "spray", "priority": "medium", "deadline": "17:00"}`. |
+| GET | `/why/<job id>` | Why this job is with this tractor: the planner's own reasons, with the alternatives it rejected. The **Why?** button on each job row shows it. |
 | DELETE | `/draft/<job id>` | Remove a job that has not been sent to the planner, and any job that waits for it. |
 | POST | `/drone/scan` | Send the drone to map fields. Body: `{"fields": ["Ridge 80"]}`. 409 with a reason if no field is given. |
 | POST | `/start` | Start the day. 409 if it is already running or the list is empty. |
@@ -469,7 +470,6 @@ The same file lists ten injected-fault cases, all passing in the copy generated 
 | A hand-over restarts the interrupted pass | A job's route is kept when another tractor takes over, but the new tractor drives the interrupted pass again from its start. The code comment says nothing is repeated. By my reading of `live.js`, one pass can be driven twice. I did not watch it. |
 | Fault detection has blind spots | `GO_NOT_MOVING` is only checked when the tractor is told to go and is not opening a field. Within 5 m of its target a tractor counts as arrived, so one that stalls there is not caught until its next leg. |
 | Lanes do not react to `block_route` | The lane network is built once. A `block_route` event changes the planner's travel times but not where the tractors drive. I did not test this. |
-| The status page shows only the re-plan headline | The line for each moved job and its reason is printed in the coordinator's Terminal window, not on the status page. |
 | Weather and drone are simulated | The weather feed is a scripted day and the drone's readings are generated from the field's name. Neither reads a real sensor. |
 | Give-way is simple | It stops one tractor when two moving tractors come within 9 m. It does not plan around a tractor that is standing still in the lane. |
 | No persistence | The job list, the trail and the roundtable lines live in memory. Start over, or a restart, loses them. `out/trail.jsonl` is emptied at each start. |
