@@ -3,158 +3,374 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fleet live status</title>
+<title>Fleet coordinator</title>
 <style>
-  :root { --bg:#f3f1ea; --card:#fff; --ink:#1f2a24; --muted:#6b756e; --line:#dcd8cd; --ok:#2f855a; --warn:#b7791f; --bad:#c0392b; --info:#1c7ed6; }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
-  header { display:flex; align-items:baseline; gap:16px; padding:10px 16px; background:#1f2a24; color:#fff; flex-wrap:wrap; }
-  header h1 { margin:0; font-size:17px; }
-  header #clock { font:600 22px ui-monospace,Menlo,monospace; margin-left:auto; }
-  header small { opacity:.75; }
-  main { padding:12px; display:grid; gap:12px; }
-  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px; min-width:0; }
-  .card h2 { margin:0 0 6px; font-size:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; color:#fff; background:var(--muted); letter-spacing:.02em; }
-  .WORKING { background:var(--ok); } .DRIVING { background:var(--info); } .SWAP,.REFUEL { background:var(--warn); }
-  .STANDBY { background:var(--muted); } .HOLD { background:#b7791f; } .NO_RESPONSE,.GO_NOT_MOVING,.DOWN { background:var(--bad); }
-  .fault { border-color:var(--bad); background:#fdf1ef; }
-  dl { display:grid; grid-template-columns:auto 1fr; gap:2px 10px; margin:0; font-size:13px; }
-  dt { color:var(--muted); } dd { margin:0; font-variant-numeric:tabular-nums; }
-  iframe { width:100%; height:300px; border:1px solid var(--line); border-radius:6px; margin-top:8px; background:#ddd; }
-  .btns { display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
-  button { font:inherit; font-size:12px; border:1px solid var(--line); border-radius:6px; padding:3px 9px; background:#fff; cursor:pointer; }
-  button.bad { color:var(--bad); border-color:#e3b1ab; }
-  table { width:100%; border-collapse:collapse; font-size:12.5px; }
-  th { text-align:left; color:var(--muted); font-size:11px; border-bottom:1px solid var(--line); padding:3px 4px; }
-  td { padding:3px 4px; border-bottom:1px solid #efece4; }
-  .trail { max-height:300px; overflow:auto; font-size:12.5px; }
-  .trail div { padding:3px 0; border-bottom:1px solid #f1eee6; }
-  .trail time { font-family:ui-monospace,Menlo,monospace; color:var(--muted); margin-right:6px; }
-  .trail .who { color:var(--info); font-weight:600; margin-right:6px; }
-  .trail .fault .who, .trail .fault { color:var(--bad); font-weight:600; }
+  :root {
+    --bg:#f4f1ea; --panel:#fcfbf8; --ink:#161c18; --ink2:#3a443e; --muted:#69716b; --line:#d6d1c4; --line2:#e9e5da;
+    --accent:#1e5a3d;
+    --working:#2f8552; --driving:#c47f0c; --person:#1f6fb5; --fault:#bf3a2b; --hold:#8a6b1a; --idle:#7b837d;
+    /* kept for the inline styles in the render code */
+    --ok:#2f8552; --warn:#c47f0c; --bad:#bf3a2b; --info:#1f6fb5;
+  }
+  * { box-sizing:border-box; }
+  html { scroll-padding-top:70px; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif; -webkit-text-size-adjust:100%; }
+  a { color:var(--accent); }
+  b { font-weight:650; }
   .muted { color:var(--muted); }
-  .scroll { overflow-x:auto; }
-  .wx { font-size:13px; display:grid; gap:6px; }
-  .wxpill { display:inline-block; font-weight:800; font-size:18px; padding:4px 16px; border-radius:16px; color:#fff; }
-  .wxpill.GO { background:var(--ok); } .wxpill.CAUTION { background:var(--warn); } .wxpill.STOP { background:var(--bad); }
-  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:2px 14px; font-variant-numeric:tabular-nums; }
-  .wxlog { font-size:12px; color:var(--muted); max-height:86px; overflow:auto; }
-  .dronebox { display:block; font-size:13px; }
-  #dronecam { display:block; width:100%; aspect-ratio:16/9; height:auto; margin:0 0 6px; background:#cfe6f5; border-radius:6px; border:0; }
-  button.small { font-size:12px; padding:2px 8px; float:right; }
-  #map .drone { fill:#111; stroke:#fff; stroke-width:1; }
-  #map .dronepath { stroke:#111; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
-  .roundtable { max-height:300px; overflow:auto; display:grid; gap:6px; }
-  .rt-topic { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin-top:6px; border-top:1px solid var(--line); padding-top:6px; }
-  .rt-line { display:grid; grid-template-columns:132px 1fr; gap:8px; align-items:start; font-size:13px; }
-  .rt-who { font-weight:700; font-size:12px; padding:2px 8px; border-radius:10px; color:#fff; background:#6b756e; text-align:center; }
-  .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
-  .rt-line.tool .rt-text::before { content:"Tool: "; color:var(--info); }
-  .rt-meta { color:var(--muted); font-size:11px; margin-left:6px; white-space:nowrap; }
-  #peoplecard { border-color:var(--warn); background:#fff8e8; }
-  .task { display:flex; align-items:center; gap:10px; padding:6px 0; border-top:1px solid #f0e2bf; flex-wrap:wrap; }
-  .task b { min-width:220px; }
-  button.go { background:var(--ok); color:#fff; border-color:var(--ok); font-weight:700; font-size:13px; padding:5px 14px; }
-  button.go:disabled { background:#c9d2cc; border-color:#c9d2cc; cursor:default; }
-  header a { color:#bfe3cf; font-size:13px; }
-  #startover { font-size:12px; padding:3px 10px; border-radius:6px; border:1px solid #6b756e; background:#2c3a33; color:#fff; cursor:pointer; }
-  #startovermsg { opacity:.8; }
-  .farm { display:grid; grid-template-columns:minmax(0,1fr) 280px; gap:12px; align-items:start; }
-  #map { width:100%; height:auto; max-height:460px; background:#e9e3d2; border-radius:6px; }
-  #map .field { fill:#cfe3b4; stroke:#5f7a45; stroke-width:1.2; cursor:pointer; }
-  #map .field.open { fill:#f6e3a1; } #map .field.active { fill:#9fd3a8; } #map .field.done { fill:#c9d2cc; }
-  #map .field.sel { stroke:#1c7ed6; stroke-width:3.5; }
-  #map .lane { stroke:#b79c6b; stroke-width:3.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
-  #map .gate { fill:#7a5f33; }
-  #map .line { stroke:#8e24aa; stroke-width:1; stroke-dasharray:5 4; fill:none; pointer-events:none; }
-  #map text { font:600 8px sans-serif; fill:#1f2a24; pointer-events:none; text-anchor:middle; }
-  #map text.sub { font:400 6px sans-serif; fill:#4a554e; }
-  #map .tr { stroke:#fff; stroke-width:1.2; }
-  #builder { display:grid; gap:10px; font-size:13px; }
-  #builder label { display:grid; gap:2px; color:var(--muted); font-size:12px; }
-  #builder select, #builder input { font:inherit; padding:3px 6px; border:1px solid var(--line); border-radius:6px; }
-  #builder .banner { background:#e7f1fb; border:1px solid #b9d6f2; border-radius:6px; padding:6px 8px; font-size:12.5px; }
-  #builder .step { font-weight:700; font-size:12px; margin-bottom:3px; }
-  #chips { display:flex; gap:6px; flex-wrap:wrap; }
-  #chips button { padding:4px 10px; font-size:13px; border-radius:14px; }
-  #chips button.on { background:var(--info); border-color:var(--info); color:#fff; font-weight:700; }
-  #builder button.add { background:#fff; border-color:var(--info); color:var(--info); font-weight:700; font-size:13px; padding:5px 12px; }
-  #builder button.add:disabled { color:var(--muted); border-color:var(--line); cursor:default; }
-  #draftlist .fgroup { border-top:1px solid var(--line); padding:5px 0; }
-  #draftlist .fname { font-weight:700; }
-  #draftlist .jb { display:flex; align-items:baseline; gap:6px; padding:2px 0; font-size:12.5px; }
+  .num, dd, td, time, #clock, .stat .v, .pct { font-variant-numeric:tabular-nums; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+
+  /* ---- Top bar ---- */
+  .top { position:sticky; top:0; z-index:20; display:flex; align-items:stretch; background:var(--panel); border-bottom:1px solid var(--ink); padding:0 16px; min-height:56px; }
+  .brand { display:flex; flex-direction:column; justify-content:center; min-width:0; flex:1 1 150px; padding:6px 16px 6px 0; }
+  .brand h1 { margin:0; font-size:15px; font-weight:700; white-space:nowrap; }
+  #scn { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stats { display:flex; }
+  .stat { display:flex; flex-direction:column; justify-content:center; gap:1px; padding:6px 14px; border-left:1px solid var(--line); text-decoration:none; color:inherit; white-space:nowrap; }
+  .k, .stat .k, #daystate { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .stat .v { font-size:15px; font-weight:600; }
+  .stat .v .of, .stat .v .u { font-weight:400; color:var(--muted); }
+  .stat .v .sep { color:var(--line); margin:0 5px; }
+  .stat.alert { background:var(--person); border-left-color:var(--person); }
+  .stat.alert .k, .stat.alert .v { color:#fff; }
+  .c-GO { color:var(--working); } .c-CAUTION { color:var(--driving); } .c-STOP, .c-fault { color:var(--fault); } .c-hold { color:var(--hold); }
+  .clockbox { display:flex; flex-direction:column; justify-content:center; align-items:flex-end; gap:2px; padding:6px 14px; border-left:1px solid var(--line); white-space:nowrap; }
+  #clock { font-size:26px; font-weight:650; line-height:1; letter-spacing:-.01em; }
+  .toplink { align-self:center; margin-left:2px; font-size:13px; white-space:nowrap; padding:6px 10px; border:1px solid var(--line); border-radius:3px; text-decoration:none; color:var(--ink); background:#fff; }
+  .toplink:hover { border-color:var(--ink2); }
+
+  /* ---- Grid ---- */
+  main { display:grid; grid-template-columns:320px minmax(0,1fr) 372px; gap:12px; padding:12px 16px 28px; align-items:start; }
+  .col { display:grid; gap:12px; min-width:0; align-content:start; }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:3px; min-width:0; }
+  .phead { display:flex; align-items:baseline; gap:10px; padding:8px 12px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .phead h2 { margin:0; font-size:11px; font-weight:700; letter-spacing:.09em; text-transform:uppercase; color:var(--ink); white-space:nowrap; }
+  .phead small { font-size:12px; color:var(--muted); min-width:0; }
+  .phead button { margin-left:auto; }
+  .pbody { padding:10px 12px; }
+  .note { font-size:11.5px; color:var(--muted); }
+
+  /* ---- Buttons ---- */
+  button { font:inherit; font-size:13px; line-height:1.2; padding:6px 10px; border:1px solid #c4beb0; border-radius:3px; background:#fff; color:var(--ink); cursor:pointer; }
+  button:hover:not(:disabled) { border-color:var(--ink2); }
+  button:disabled { cursor:default; color:#9aa19b; background:#efece4; border-color:#e3dfd3; }
+  button.small { font-size:12px; padding:3px 8px; }
+  button.go, button.add { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:650; font-size:14px; padding:9px 14px; }
+  button.go:hover:not(:disabled), button.add:hover:not(:disabled) { background:#17472f; border-color:#17472f; }
+  button.go:disabled, button.add:disabled { background:#e6e3d9; border-color:#e6e3d9; color:#979d98; }
+  button.bad, #startover { color:var(--fault); border-color:#dbb4ad; background:transparent; }
+  button.bad:hover:not(:disabled), #startover:hover:not(:disabled) { border-color:var(--fault); background:#fbf0ed; }
+
+  /* ---- Add jobs ---- */
+  #builder { display:grid; gap:14px; padding:12px; font-size:13px; }
+  #builder .banner { border-left:3px solid var(--accent); background:#edf2ea; padding:7px 10px; font-size:13px; }
+  .step { display:flex; align-items:center; gap:8px; font-weight:650; font-size:13px; margin-bottom:7px; }
+  .step .n { display:inline-grid; place-items:center; width:18px; height:18px; border:1px solid var(--ink); border-radius:50%; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; flex:none; }
+  #chips, #fieldchips { display:flex; gap:5px; flex-wrap:wrap; }
+  #chips button, #fieldchips button { padding:6px 9px; font-size:13px; }
+  #chips button { flex:1 1 0; min-width:60px; }
+  #chips button.on, #fieldchips button.on { background:var(--ink); border-color:var(--ink); color:#fff; font-weight:600; }
+  #picked, #stepsum { margin-top:6px; font-size:12.5px; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
+  #builder label { display:grid; gap:3px; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  #builder select, #builder input { font:inherit; font-size:13px; letter-spacing:0; text-transform:none; color:var(--ink); padding:5px 6px; border:1px solid #c4beb0; border-radius:3px; background:#fff; width:100%; min-width:0; height:31px; }
+  #jadd, #startbtn { width:100%; }
+  #jmsg:empty, #startmsg:empty, #startovermsg:empty { display:none; }
+  #jmsg, #startmsg { margin-top:6px; font-size:12.5px; }
+  .listhead { display:flex; align-items:baseline; justify-content:space-between; border-top:1px solid var(--line); padding-top:12px; margin-bottom:4px; }
+  #draftlist.muted { font-size:12.5px; }
+  #draftlist .fgroup { padding:6px 0; border-bottom:1px solid var(--line2); }
+  #draftlist .fname { font-weight:650; }
+  #draftlist .jb { display:flex; align-items:baseline; gap:6px; padding:3px 0; }
+  #draftlist .jb > span:first-child { color:var(--muted); font-variant-numeric:tabular-nums; }
   #draftlist .jb .lbl { flex:1; min-width:0; }
   #draftlist .jb small { display:block; color:var(--muted); font-size:11.5px; }
-  #draftlist .jb button { padding:1px 7px; }
-  #startbtn { width:100%; }
-  @media (max-width: 760px) { .farm { grid-template-columns:1fr; } }
+  #draftlist .jb button { padding:2px 7px; font-size:12px; }
+  .resetrow { display:flex; align-items:center; gap:8px; border-top:1px solid var(--line); padding-top:10px; flex-wrap:wrap; }
+  .resetrow .note { flex:1; min-width:120px; }
+
+  /* ---- Needs a person ---- */
+  #peoplecard { border-color:var(--person); border-left-width:4px; background:#eef4fa; }
+  #peoplecard .phead { border-bottom-color:#c5d8ea; }
+  #peoplecard .phead h2 { color:var(--person); }
+  #people { padding:0 12px; }
+  .task { display:grid; gap:6px; padding:10px 0; border-top:1px solid #c5d8ea; font-size:13px; }
+  .task:first-child { border-top:0; }
+  .task b { font-size:15px; line-height:1.3; }
+  .task button.go { width:100%; font-size:16px; padding:12px 14px; background:var(--person); border-color:var(--person); }
+  .task button.go:hover:not(:disabled) { background:#185a94; border-color:#185a94; }
+  .task button.go:disabled { background:#d5dde4; border-color:#d5dde4; color:#7f8a93; }
+
+  /* ---- Map ---- */
+  #map { display:block; width:100%; height:auto; max-height:min(60vh,680px); background:#e9e4d4; }
+  #map .field { fill:#dde5cb; stroke:#6c8554; stroke-width:1.2; cursor:pointer; }
+  #map .field:hover { stroke:var(--ink); }
+  #map .field.open { fill:#f0e2a6; } #map .field.active { fill:#a5cf9f; } #map .field.done { fill:#cdd1ca; }
+  #map .field.sel { stroke:#161c18; stroke-width:3.5; }
+  #map .lane { stroke:#b9a273; stroke-width:3.2; fill:none; stroke-linecap:round; stroke-linejoin:round; }
+  #map .gate { fill:#7a5f33; }
+  #map .line { stroke:#4a554e; stroke-width:.8; stroke-dasharray:5 4; fill:none; pointer-events:none; opacity:.7; }
+  #map text { font:600 8.5px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; fill:#161c18; pointer-events:none; text-anchor:middle; }
+  #map text.sub { font-weight:400; font-size:6.5px; fill:#3a443e; }
+  #map .tr { stroke:#fff; stroke-width:1.2; }
+  #map .drone { fill:#161c18; stroke:#fff; stroke-width:1; }
+  #map .dronepath { stroke:#161c18; stroke-width:.8; stroke-dasharray:3 3; fill:none; opacity:.6; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 14px; padding:7px 12px; border-top:1px solid var(--line); font-size:11.5px; color:var(--ink2); }
+  .legend span { display:inline-flex; align-items:center; gap:5px; white-space:nowrap; }
+  .legend .grp { color:var(--muted); font-weight:600; letter-spacing:.08em; text-transform:uppercase; font-size:10.5px; }
+  .sw { display:inline-block; width:12px; height:10px; border:1px solid #6c8554; }
+  .sw.strip { border:0; height:5px; opacity:.6; }
+  .sw.dash { border:0; height:0; border-top:1px dashed #4a554e; width:16px; }
+
+  /* ---- Fleet ---- */
+  .veh { padding:10px 12px 8px 9px; border-top:1px solid var(--line); border-left:3px solid transparent; }
+  .veh:first-child { border-top:0; }
+  .veh.fault { border-left-color:var(--fault); background:#fbf0ed; }
+  .veh-row { display:grid; grid-template-columns:168px minmax(0,1fr) 148px; gap:14px; align-items:start; }
+  .veh-name { font-size:15px; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .veh-name b { font-weight:700; }
+  .badge { display:inline-block; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:2px 6px; border-radius:2px; color:#fff; background:var(--idle); }
+  .badge:empty { display:none; }
+  .WORKING { background:var(--working); } .DRIVING { background:var(--driving); } .SWAP, .REFUEL { background:var(--person); }
+  .STANDBY { background:var(--idle); } .HOLD { background:var(--hold); } .NO_RESPONSE, .GO_NOT_MOVING, .DOWN { background:var(--fault); }
+  .veh-task { font-size:14px; font-weight:600; }
+  .veh-task::first-letter { text-transform:uppercase; }
+  .veh-line { font-size:12.5px; color:var(--ink2); margin-top:2px; }
+  .veh-line .gap { display:inline-block; width:14px; }
+  .veh-warn { font-size:12.5px; font-weight:650; color:var(--fault); margin-top:2px; }
+  .veh-lock { font-size:12.5px; font-weight:650; color:var(--person); margin-top:2px; }
+  .fuelhead { display:flex; justify-content:space-between; align-items:baseline; }
+  .fuelhead .pct { font-size:14px; font-weight:650; }
+  .meter { height:5px; background:#e1ddd0; margin:4px 0 5px; }
+  .meter i { display:block; height:100%; background:var(--ink2); }
+  .low .meter i { background:var(--fault); } .low .pct { color:var(--fault); }
+  .impl { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .veh-more { margin-top:6px; }
+  .veh-more summary { font-size:12px; color:var(--muted); cursor:pointer; width:max-content; max-width:100%; }
+  .veh-more summary:hover { color:var(--ink); }
+  .veh-detail { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:14px; padding:10px 0 6px; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:3px 10px; margin:0; font-size:12.5px; }
+  dt { color:var(--muted); white-space:nowrap; } dd { margin:0; min-width:0; overflow-wrap:anywhere; }
+  .btns { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .btns button { font-size:12px; padding:4px 8px; }
+  .faultlbl { margin-top:12px; padding-top:8px; border-top:1px solid var(--line2); }
+  #tractors iframe { display:block; width:100%; height:300px; border:1px solid var(--line); border-radius:3px; background:#dedad0; margin-bottom:4px; }
+
+  /* ---- Jobs ---- */
+  .scroll { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border-bottom:1px solid var(--line); padding:7px 10px; white-space:nowrap; }
+  th:first-child, td:first-child { padding-left:12px; }
+  td.cap { text-transform:capitalize; }
+  td { padding:7px 10px; border-bottom:1px solid var(--line2); vertical-align:middle; }
+  tr:last-child td { border-bottom:0; }
+  td.empty { color:var(--muted); }
+  .prog { display:flex; align-items:center; gap:8px; min-width:96px; }
+  .prog .meter { flex:1; margin:0; }
+  .prog .meter i { background:var(--working); }
+  .prog .pct { width:36px; text-align:right; }
+  .jst { white-space:nowrap; text-transform:capitalize; }
+  .jst::before { content:""; display:inline-block; width:8px; height:8px; margin-right:6px; background:transparent; border:1px solid var(--idle); }
+  .jst.active::before { background:var(--working); border-color:var(--working); }
+  .jst.done::before { background:var(--idle); }
+  .jst.held::before, .jst.hold::before { background:var(--hold); border-color:var(--hold); }
+  .jst.cancelled { color:var(--muted); text-decoration:line-through; }
+
+  /* ---- Spray conditions ---- */
+  .wx { font-size:13px; display:grid; gap:8px; padding:10px 12px; }
+  .wxpill { display:inline-block; font-weight:700; font-size:20px; line-height:1; padding:6px 12px; border-radius:3px; color:#fff; margin-right:6px; }
+  .wxpill.GO { background:var(--working); } .wxpill.CAUTION { background:var(--driving); } .wxpill.STOP { background:var(--fault); }
+  .wxgrid { display:grid; grid-template-columns:auto 1fr 1fr; gap:3px 14px; font-variant-numeric:tabular-nums; border-top:1px solid var(--line2); border-bottom:1px solid var(--line2); padding:6px 0; }
+  .wxgrid b { font-size:10.5px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .wxlog { font-size:12px; color:var(--muted); max-height:84px; overflow:auto; font-variant-numeric:tabular-nums; }
+
+  /* ---- Drone ---- */
+  .dronebox { display:block; font-size:13px; }
+  #dronecam { display:block; width:100%; aspect-ratio:16/9; height:auto; margin:0; background:#cfe0ea; border:0; border-bottom:1px solid var(--line); }
+  .dronebox .note { padding:5px 12px 0; }
+  #droneinfo { padding:6px 12px 10px; }
+
+  /* ---- Roundtable ---- */
+  .roundtable { max-height:320px; overflow:auto; padding:0 12px 10px; }
+  .roundtable > .muted { padding-top:10px; font-size:13px; }
+  .rt-topic { font-size:11.5px; font-weight:600; color:var(--ink2); margin-top:10px; border-top:1px solid var(--line); padding-top:8px; font-variant-numeric:tabular-nums; }
+  .rt-topic:first-child { border-top:0; margin-top:0; padding-top:10px; }
+  .rt-line { margin-top:7px; font-size:13px; padding-left:8px; border-left:2px solid var(--line2); }
+  .rt-line.decision { border-left-color:var(--accent); }
+  .rt-who { display:block; font-size:10.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+  .rt-line.tool .rt-text, .rt-line.decision .rt-text { font-weight:600; }
+  .rt-line.tool .rt-text::before { content:"Tool: "; color:var(--muted); }
+  .rt-meta { color:var(--muted); font-size:11px; font-weight:400; margin-left:6px; white-space:nowrap; }
+
+  /* ---- Message trail ---- */
+  .trail { max-height:340px; overflow:auto; font-size:12.5px; padding:2px 12px 8px; }
+  .trail > div { display:grid; grid-template-columns:40px minmax(0,1fr); gap:6px; padding:5px 0; border-bottom:1px solid var(--line2); }
+  .trail > div.muted { display:block; border-bottom:0; padding-top:8px; }
+  .trail time { color:var(--muted); }
+  .trail .who { display:block; font-size:10.5px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+  .trail .fault, .trail .fault .who { color:var(--fault); }
+  .trail .fault { font-weight:600; }
+
+  /* ---- Plan explanations ---- */
+  #planchange { padding:10px 12px; font-size:13px; }
+  .planhead { display:grid; grid-template-columns:40px minmax(0,1fr); gap:6px; }
+  .planhead time { color:var(--muted); }
+  .planlines { margin:6px 0 0; padding:0 0 0 16px; font-weight:400; }
+  .planlines li { margin:3px 0; }
+  #planchange .planlines, #planchange .planfoot { margin-left:46px; }
+  .planfoot { margin-top:6px; font-size:12.5px; color:var(--muted); font-weight:400; }
+  .planpanel { border-left:4px solid var(--accent); }
+  .trail > div.plan { border-left:2px solid var(--accent); padding-left:8px; margin-left:-10px; }
+  .trail .planlines { color:var(--ink2); }
+  .whycell { text-align:right; width:1%; white-space:nowrap; }
+  .whyrow td { background:#f3f0e7; border-left:3px solid var(--accent); padding:9px 12px 10px; }
+  .whyrow .planlines { margin-top:4px; }
+  .dronerep { margin-top:8px; padding-top:8px; border-top:1px solid var(--line2); }
+
+  @media (min-width:1700px) { main { grid-template-columns:340px minmax(0,1fr) 400px; } body { font-size:15px; } }
+  @media (max-width:1320px) {
+    .top { flex-wrap:wrap; }
+    .brand { order:1; } .clockbox { order:2; } .toplink { order:3; }
+    .stats { order:4; flex:1 0 100%; flex-wrap:wrap; border-top:1px solid var(--line); margin:0 -16px; padding:0 16px; }
+    .stat:first-child { border-left:0; padding-left:0; }
+    html { scroll-padding-top:110px; }
+  }
+  @media (max-width:1180px) {
+    main { grid-template-columns:300px minmax(0,1fr); }
+    .col.right { grid-column:1 / -1; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  }
+  @media (max-width:860px) {
+    .top { position:static; }
+    main { grid-template-columns:minmax(0,1fr); padding:10px; }
+    .col.right { grid-template-columns:minmax(0,1fr); }
+    .veh-row { grid-template-columns:minmax(0,1fr) 140px; }
+    .veh-now { grid-column:1 / -1; grid-row:2; }
+    .veh-detail { grid-template-columns:minmax(0,1fr); }
+    .stat { padding:6px 10px; }
+  }
 </style>
 </head>
 <body>
-<header>
-  <h1>Fleet live status</h1><small id="scn"></small> <a href="/3d" target="_blank">Open 3D view</a>
-  <button id="startover" type="button">Start over</button><small id="startovermsg"></small>
-  <span id="clock">--:--</span>
+<header class="top">
+  <div class="brand"><h1>Fleet coordinator</h1><span id="scn"></span></div>
+  <div class="stats">
+    <div class="stat"><span class="k">Jobs done</span><span class="v" id="st-jobs">–</span></div>
+    <div class="stat"><span class="k">Tractors</span><span class="v" id="st-tr">–</span></div>
+    <a class="stat" id="st-peoplebox" href="#peoplecard"><span class="k">Needs a person</span><span class="v" id="st-people">–</span></a>
+    <div class="stat"><span class="k">Spray</span><span class="v" id="st-spray">–</span></div>
+    <div class="stat"><span class="k">Fuel truck</span><span class="v" id="st-truck">–</span></div>
+    <div class="stat"><span class="k">Drone</span><span class="v" id="st-drone">–</span></div>
+  </div>
+  <div class="clockbox"><span id="clock">--:--</span><span id="daystate">Connecting</span></div>
+  <a class="toplink" href="/3d" target="_blank">Open 3D view</a>
 </header>
 <main>
-  <div class="card">
-    <h2>Farm <small class="muted" id="farmsrc"></small></h2>
-    <div class="farm">
-      <svg id="map" role="img" aria-label="Farm map"></svg>
+  <div class="col left">
+    <section class="panel" id="peoplecard" hidden>
+      <div class="phead"><h2>Needs a person at the depot</h2><small>A tractor being serviced is locked and cannot move until you press Good to go.</small></div>
+      <div id="people"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Add jobs</h2></div>
       <div id="builder">
         <div class="banner" id="bbanner" hidden>All tractors are at home. Build today's job list, then start the day.</div>
-        <div><div class="step">1. Pick fields</div><div id="picked" class="muted">Click fields on the map.</div></div>
-        <div><div class="step">2. Pick operations in order</div>
+        <div>
+          <div class="step"><span class="n">1</span>Pick fields</div>
+          <div id="fieldchips"></div>
+          <div id="picked" class="muted">Click fields on the map, or pick them here.</div>
+        </div>
+        <div>
+          <div class="step"><span class="n">2</span>Pick the work, in order</div>
           <div id="chips">
             <button type="button" data-type="till">Plow</button>
             <button type="button" data-type="seed">Sow</button>
             <button type="button" data-type="spray">Spray</button>
             <button type="button" data-type="mow">Mow</button>
           </div>
-          <div id="stepsum" class="muted" style="margin-top:4px">None chosen yet.</div>
+          <div id="stepsum" class="muted">None chosen yet.</div>
         </div>
-        <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
-        <label>Finish by <input id="jdl" type="time" value="17:00"></label>
-        <button type="button" class="add" id="jadd" disabled>Add to list</button>
-        <div id="jmsg" class="muted"></div>
-        <div><div class="step">Today's job list</div><div id="draftlist" class="muted">No jobs yet.</div></div>
+        <div>
+          <div class="step"><span class="n">3</span>Add to the list</div>
+          <div class="pair">
+            <label>Priority <select id="jpri"><option value="high">High</option><option value="medium" selected>Medium</option><option value="low">Low</option></select></label>
+            <label>Finish by <input id="jdl" type="time" value="17:00"></label>
+          </div>
+          <button type="button" class="add" id="jadd" disabled>Add to list</button>
+          <div id="jmsg" class="muted"></div>
+        </div>
+        <div>
+          <div class="listhead"><span class="k">Today's job list</span></div>
+          <div id="draftlist" class="muted">Pick fields, choose the work, then Add to list.</div>
+        </div>
         <div>
           <button type="button" class="go" id="startbtn" disabled>Start the day</button>
-          <div id="startmsg" class="muted" style="margin-top:4px"></div>
+          <div id="startmsg" class="muted"></div>
         </div>
-        <div class="muted" style="font-size:11px">Solid outline: field boundary. Dashed: its guidance line. Both are read from AgOpenWeb's field files.</div>
+        <div class="resetrow">
+          <button id="startover" type="button">Start over</button>
+          <span class="note">Sends every tractor home and clears the day.</span>
+          <small id="startovermsg" class="muted"></small>
+        </div>
       </div>
-    </div>
+    </section>
   </div>
-  <div class="card">
-    <h2>Roundtable <small class="muted" id="rtmeta">the managers discuss each event; the tractors have already acted</small></h2>
-    <div id="roundtable" class="roundtable"></div>
+
+  <div class="col centre">
+    <section class="panel">
+      <div class="phead"><h2>Farm</h2><small id="farmsrc"></small></div>
+      <svg id="map" role="img" aria-label="Farm map"></svg>
+      <div class="legend">
+        <span class="grp">Fields</span>
+        <span><i class="sw" style="background:#dde5cb"></i>No work</span>
+        <span><i class="sw" style="background:#f0e2a6"></i>Queued</span>
+        <span><i class="sw" style="background:#a5cf9f"></i>In work</span>
+        <span><i class="sw" style="background:#cdd1ca"></i>Done</span>
+        <span><i class="sw" style="border:2px solid #161c18"></i>Picked</span>
+        <span><i class="sw dash"></i>Guidance line</span>
+        <span class="grp">Worked</span>
+        <span><i class="sw strip" style="background:#6d4c41"></i>Plowed</span>
+        <span><i class="sw strip" style="background:#2e7d32"></i>Sown</span>
+        <span><i class="sw strip" style="background:#1f6f8b"></i>Sprayed</span>
+        <span><i class="sw strip" style="background:#c99700"></i>Mown</span>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Fleet</h2><small>Each vehicle is its own AgOpenWeb instance.</small><button type="button" class="small" id="vehtoggle">Show all detail</button></div>
+      <div id="tractors"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Jobs</h2></div>
+      <div class="scroll"><table id="jobs"></table></div>
+    </section>
   </div>
-  <div class="row">
-    <div class="card">
-      <h2>Spray conditions <small class="muted">weather at two heights, simulated feed</small></h2>
+
+  <div class="col right">
+    <section class="panel planpanel">
+      <div class="phead"><h2>Latest plan change</h2><small>What moved and why</small></div>
+      <div id="planchange"><div class="muted">No plan change yet. When the plan changes, what moved and why is listed here.</div></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Spray conditions</h2><small>Weather at two heights, simulated feed</small></div>
       <div id="wx" class="wx muted">Starts with the day.</div>
-    </div>
-    <div class="card">
-      <h2>Scout drone <small class="muted">fully simulated</small> <button id="dscan" type="button" class="small">Map the picked fields</button></h2>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Scout drone</h2><small>Fully simulated</small><button id="dscan" type="button" class="small">Map the picked fields</button></div>
       <div class="dronebox">
         <!-- Static element: created once, never re-rendered, so the 3D view is not reloaded on each refresh. -->
         <iframe id="dronecam" src="/3d?drone=1" title="Simulated drone camera" loading="lazy"></iframe>
-        <div class="muted" style="font-size:11px">Drone camera (simulated): the 3D farm seen from the drone</div>
+        <div class="note">Drone camera, rendered from the simulation, not a real camera.</div>
         <div id="droneinfo" class="muted">Docked.</div>
       </div>
-    </div>
-  </div>
-  <div class="card" id="peoplecard" hidden>
-    <h2>Needs a person at the depot <small class="muted">a tractor being serviced is locked and cannot move until you press Good to go</small></h2>
-    <div id="people"></div>
-  </div>
-  <div class="row" id="tractors"></div>
-  <div class="row">
-    <div class="card"><h2>Messages between agents <small class="muted">newest first</small></h2><div class="trail" id="trail"></div></div>
-    <div class="card"><h2>Jobs</h2><div class="scroll"><table id="jobs"></table></div></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Roundtable</h2><small id="rtmeta">The managers discuss each event; the tractors have already acted.</small></div>
+      <div id="roundtable" class="roundtable"></div>
+    </section>
+    <section class="panel">
+      <div class="phead"><h2>Messages between agents</h2><small>Newest first</small></div>
+      <div class="trail" id="trail"></div>
+    </section>
   </div>
 </main>
 <script>
@@ -163,7 +379,14 @@ const cmd = (c) => fetch('/cmd/' + encodeURIComponent(c), { method: 'POST' });
 let built = false;
 
 let farm = null, picked = new Set(), lastState = null;
-const TR_COLOR = ['#d9480f', '#1c7ed6', '#862e9c', '#0b7285'];
+const TR_INK = '#161c18';
+const FAULT_CODES = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'];
+// Replace an element's markup only when it changed, so a click is never lost to a re-render between mouse down and up.
+const htmlCache = new WeakMap();
+function setHTML(el, html) {
+  if (!el || htmlCache.get(el) === html) return;
+  el.innerHTML = html; htmlCache.set(el, html);
+}
 function proj(lat, lon) {
   const r = Math.PI / 180, h = farm.home;
   return [(lon - h.lon) * (111412.84 * Math.cos(lat * r) - 93.5 * Math.cos(3 * lat * r)), -(lat - h.lat) * (111132.92 - 559.82 * Math.cos(2 * h.lat * r))];
@@ -173,8 +396,19 @@ async function loadFarm() {
   document.getElementById('farmsrc').textContent = `${farm.fields.length} fields read from AgOpenWeb's field folder`;
   drawFarm();
 }
+let lastChipKey = null;
+function renderFieldChips() {
+  const el = document.getElementById('fieldchips');
+  if (!el || !farm || !Array.isArray(farm.fields)) return;
+  const key = farm.fields.map(f => f.name).join('|') + '#' + [...picked].join('|');
+  if (key === lastChipKey) return;
+  lastChipKey = key;
+  // Same class and data-name as the map polygons, so the existing click handler picks them.
+  el.innerHTML = farm.fields.map(f => `<button type="button" class="field${picked.has(f.name) ? ' on' : ''}" data-name="${esc(f.name)}">${esc(f.name)}</button>`).join('');
+}
 function drawFarm() {
   if (!farm || !farm.home) return;
+  try { renderFieldChips(); } catch {}
   const svg = document.getElementById('map');
   let x0 = -40, x1 = 40, y0 = -40, y1 = 40;
   const polys = farm.fields.map(f => ({ f, pts: f.boundary.map(([lon, lat]) => proj(lat, lon)) }));
@@ -199,23 +433,24 @@ function drawFarm() {
     h += `<text class="sub" x="${cx.toFixed(0)}" y="${(cy + 7).toFixed(0)}">${esc(open || (gnd ? gnd.now : ''))}</text>`;
   }
   // Ground already worked, as strips one implement-width wide.
-  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#7b1fa2', mow: '#c99700' };
+  const COVER = { till: '#6d4c41', seed: '#2e7d32', spray: '#1f6f8b', mow: '#c99700' };
   for (const c of (lastState && lastState.coverage) || []) for (const [e0, n0, e1, n1] of c.segs)
     h += `<line x1="${e0}" y1="${-n0}" x2="${e1}" y2="${-n1}" stroke="${COVER[c.type] || '#555'}" stroke-opacity="0.55" stroke-width="${c.widthM}" stroke-linecap="butt" pointer-events="none"></line>`;
-  h += `<rect x="-17" y="4" width="34" height="14" fill="#3d4a43"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
+  h += `<rect x="-17" y="4" width="34" height="14" fill="#3a443e"></rect><text x="0" y="27">${esc(farm.depot || 'Depot')}</text>`;
   if (lastState) lastState.tractors.forEach((t, i) => {
     if (!t.tel || t.tel.lat == null) return;
     const [x, y] = proj(t.tel.lat, t.tel.lon);
-    const bad = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
-    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#c0392b' : TR_COLOR[i % 4]}"></circle><text x="${x.toFixed(0)}" y="${(y + 2.8).toFixed(1)}" style="fill:#fff">${esc(t.id)}</text>`;
+    const bad = FAULT_CODES.includes(t.state.code);
+    const lbl = String(t.id ?? '');
+    h += `<circle class="tr" cx="${x.toFixed(0)}" cy="${y.toFixed(0)}" r="5.5" fill="${bad ? '#bf3a2b' : TR_INK}"></circle><text x="${x.toFixed(0)}" y="${(y + (lbl.length > 2 ? 1.8 : 2.8)).toFixed(1)}" style="fill:#fff${lbl.length > 2 ? ';font-size:4.6px' : ''}">${esc(lbl)}</text>`;
   });
   const dr = lastState && lastState.drone;
   if (dr) {
-    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#7b1fa2" fill-opacity="0.45" pointer-events="none"></circle>`;
+    for (const sp of dr.sprayed || []) h += `<circle cx="${sp.e.toFixed(0)}" cy="${(-sp.n).toFixed(0)}" r="${sp.radiusM}" fill="#1f6f8b" fill-opacity="0.45" pointer-events="none"></circle>`;
     if (dr.path && dr.path.length > 1) h += `<polyline class="dronepath" points="${[{ e: dr.e, n: dr.n }, ...dr.path].map(p => `${p.e.toFixed(0)},${(-p.n).toFixed(0)}`).join(' ')}"></polyline>`;
-    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#111" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#111" stroke-width="1.2"></line></g>`;
+    h += `<g transform="translate(${dr.e.toFixed(1)},${(-dr.n).toFixed(1)})"><circle class="drone" r="3.2"></circle><line x1="-5" y1="-5" x2="5" y2="5" stroke="#161c18" stroke-width="1.2"></line><line x1="-5" y1="5" x2="5" y2="-5" stroke="#161c18" stroke-width="1.2"></line></g>`;
   }
-  svg.innerHTML = h;
+  setHTML(svg, h);
 }
 // ---- Job list builder ----
 const OP_NAME = { till: 'Plow', seed: 'Sow', spray: 'Spray', mow: 'Mow' };
@@ -226,7 +461,7 @@ const modeOf = (s) => (s && s.mode === 'building' ? 'building' : 'running');
 const $ = (id) => document.getElementById(id);
 
 function renderPicked() {
-  $('picked').textContent = [...picked].join(', ') || 'Click fields on the map.';
+  $('picked').textContent = [...picked].join(', ') || 'Click fields on the map, or pick them here.';
   updateAdd();
 }
 function renderSteps() {
@@ -257,7 +492,7 @@ function renderBuilder(s) {
   const key = JSON.stringify([building, list]);
   if (key === lastListKey) return;
   lastListKey = key;
-  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'No jobs yet.'; return; }
+  if (!list.length) { $('draftlist').className = 'muted'; $('draftlist').textContent = 'Pick fields, choose the work, then Add to list.'; return; }
   const byField = new Map();
   for (const j of list) { if (!byField.has(j.field)) byField.set(j.field, []); byField.get(j.field).push(j); }
   const STATUS = { draft: 'Not started', waiting: 'Waiting', released: 'Sent to the planner' };
@@ -330,19 +565,127 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+// ---- "Why?" for a job: the planner's reasons, kept in a variable so they survive the one-second re-render ----
+let why = null; // { id, loading, lines, label, note }
+const NO_WHY = 'No explanation available yet.';
+document.addEventListener('click', async (e) => {
+  const b = e.target.closest && e.target.closest('button[data-why]');
+  if (!b) return;
+  const id = b.dataset.why;
+  if (why && why.id === id) { why = null; renderJobs(lastState); return; }
+  const mine = why = { id, loading: true, lines: [], label: '', note: '' };
+  renderJobs(lastState);
+  try {
+    const res = await fetch(`/why/${encodeURIComponent(id)}`, { cache: 'no-store' });
+    if (res.ok) {
+      const d = await res.json();
+      mine.lines = Array.isArray(d && d.lines) ? d.lines.map(String) : [];
+      mine.label = String((d && d.label) || '');
+      if (!mine.lines.length) mine.note = NO_WHY;
+    } else mine.note = NO_WHY;
+  } catch { mine.note = NO_WHY; }
+  mine.loading = false;
+  if (why === mine) renderJobs(lastState);
+});
+function whyRow(j) {
+  if (!why || why.id !== j.id) return '';
+  const body = why.loading ? '<span class="muted">Asking the planner.</span>'
+    : why.lines.length ? `<ul class="planlines">${why.lines.map(l => `<li>${esc(String(l).replace(/^\s*[•·]\s*/, ''))}</li>`).join('')}</ul>`
+    : `<span class="muted">${esc(why.note || NO_WHY)}</span>`;
+  return `<tr class="whyrow"><td colspan="7"><div class="k">Why this plan for ${esc(why.label || j.label || j.id)}</div>${body}</td></tr>`;
+}
+function renderJobs(s) {
+  const jobs = s && Array.isArray(s.jobs) ? s.jobs : [];
+  setHTML(document.getElementById('jobs'), '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th><th></th></tr>' +
+    (jobs.map(j => {
+      const p = Math.max(0, Math.min(100, Number(j.pct) || 0));
+      return `<tr><td><b>${esc(j.label)}</b></td><td class="cap">${esc(j.priority)}</td><td>${esc(j.deadline)}</td><td>${esc(j.tractor || '–')}</td><td><div class="prog"><div class="meter"><i style="width:${p}%"></i></div><span class="pct">${esc(j.pct)}%</span></div></td><td><span class="jst ${esc(j.status)}">${esc(j.status)}</span></td><td class="whycell"><button type="button" class="small" data-why="${esc(j.id)}" aria-expanded="${why && why.id === j.id ? 'true' : 'false'}">${why && why.id === j.id ? 'Hide' : 'Why?'}</button></td></tr>${whyRow(j)}`;
+    }).join('') || '<tr><td class="empty" colspan="7">No jobs with the planner yet. Add jobs on the left, then start the day.</td></tr>'));
+}
+// Plain-language reasons attached to a re-plan message (optional fields).
+function planLines(r) {
+  const lines = r && Array.isArray(r.lines) ? r.lines : [];
+  return (lines.length ? `<ul class="planlines">${lines.map(l => `<li>${esc(String(l).replace(/^\s*[•·]\s*/, ''))}</li>`).join('')}</ul>` : '') + (r && r.footer ? `<div class="planfoot">${esc(r.footer)}</div>` : '');
+}
+function renderPlanChange(s) {
+  const el = document.getElementById('planchange');
+  if (!el) return;
+  const r = (Array.isArray(s.trail) ? s.trail : []).find(x => x && x.type === 'plan');
+  setHTML(el, r ? `<div class="planhead"><time>${esc(r.clock)}</time><b>${esc(r.text)}</b></div>${planLines(r) || '<div class="muted planfoot">No job moved to another tractor or time.</div>'}`
+    : '<div class="muted">No plan change yet. When the plan changes, what moved and why is listed here.</div>');
+}
+
+// ---- At-a-glance counters in the top bar, all computed from the same state ----
+const DRONE_SHORT = { docked: 'Docked', flying: 'Flying', hovering: 'Circling', escorting: 'Wind watch', scanning: 'Mapping', spraying: 'Spraying', returning: 'Returning', charging: 'Charging' };
+function renderSummary(s) {
+  const jobs = Array.isArray(s.jobs) ? s.jobs : [];
+  const queued = backlogOf(s).filter(b => b && b.status !== 'released' && !jobs.some(j => j && j.id === b.id)).length;
+  setHTML($('st-jobs'), `${jobs.filter(j => j && j.status === 'done').length} <span class="of">of ${jobs.length + queued}</span>`);
+  const all = Array.isArray(s.tractors) ? s.tractors : [];
+  const trs = all.filter(t => t && t.kind !== 'fuel-truck');
+  const n = (codes) => trs.filter(t => codes.includes(t.state && t.state.code)).length;
+  const depot = n(['SWAP', 'REFUEL']), hold = n(['HOLD']), fault = n(FAULT_CODES);
+  const part = (v, w, c) => `<span class="${c || ''}">${v}</span> <span class="u">${w}</span>`;
+  setHTML($('st-tr'), [part(n(['WORKING', 'DRIVING']), 'working'), part(n(['STANDBY']), 'idle'), depot ? part(depot, 'at depot') : '', hold ? part(hold, 'on hold', 'c-hold') : '', part(fault, 'fault', fault ? 'c-fault' : '')].filter(Boolean).join('<span class="sep">|</span>'));
+  const people = Array.isArray(s.tasks) ? s.tasks.length : 0;
+  $('st-peoplebox').className = 'stat' + (people ? ' alert' : '');
+  setHTML($('st-people'), people ? `${people} waiting` : 'None');
+  const w = s.weather && s.weather.status;
+  setHTML($('st-spray'), w ? `<span class="c-${esc(w)}">${w === 'GO' ? 'Go' : w === 'STOP' ? 'Stop' : 'Caution'}</span>` : '<span class="u">Not started</span>');
+  const truck = all.find(t => t && t.kind === 'fuel-truck');
+  setHTML($('st-truck'), truck && truck.state ? `<span class="${FAULT_CODES.includes(truck.state.code) ? 'c-fault' : ''}">${esc(truck.state.text)}</span>` : '<span class="u">None</span>');
+  const d = s.drone;
+  setHTML($('st-drone'), d ? `${esc(DRONE_SHORT[d.status] || d.status)} <span class="u">${Math.round(Number(d.batteryPct) || 0)}%</span>` : '<span class="u">None</span>');
+  $('daystate').textContent = s.finished ? 'Day ended' : modeOf(s) === 'building' ? 'Building the job list' : 'Day running';
+}
+
+// ---- Fleet rows: the scannable part of each vehicle ----
+function vehNow(t) {
+  const e = t.eta || {}, fp = e.fuelPlan, m = t.tel || {};
+  let h = `<div class="veh-task">${esc(t.task || 'No task')}</div>`;
+  const bits = [];
+  if (e.jobDoneAt) bits.push(`Job finishes <b>${esc(e.jobDoneAt)}</b> <span class="muted">in ${esc(e.jobDoneInMin)} min</span>`);
+  if (e.jobDoneAt && e.fuelToReserveAt) bits.push(`Fuel to reserve <b>${esc(e.fuelToReserveAt)}</b> <span class="muted">in ${esc(e.fuelToReserveInMin)} min</span>`);
+  if (bits.length) h += `<div class="veh-line">${bits.join('<span class="gap"></span>')}</div>`;
+  if (e.runsShortBeforeJobEnds) h += '<div class="veh-warn">Fuel runs short before this job ends.</div>';
+  if (e.jobDoneAt && fp) h += `<div class="veh-line">Next refuel: ${fp.needsFuelFirst ? `<b>${fp.choice ? (fp.choice === 'truck' ? 'fuel truck' : 'depot') : 'needed'}</b> before ${esc(fp.next)}` : `not needed, enough for ${esc(fp.next)} too`}</div>`;
+  if (m.service) h += '<div class="veh-lock">Locked for service until a person presses Good to go.</div>';
+  const q = Array.isArray(t.queue) ? t.queue : [];
+  if (q.length) h += `<div class="veh-line muted">Queue: ${esc(q.join(' → '))}</div>`;
+  return h;
+}
+function vehFuel(t) {
+  const p = Math.max(0, Math.min(100, Number(t.fuelPct) || 0));
+  return `<div class="${p < 20 ? 'low' : ''}"><div class="fuelhead"><span class="k">${t.kind === 'fuel-truck' ? 'Tank' : 'Fuel'}</span><span class="pct">${esc(t.fuelPct ?? '–')}%</span></div><div class="meter"><i style="width:${p}%"></i></div></div><div class="impl">${esc(t.mounted || '')}</div>`;
+}
+
 function build(s) {
   // Built once so the embedded AgOpenWeb views are not reloaded on every refresh.
   document.getElementById('tractors').innerHTML = s.tractors.map(t => `
-    <div class="card" id="card-${t.id}">
-      <h2>${esc(t.id)} ${esc(t.name)} <span class="badge" id="badge-${t.id}"></span></h2>
-      <dl id="dl-${t.id}"></dl>
-      <div class="btns">
-        <button class="bad" onclick="cmd('fault ${t.id} stuck')">Inject: GO but not moving</button>
-        <button class="bad" onclick="cmd('fault ${t.id} dead')">Inject: stop responding</button>
-        <button onclick="cmd('fault ${t.id} ok').then(() => setTimeout(() => cmd('repair ${t.id}'), 1500))">Clear fault</button>
+    <div class="veh" id="card-${t.id}">
+      <div class="veh-row">
+        <div class="veh-id"><div class="veh-name">${t.kind === 'fuel-truck' ? `<b>${esc(t.name)}</b>` : `<b>${esc(t.id)}</b> ${esc(t.name)}`}</div><span class="badge" id="badge-${t.id}"></span></div>
+        <div class="veh-now" id="now-${t.id}"></div>
+        <div class="veh-fuel" id="fuel-${t.id}"></div>
       </div>
-      <iframe src="http://localhost:${t.agopenPort}/?embed=1" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
-      <div class="muted" style="font-size:11px">AgOpenWeb on port ${t.agopenPort} (view only; this tractor is driven by its own process)</div>
+      <details class="veh-more">
+        <summary>Detail, AgOpenWeb view and fault test</summary>
+        <div class="veh-detail">
+          <div>
+            <dl id="dl-${t.id}"></dl>
+            <div class="faultlbl k">Fault test</div>
+            <div class="btns">
+              <button class="bad" onclick="cmd('fault ${t.id} stuck')">Inject: GO but not moving</button>
+              <button class="bad" onclick="cmd('fault ${t.id} dead')">Inject: stop responding</button>
+              <button onclick="cmd('fault ${t.id} ok').then(() => setTimeout(() => cmd('repair ${t.id}'), 1500))">Clear fault</button>
+            </div>
+          </div>
+          <div>
+            <iframe src="http://localhost:${t.agopenPort}/?embed=1" title="AgOpenWeb view for ${esc(t.id)}" loading="lazy"></iframe>
+            <div class="note">AgOpenWeb on port ${t.agopenPort} (view only; this tractor is driven by its own process)</div>
+          </div>
+        </div>
+      </details>
     </div>`).join('');
   built = true;
 }
@@ -354,15 +697,19 @@ async function refresh() {
   if (!built) { build(s); loadFarm(); }
   drawFarm();
   try { renderBuilder(s); } catch {}
-  document.getElementById('scn').textContent = s.scenario;
+  try { renderSummary(s); } catch {}
+  const scn = document.getElementById('scn'), scTxt = String(s.scenario ?? '');
+  scn.textContent = scTxt.includes(': ') ? scTxt.slice(scTxt.indexOf(': ') + 2) : scTxt;
+  scn.title = scTxt;
   document.getElementById('clock').textContent = s.clock + (s.finished ? ' · ended' : '');
   for (const t of s.tractors) {
-    const faulty = ['NO_RESPONSE', 'GO_NOT_MOVING', 'DOWN'].includes(t.state.code);
+    const faulty = FAULT_CODES.includes(t.state.code);
     document.getElementById('card-' + t.id).classList.toggle('fault', faulty);
     const b = document.getElementById('badge-' + t.id);
     b.textContent = t.state.text; b.className = 'badge ' + t.state.code;
+    try { setHTML(document.getElementById('now-' + t.id), vehNow(t)); setHTML(document.getElementById('fuel-' + t.id), vehFuel(t)); } catch {}
     const m = t.tel || {};
-    document.getElementById('dl-' + t.id).innerHTML = `
+    setHTML(document.getElementById('dl-' + t.id), `
       <dt>Task</dt><dd>${esc(t.task || '–')}</dd>
       <dt>Next jobs</dt><dd>${esc(t.queue.join(' → ') || '–')}</dd>
       <dt>Implement</dt><dd>${esc(t.mounted)} · fuel ${t.fuelPct}%</dd>
@@ -374,18 +721,18 @@ async function refresh() {
       <dt>GPS</dt><dd>${m.lat != null ? m.lat.toFixed(6) + ', ' + m.lon.toFixed(6) : '–'}</dd>
       <dt>Speed</dt><dd>${m.speedKph ?? '–'} km/h · heading ${m.headingDeg ?? '–'}°</dd>
       <dt>Last heard</dt><dd>${t.heardAgoMs == null ? 'never' : (t.heardAgoMs / 1000).toFixed(1) + ' s ago'} · command ack ${m.ack ?? '–'}</dd>
-      <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`;
+      <dt>Gap to plan</dt><dd>${t.planGapM ?? '–'} m</dd>`);
   }
   const wx = s.weather, wxEl = document.getElementById('wx');
   if (wx) {
     wxEl.classList.remove('muted');
-    wxEl.innerHTML = `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
+    setHTML(wxEl, `<div><span class="wxpill ${esc(wx.status)}">${esc(wx.status === 'GO' ? 'Go' : wx.status === 'STOP' ? 'Stop' : 'Caution')}</span> <span class="muted">at ${esc(wx.clock)}</span></div>
       <div>${esc(wx.reason)}</div>
       <div class="wxgrid"><span></span><b>2 m</b><b>10 m</b><span class="muted">Temperature</span><span>${wx.low.tempC.toFixed(1)} °C</span><span>${wx.high.tempC.toFixed(1)} °C</span><span class="muted">Wind</span><span>${wx.low.windMph.toFixed(1)} mph</span><span>${wx.high.windMph.toFixed(1)} mph</span></div>
       ${(s.drone && s.drone.wind && s.drone.wind.length) ? `<div>Drone above ${esc(s.drone.wind[0].over)} (simulated): ${s.drone.wind.map(w => `<b>${w.mph.toFixed(1)} mph</b> at ${w.altM} m`).join(' · ')} <span class="muted">last at ${esc(s.drone.wind[s.drone.wind.length - 1].clock)}</span></div>` : ''}
       <div class="${wx.caughtByTwoHeights ? '' : 'muted'}">A single ground station would say: <b>${esc(wx.groundOnly.status === 'GO' ? 'Go' : wx.groundOnly.status === 'STOP' ? 'Stop' : 'Caution')}</b>${wx.caughtByTwoHeights ? '. The second height caught the risk.' : ''}</div>
       <div class="wxlog">${(wx.log || []).map(l => `<div>${esc(l.clock)} ${esc(l.status)}: ${esc(l.note)}</div>`).join('')}</div>
-      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`;
+      <div><a href="/weather-log" target="_blank">Full time-stamped log</a></div>`);
   }
   const d = s.drone, dEl = document.getElementById('droneinfo');
   if (d && dEl) {
@@ -393,14 +740,12 @@ async function refresh() {
     const words = { docked: 'Docked', flying: 'Flying', hovering: 'Circling a tractor', escorting: 'Reading the wind above a sprayer', scanning: 'Mapping', spraying: 'Spot-spraying', returning: 'Returning', charging: 'Charging' };
     dEl.classList.remove('muted');
     dEl.innerHTML = `<div><b>${esc(words[d.status] || d.status)}</b> · battery ${Math.round(d.batteryPct)}%${d.mission ? ' · ' + esc(d.mission.label || d.mission.type) + ' ' + Math.round(d.mission.progressPct || 0) + '%' : ''}${d.queue ? ' · ' + d.queue + ' waiting' : ''}</div>
-      <div class="muted" style="font-size:11px">Camera view above is rendered from the simulation, not a real camera.</div>
-      ${rep ? `<div style="margin-top:6px"><b>${esc(rep.clock)} ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</b><br>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
+      ${rep ? `<div class="dronerep"><div class="k">${esc(rep.clock)} · ${esc(rep.kind === 'fault-inspection' ? 'Looked at ' + rep.subject : 'Scan of ' + rep.field)}</div>${esc(rep.kind === 'fault-inspection' ? rep.assessment + ' Recommends: ' + rep.recommend + '.' : rep.summary)}</div>` : ''}`;
   }
   document.getElementById('peoplecard').hidden = !s.tasks.length;
-  document.getElementById('people').innerHTML = s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
+  setHTML(document.getElementById('people'), s.tasks.map(k => `<div class="task"><b>${esc(k.text)}</b>
     <span class="muted">${k.state === 'waiting' ? 'Tractor is parked and locked. Do the work, then confirm.' : 'Tractor is on its way to the depot.'} Asked at ${k.since}.</span>
-    <button class="go" ${k.state === 'waiting' ? '' : 'disabled'} onclick="fetch('/human/${k.id}/go', { method: 'POST' })">Good to go</button></div>`).join('');
-  const RT_COLOR = { 'Plan Manager': '#2f6f4f', 'Fleet Manager': '#1c7ed6', 'Fault Manager': '#c0392b', 'Route Manager': '#8e24aa', 'Depot Manager': '#b7791f', 'Safety Officer': '#0b7285', 'Weather Manager': '#5c7cfa' };
+    <button class="go" ${k.state === 'waiting' ? '' : 'disabled'} onclick="fetch('/human/${k.id}/go', { method: 'POST' })">Good to go</button></div>`).join(''));
   const rtEl = document.getElementById('roundtable');
   const rtKey = (s.roundtable || []).length + ':' + ((s.roundtable || [])[0] || {}).id;
   if (rtEl.dataset.key !== rtKey) {
@@ -408,19 +753,24 @@ async function refresh() {
     let lastTopic = null, out = '';
     for (const l of (s.roundtable || [])) {
       if (l.topicId !== lastTopic) { out += `<div class="rt-topic">${esc(l.clock || '')} · ${esc(l.topic || '')}</div>`; lastTopic = l.topicId; }
-      out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who" style="background:${RT_COLOR[l.agent] || '#6b756e'}">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
+      out += `<div class="rt-line ${esc(l.kind)}"><span class="rt-who">${esc(l.agent)}</span><span class="rt-text">${esc(l.text)}<span class="rt-meta">${l.kind === 'fallback' ? 'rule-written' : l.ms != null ? (l.ms / 1000).toFixed(1) + ' s' : ''}</span></span></div>`;
     }
     rtEl.innerHTML = out || '<div class="muted">Nothing to discuss yet. The managers speak when the day starts, a tractor faults, a job finishes, or work is held.</div>';
   }
   if (s.roundtableStats) document.getElementById('rtmeta').textContent = `${s.roundtableStats.lines || 0} lines · ${s.roundtableStats.modelCalls || 0} model calls · ${s.roundtableStats.toolCalls || 0} tool calls · ${s.roundtableStats.fallbacks || 0} rule-written`;
-  document.getElementById('trail').innerHTML = s.trail.map(r =>
-    `<div class="${r.type === 'fault' ? 'fault' : ''}"><time>${r.clock}</time><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}</div>`).join('') || '<div class="muted">No messages yet.</div>';
-  document.getElementById('jobs').innerHTML = '<tr><th>Job</th><th>Priority</th><th>Deadline</th><th>Tractor</th><th>Done</th><th>Status</th></tr>' +
-    s.jobs.map(j => `<tr><td>${esc(j.label)}</td><td>${esc(j.priority)}</td><td>${j.deadline}</td><td>${esc(j.tractor || '–')}</td><td>${j.pct}%</td><td>${esc(j.status)}</td></tr>`).join('');
+  try { renderPlanChange(s); } catch {}
+  setHTML(document.getElementById('trail'), s.trail.map(r =>
+    `<div class="${r.type === 'fault' ? 'fault' : r.type === 'plan' ? 'plan' : ''}"><time>${r.clock}</time><div><span class="who">${esc(r.from)} → ${esc(r.to)}</span>${esc(r.text)}${planLines(r)}</div></div>`).join('') || '<div class="muted">No messages yet. Agents start talking when the day starts.</div>');
+  renderJobs(s);
 }
 document.getElementById('dscan').addEventListener('click', async () => {
   const res = await fetch('/drone/scan', { method: 'POST', body: JSON.stringify({ fields: [...picked] }) });
   document.getElementById('droneinfo').textContent = res.ok ? 'Drone sent.' : await res.text();
+});
+document.getElementById('vehtoggle').addEventListener('click', () => {
+  const ds = [...document.querySelectorAll('#tractors details')], open = ds.some(x => !x.open);
+  ds.forEach(x => { x.open = open; });
+  document.getElementById('vehtoggle').textContent = open ? 'Hide all detail' : 'Show all detail';
 });
 // Start over needs two clicks, so it cannot be hit by accident.
 const so = document.getElementById('startover'), soMsg = document.getElementById('startovermsg');

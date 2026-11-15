@@ -140,7 +140,8 @@ let trail = function (from, to, type, text, data = {}) {
 sim.listeners.push((e) => {
   if (!['plan', 'event', 'done'].includes(e.type)) return;
   const who = e.type === 'plan' ? ['planner', 'executor'] : e.type === 'done' ? ['executor', 'planner'] : ['world', 'planner'];
-  trail(who[0], who[1], e.type, e.text);
+  // A re-plan carries the planner's own explanation: one line per job that moved, and why.
+  trail(who[0], who[1], e.type, e.text, e.type === 'plan' && e.lines?.length ? { lines: e.lines, footer: e.footer || null } : {});
   for (const l of e.lines || []) console.log(`           ${l}`);
 });
 console.log(`Scenario: ${scenario.name}`);
@@ -915,7 +916,7 @@ sim.listeners.push((e) => {
 // ---- Status page: every tractor's state, the job list, the message trail, and each AgOpenWeb view.
 const recent = [];
 const _trail = trail;
-trail = function (from, to, type, text, data) { recent.push({ clock: fmtTime(sim.time), from, to, type, text }); if (recent.length > 60) recent.shift(); return _trail(from, to, type, text, data); };
+trail = function (from, to, type, text, data) { recent.push({ clock: fmtTime(sim.time), from, to, type, text, ...(data?.lines ? { lines: data.lines, footer: data.footer } : {}) }); if (recent.length > 60) recent.shift(); return _trail(from, to, type, text, data); };
 function stateOf(u) {
   const t = u.twin, k = t.action?.kind;
   if (u.fault === 'NO_RESPONSE') return { code: 'NO_RESPONSE', text: 'Not responding' };
@@ -973,6 +974,14 @@ function snapshot() {
 }
 const PAGE_PORT = Number(opt('page', 5190));
 const server = http.createServer((req, res) => {
+  // "Why?" for any job: the planner's own reasons for who has it and when it will finish.
+  const why = req.method === 'GET' && req.url.match(/^\/why\/([\w-]+)$/);
+  if (why) {
+    let lines;
+    try { lines = [].concat(sim.dispatcher.why(sim, why[1])); } catch (err) { lines = [`No explanation available: ${err.message}`]; }
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ job: why[1], label: sim.jobs.get(why[1]) ? sim.label(sim.jobs.get(why[1])) : why[1], lines }));
+  }
   if (req.url === '/state') { res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); return res.end(JSON.stringify(snapshot())); }
   const m = req.method === 'POST' && req.url.match(/^\/human\/(H\d+)\/go$/);
   if (m) {
@@ -1053,7 +1062,8 @@ function startOver() {
   if (stopped) return;
   stopped = true;
   console.log('\nStarting over: tractors back to their bays, job list cleared.');
-  Promise.allSettled([...units, truck].map(u => call(u, 'POST', '/home', {}))).then(() => {
+  // Clear any injected fault first: a tractor left "not responding" would give no telemetry to the fresh start.
+  Promise.allSettled([...units, truck].map(u => call(u, 'POST', '/fault/ok', {}).catch(() => {}).then(() => call(u, 'POST', '/release', {})).catch(() => {}).then(() => call(u, 'POST', '/home', {})))).then(() => {
     server.close();
     spawn(process.execPath, process.argv.slice(1), { stdio: 'inherit' });
     setTimeout(() => process.exit(0), 250);
