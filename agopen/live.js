@@ -781,10 +781,10 @@ function droneScan(name, quiet = false) {
 }
 // While a tractor is spraying, the drone flies just behind it and steps through three heights, reading the wind
 // at each. It leaves as soon as the pass stops (job done, hold, fault) or another drone mission is waiting.
-let escort = null, droneWind = [];
+let escort = null, droneWind = [], escortAfter = 0;
 const LIMITS_WIND_MAX = 10;
 function escortSprayer() {
-  if (escort) return;
+  if (escort || sim.time < escortAfter) return;
   const u = units.find(x => { const t = x.twin, j = t.jobId && sim.jobs.get(t.jobId); return x.tel && !x.fault && t.status === 'ok' && t.action?.kind === 'work' && j?.type === 'spray' && x.place === j.fieldId && !heldBy(j); });
   if (!u) return;
   const jobId = u.twin.jobId;
@@ -1143,7 +1143,7 @@ function droneTick(dt) {
         }
       }
     } else if (ev.type === 'escort-ended') {
-      if (escort?.id === ev.missionId) escort = null;
+      if (escort?.id === ev.missionId) { escort = null; escortAfter = sim.time + 30; }      // then leave the drone to its surveys for half a plan hour
     } else if (ev.type === 'wind-sample') {
       // Wind at the drone's height, from the same simulated air as the mast readings at 2 m and 10 m
       // (a power-law profile through those two), with a little gust noise.
