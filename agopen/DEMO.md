@@ -1,5 +1,27 @@
 # Five-minute table demo
 
+## Run of show (five minutes, current build)
+
+Start clean, a few minutes before the judges arrive:
+
+```bash
+FRESH=1 agopen/start-demo.sh
+```
+
+Wait for `All checks passed. Ready to demo.` The laptop must be online (assistant, roundtable voices, 3D and drone views).
+
+1. **The farm as it is (30 s).** Dashboard at http://localhost:5190. Point at the map: every field says what is on it ("Corn — estimated harvest in 36 days", "Empty — needs tilling", "Tilled — needs sowing, pick a plant"). Say: fields and implements are read from AgOpenGPS, one AgOpenWeb copy per vehicle, and each field's record lives in its AgOpenGPS folder.
+2. **Take a job list (40 s).** Press **Plan jobs**. Add work with one click on a field card ("Plow and sow", "Sow ..."), pick a crop for a tilled field, raise a sowing job to High and show that its plowing was raised with it. Close, press **Start the day**. Or switch on **Let the AI drive**: it sends the drone round every field first, then queues what each field needs.
+3. **Compatible tractors, people in the loop (40 s).** "Needs a person" lights up: a tractor is locked at the depot for an implement change or fuel. Press **Good to go**. Press **Why?** on a job: the planner's reasons and the alternatives it rejected.
+4. **Breakdown and re-plan (60 s).** Open a working tractor's **Detail** line and press **Inject: GO but not moving** (or type `stuck` in its Terminal window). Within about ten seconds: fault badge, the drone circles the tractor (camera on it), and **Latest plan change** lists each job that moved, who has it now and why. Clear the fault.
+5. **Fuel, spray, drone (60 s).** Tractor card: "Next refuel: fuel truck" with both costs. Spray conditions: Go / Caution / Stop from two heights, plus the drone's wind and temperature at 10, 30 and 50 m above a spraying tractor. Drone card tabs: Camera, Thermal, LiDAR, Stitched photo; problem areas show as a heatmap on the map.
+6. **Ask it (40 s).** **Ask the assistant**: "What is North Field like?" (answers from the record, sends the drone, camera under the answer), then "Why does T2 have that job?" or "Plow and sow Home Quarter".
+7. **Numbers (30 s).** `agopen/test/TEST_REPORT.md`: same farm and breakdown, 11 of 11 jobs on time against 7 of 11 for first come, first served; travel 698 against 758 tractor-minutes; idle 0 against 22.
+
+If something sticks: **Start over** on the dashboard (fields keep their state), or relaunch with the command above (fields reset).
+
+The sections below were written for the earlier page and are kept for the detail and the question-and-answer notes.
+
 > The status page was redesigned as a dashboard after this script was written. Everything named here is still on it, but the fault buttons, GPS detail and the AgOpenWeb mini map for each vehicle are now inside that vehicle's **Detail, AgOpenWeb view and fault test** line (or press **Show all detail** in the Fleet header). You can also type `stuck`, `dead` or `ok` in a tractor's Terminal window.
 
 This script shows the live mode (see [README.md](README.md)) to judges in five minutes, then takes questions. The track is "Run the Fleet": a coordinator that assigns jobs to a small fleet of tractors and re-plans when something breaks. The same run also shows the spray-conditions check ("Spray or Wait?"), a fuel truck and a scout drone.

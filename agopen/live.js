@@ -1152,11 +1152,16 @@ function droneTick(dt) {
         const lo = c.reading.low, hi = c.reading.high;
         const alpha = lo.windMph > 0.2 && hi.windMph > 0.2 ? Math.log(hi.windMph / lo.windMph) / Math.log(hi.heightM / lo.heightM) : 0.15;
         const mph = Math.max(0, lo.windMph * Math.pow(ev.altM / lo.heightM, Math.max(-0.2, Math.min(0.5, alpha))) + (Math.random() - 0.5) * 0.6);
-        droneWind = droneWind.filter(w => w.altM !== ev.altM).concat({ altM: ev.altM, mph: +mph.toFixed(1), clock: fmtTime(sim.time), over: ev.subject }).sort((a, b) => a.altM - b.altM);
+        // Air temperature at that height: the mast's gradient between 2 m and 10 m carried upward, easing off with
+        // height. Warmer air above cooler air is an inversion, which keeps spray droplets hanging near the ground.
+        const grad = (hi.tempC - lo.tempC) / (hi.heightM - lo.heightM);
+        const tempC = lo.tempC + grad * (hi.heightM - lo.heightM) * Math.log(ev.altM / lo.heightM) / Math.log(hi.heightM / lo.heightM) + (Math.random() - 0.5) * 0.1;
+        droneWind = droneWind.filter(w => w.altM !== ev.altM).concat({ altM: ev.altM, mph: +mph.toFixed(1), tempC: +tempC.toFixed(1), clock: fmtTime(sim.time), over: ev.subject }).sort((a, b) => a.altM - b.altM);
         if (ev.lastOfCycle && sim.time - (escort?.said ?? -99) >= 20) {
           if (escort) escort.said = sim.time;
           const top = droneWind[droneWind.length - 1];
-          trail('drone', 'weather', 'wind-profile', `Drone above ${ev.subject} while it sprays: wind ${droneWind.map(w => `${w.mph} mph at ${w.altM} m`).join(', ')} (mast: ${lo.windMph} mph at ${lo.heightM} m).${top.mph > LIMITS_WIND_MAX ? ` Above the ${LIMITS_WIND_MAX} mph limit aloft: watch for drift if it mixes down.` : ''}`, { profile: droneWind });
+          const warmAloft = top.tempC != null && top.tempC - lo.tempC > 0.3;
+          trail('drone', 'weather', 'wind-profile', `Drone above ${ev.subject} while it sprays: ${droneWind.map(w => `${w.altM} m: ${w.mph} mph, ${w.tempC} °C`).join('; ')} (mast at ${lo.heightM} m: ${lo.windMph} mph, ${lo.tempC} °C).${warmAloft ? ` The air is ${(top.tempC - lo.tempC).toFixed(1)} °C warmer at ${top.altM} m than at the ground: an inversion, spray would hang and drift.` : ' Temperature falls with height: no inversion.'}${top.mph > LIMITS_WIND_MAX ? ` Above the ${LIMITS_WIND_MAX} mph limit aloft: watch for drift if it mixes down.` : ''}`, { profile: droneWind });
         }
       }
     } else if (ev.type === 'sprayed') {
