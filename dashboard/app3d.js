@@ -19,6 +19,26 @@ let injected = [], newJobSeq = 1, llmOn = false, lastLog = 0, lastUi = 0, uiDirt
 const shifts = []; // {id, entry, facts, title, reason, by}
 
 // ------------------------------------------------------------------ boot
+// Live mode (?live=1, served by agopen/live.js): this page keeps its own copy of the planner's world and
+// replays the live run's log into it, so the 3D farm shows the same day the AgOpenWeb tractors are working.
+const LIVE = new URLSearchParams(location.search).has('live');
+let liveApplied = 0;
+async function liveSync() {
+  let r;
+  try { r = await (await fetch('/replay', { cache: 'no-store' })).json(); } catch { return; }
+  let stepped = false;
+  const stepTo = (t) => { while (sim.time < t && !sim.finished) { sim.step(); stepped = true; } };
+  for (; liveApplied < r.entries.length; liveApplied++) {
+    const en = r.entries[liveApplied];
+    stepTo(en.t);
+    if (en.kind === 'event') { injected.push(en.event); sim.inject(structuredClone(en.event)); }
+    else { const a = sim.tractor(en.tractor)?.action; if (a && (a.kind === 'refuel' || a.kind === 'swap')) a.left = en.kind === 'hold' ? en.left : 1; }
+    stepped = true;
+  }
+  stepTo(r.time);
+  if (stepped) { processLog(); uiDirty = true; }
+}
+
 async function boot() {
   scenario = await (await fetch('../scenario.json')).json();
   try { llmOn = (await (await fetch('/api/llm/status')).json()).enabled; } catch { llmOn = false; }
@@ -29,6 +49,7 @@ async function boot() {
   scene = new FarmScene($('stage'), scenario, { onPick: showPopover });
   $('loading').remove();
   reset();
+  if (LIVE) { $('play').disabled = true; $('play').textContent = 'Live'; setInterval(liveSync, 800); liveSync(); }
   requestAnimationFrame(loop);
 }
 
@@ -44,6 +65,7 @@ function reset() {
 function setPlaying(p) { playing = p && !sim.finished; $('play').textContent = playing ? '❚❚ Pause' : '▶ Run'; }
 
 function inject(evt) {
+  if (LIVE) { fetch('/event', { method: 'POST', body: JSON.stringify({ source: 'operator', ...evt }) }); return; }   // the live run applies it; we see it via the replay log
   const e = { source: 'operator', ...evt, time: sim.time };
   injected.push(e); sim.inject(e); sim.processEvents();
   processLog(); uiDirty = true;
@@ -51,7 +73,7 @@ function inject(evt) {
 
 function loop(ts) {
   const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0; lastTs = ts;
-  if (playing) {
+  if (playing && !LIVE) {
     acc += dt * speed;
     let n = 0;
     while (acc >= 1 && !sim.finished) { sim.step(); acc -= 1; n++; }

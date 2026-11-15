@@ -1,0 +1,108 @@
+{
+ "home": {
+  "lat": 32.72,
+  "lon": -114.6741
+ },
+ "cell": 100,
+ "fields": [
+  {
+   "id": "F1",
+   "name": "North Field",
+   "crop": "corn",
+   "acres": 40,
+   "centre": {
+    "lat": 32.72676288196014,
+    "lon": -114.67249983225106
+   },
+   "drawnHectares": 15
+  },
+  {
+   "id": "F2",
+   "name": "Creek Pasture",
+   "crop": "hay",
+   "acres": 30,
+   "centre": {
+    "lat": 32.72541030556811,
+    "lon": -114.66609928205536
+   },
+   "drawnHectares": 20
+  },
+  {
+   "id": "F3",
+   "name": "Home Quarter",
+   "crop": "soybeans",
+   "acres": 36,
+   "centre": {
+    "lat": 32.71549141202657,
+    "lon": -114.6682334562947
+   },
+   "drawnHectares": 20
+  },
+  {
+   "id": "F4",
+   "name": "Orchard Strip",
+   "crop": "orchard",
+   "acres": 18,
+   "centre": {
+    "lat": 32.71413883563454,
+    "lon": -114.6741
+   },
+   "drawnHectares": 12
+  },
+  {
+   "id": "F5",
+   "name": "Ridge 80",
+   "crop": "wheat",
+   "acres": 48,
+   "centre": {
+    "lat": 32.7263120231628,
+    "lon": -114.65489808365494
+   },
+   "drawnHectares": 24
+  },
+  {
+   "id": "F6",
+   "name": "East Meadow",
+   "crop": "hay",
+   "acres": 28,
+   "centre": {
+    "lat": 32.72180343518937,
+    "lon": -114.64849873327736
+   },
+   "drawnHectares": 16
+  },
+  {
+   "id": "F7",
+   "name": "Long Acre",
+   "crop": "corn",
+   "acres": 32,
+   "centre": {
+    "lat": 32.719549141202656,
+    "lon": -114.6543661867237
+   },
+   "drawnHectares": 15
+  },
+  {
+   "id": "F8",
+   "name": "South Flats",
+   "crop": "soybeans",
+   "acres": 44,
+   "centre": {
+    "lat": 32.714589694431886,
+    "lon": -114.65063406128053
+   },
+   "drawnHectares": 24
+  },
+  {
+   "id": "F9",
+   "name": "Bottomland",
+   "crop": "alfalfa",
+   "acres": 24,
+   "centre": {
+    "lat": 32.71323711803986,
+    "lon": -114.65703412030055
+   },
+   "drawnHectares": 12
+  }
+ ]
+}

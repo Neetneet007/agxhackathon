@@ -1,0 +1,45 @@
+diff --git a/Platforms/AgOpenWeb.Desktop/SingleInstance.cs b/Platforms/AgOpenWeb.Desktop/SingleInstance.cs
+index 4a65d42..7b6177b 100644
+--- a/Platforms/AgOpenWeb.Desktop/SingleInstance.cs
++++ b/Platforms/AgOpenWeb.Desktop/SingleInstance.cs
+@@ -15,7 +15,9 @@ namespace AgOpenWeb.Desktop;
+ /// </summary>
+ static class SingleInstance
+ {
+-    private const string Name = @"Global\AgOpenWeb.Desktop";
++    // Team5 hackathon patch: one copy per port instead of one per computer when AGOPENWEB_PORT is set.
++    private static readonly string Name = @"Global\AgOpenWeb.Desktop" +
++        (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("AGOPENWEB_PORT")) ? "" : "." + Environment.GetEnvironmentVariable("AGOPENWEB_PORT"));
+ 
+     /// <summary>The held mutex, or null when another copy holds it.</summary>
+     public static Mutex? TryAcquire()
+diff --git a/Shared/AgOpenWeb.RemoteServer/ControlAuthority.cs b/Shared/AgOpenWeb.RemoteServer/ControlAuthority.cs
+index 7511abb..94ee02e 100644
+--- a/Shared/AgOpenWeb.RemoteServer/ControlAuthority.cs
++++ b/Shared/AgOpenWeb.RemoteServer/ControlAuthority.cs
+@@ -49,6 +49,11 @@ public sealed class ControlAuthority
+     /// denied if another connection holds it (first-come, single authority).</summary>
+     public bool Acquire(Guid conn, string name)
+     {
++        // Team5 hackathon patch: with AGOPENWEB_OPERATOR set, only a client whose name starts with that
++        // text may take control (the fleet's tractor process). Browser pages can then only watch, so an
++        // open page can never take the seat while the tractor process restarts.
++        var only = Environment.GetEnvironmentVariable("AGOPENWEB_OPERATOR");
++        if (!string.IsNullOrWhiteSpace(only) && !(name ?? "").StartsWith(only, StringComparison.Ordinal)) return false;
+         ControlStateDto? snap = null;
+         lock (_lock)
+         {
+diff --git a/Shared/AgOpenWeb.RemoteServer/RemoteServerHost.cs b/Shared/AgOpenWeb.RemoteServer/RemoteServerHost.cs
+index 0ffaefd..c21a493 100644
+--- a/Shared/AgOpenWeb.RemoteServer/RemoteServerHost.cs
++++ b/Shared/AgOpenWeb.RemoteServer/RemoteServerHost.cs
+@@ -302,6 +302,9 @@ public sealed class RemoteServerHost
+         IVehicleProfileService vehicleProfiles, IPersistentStateService persist,
+         INtripClientService? ntrip = null, int port = 5174)
+     {
++        // Team5 hackathon patch: AGOPENWEB_PORT lets several copies run on one computer (one per simulated tractor).
++        if (int.TryParse(Environment.GetEnvironmentVariable("AGOPENWEB_PORT"), out var envPort) && envPort > 0)
++            port = envPort;
+         Port = port;
+ 
+         // Direct construction — no ASP.NET DI container. (The old Kestrel host
