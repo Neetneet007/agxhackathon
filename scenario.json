@@ -1,0 +1,483 @@
+{
+ "name": "Demo day \u2014 Barrow Farms, 9 fields, 3 tractors",
+ "horizonMinutes": 720,
+ "map": {
+  "width": 30,
+  "height": 20,
+  "obstacles": [
+   [
+    15,
+    0
+   ],
+   [
+    15,
+    1
+   ],
+   [
+    15,
+    2
+   ],
+   [
+    15,
+    3
+   ],
+   [
+    15,
+    5
+   ],
+   [
+    15,
+    6
+   ],
+   [
+    15,
+    7
+   ],
+   [
+    15,
+    8
+   ],
+   [
+    15,
+    9
+   ],
+   [
+    15,
+    10
+   ],
+   [
+    15,
+    11
+   ],
+   [
+    15,
+    12
+   ],
+   [
+    15,
+    13
+   ],
+   [
+    15,
+    14
+   ],
+   [
+    15,
+    16
+   ],
+   [
+    15,
+    17
+   ],
+   [
+    15,
+    18
+   ],
+   [
+    15,
+    19
+   ]
+  ],
+  "features": {
+   "river": {
+    "x": 15,
+    "label": "Mill Creek"
+   },
+   "bridges": [
+    {
+     "name": "North bridge",
+     "cells": [
+      [
+       15,
+       4
+      ]
+     ]
+    },
+    {
+     "name": "South bridge",
+     "cells": [
+      [
+       15,
+       15
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "depot": {
+  "x": 3,
+  "y": 10,
+  "name": "Depot (fuel + implement shed)"
+ },
+ "fields": [
+  {
+   "id": "F1",
+   "name": "North Field",
+   "x": 2,
+   "y": 1,
+   "w": 5,
+   "h": 3,
+   "acres": 40,
+   "crop": "corn"
+  },
+  {
+   "id": "F2",
+   "name": "Creek Pasture",
+   "x": 8,
+   "y": 2,
+   "w": 5,
+   "h": 4,
+   "acres": 30,
+   "crop": "hay"
+  },
+  {
+   "id": "F3",
+   "name": "Home Quarter",
+   "x": 6,
+   "y": 13,
+   "w": 5,
+   "h": 4,
+   "acres": 36,
+   "crop": "soybeans"
+  },
+  {
+   "id": "F4",
+   "name": "Orchard Strip",
+   "x": 1,
+   "y": 15,
+   "w": 4,
+   "h": 3,
+   "acres": 18,
+   "crop": "orchard"
+  },
+  {
+   "id": "F5",
+   "name": "Ridge 80",
+   "x": 18,
+   "y": 1,
+   "w": 6,
+   "h": 4,
+   "acres": 48,
+   "crop": "wheat"
+  },
+  {
+   "id": "F6",
+   "name": "East Meadow",
+   "x": 25,
+   "y": 6,
+   "w": 4,
+   "h": 4,
+   "acres": 28,
+   "crop": "hay"
+  },
+  {
+   "id": "F7",
+   "name": "Long Acre",
+   "x": 19,
+   "y": 9,
+   "w": 5,
+   "h": 3,
+   "acres": 32,
+   "crop": "corn"
+  },
+  {
+   "id": "F8",
+   "name": "South Flats",
+   "x": 22,
+   "y": 14,
+   "w": 6,
+   "h": 4,
+   "acres": 44,
+   "crop": "soybeans"
+  },
+  {
+   "id": "F9",
+   "name": "Bottomland",
+   "x": 17,
+   "y": 16,
+   "w": 4,
+   "h": 3,
+   "acres": 24,
+   "crop": "alfalfa"
+  }
+ ],
+ "tractors": [
+  {
+   "id": "T1",
+   "name": "Atlas",
+   "model": "Sprayer tractor",
+   "implements": [
+    "sprayer"
+   ],
+   "mounted": "sprayer",
+   "workRates": {
+    "sprayer": 40
+   },
+   "ticksPerCell": 2,
+   "fuelCapacity": 100,
+   "fuel": 90,
+   "burnPerCell": 0.4,
+   "burnPerAcre": 0.8
+  },
+  {
+   "id": "T2",
+   "name": "Bison",
+   "model": "Utility tractor",
+   "implements": [
+    "mower",
+    "tiller"
+   ],
+   "mounted": "mower",
+   "workRates": {
+    "mower": 20,
+    "tiller": 15
+   },
+   "ticksPerCell": 2,
+   "fuelCapacity": 120,
+   "fuel": 45,
+   "burnPerCell": 0.5,
+   "burnPerAcre": 1.2
+  },
+  {
+   "id": "T3",
+   "name": "Comet",
+   "model": "Electric row-crop (battery)",
+   "implements": [
+    "seeder",
+    "sprayer"
+   ],
+   "mounted": "seeder",
+   "workRates": {
+    "seeder": 20,
+    "sprayer": 30
+   },
+   "ticksPerCell": 3,
+   "fuelCapacity": 100,
+   "fuel": 100,
+   "burnPerCell": 0.35,
+   "burnPerAcre": 0.9
+  }
+ ],
+ "jobs": [
+  {
+   "id": "J1",
+   "type": "mow",
+   "fieldId": "F2",
+   "priority": "low",
+   "deadline": 600
+  },
+  {
+   "id": "J2",
+   "type": "spray",
+   "fieldId": "F5",
+   "priority": "medium",
+   "deadline": 480
+  },
+  {
+   "id": "J3",
+   "type": "seed",
+   "fieldId": "F8",
+   "acres": 28,
+   "priority": "high",
+   "deadline": 420
+  },
+  {
+   "id": "J4",
+   "type": "spray",
+   "fieldId": "F1",
+   "priority": "high",
+   "deadline": 210
+  },
+  {
+   "id": "J5",
+   "type": "mow",
+   "fieldId": "F6",
+   "priority": "medium",
+   "deadline": 480
+  },
+  {
+   "id": "J6",
+   "type": "till",
+   "fieldId": "F4",
+   "priority": "medium",
+   "deadline": 540
+  },
+  {
+   "id": "J7",
+   "type": "spray",
+   "fieldId": "F7",
+   "priority": "low",
+   "deadline": 660
+  },
+  {
+   "id": "J8",
+   "type": "seed",
+   "fieldId": "F3",
+   "acres": 20,
+   "priority": "medium",
+   "deadline": 570
+  },
+  {
+   "id": "J9",
+   "type": "spray",
+   "fieldId": "F9",
+   "priority": "high",
+   "deadline": 300
+  },
+  {
+   "id": "J10",
+   "type": "mow",
+   "fieldId": "F9",
+   "priority": "low",
+   "deadline": 690
+  },
+  {
+   "id": "J11",
+   "type": "spray",
+   "fieldId": "F3",
+   "priority": "medium",
+   "deadline": 510
+  },
+  {
+   "id": "J12",
+   "type": "seed",
+   "fieldId": "F7",
+   "acres": 16,
+   "priority": "low",
+   "deadline": 690
+  }
+ ],
+ "events": [
+  {
+   "time": 100,
+   "type": "breakdown",
+   "tractor": "T1",
+   "note": "hydraulic pump failure",
+   "source": "telematics",
+   "signal": "DTC SPN 1209 FMI 1 \u2014 hydraulic pressure low, machine stopped itself"
+  },
+  {
+   "time": 150,
+   "type": "new_jobs",
+   "jobs": [
+    {
+     "id": "J13",
+     "type": "spray",
+     "fieldId": "F2",
+     "priority": "high",
+     "deadline": 450,
+     "note": "aphids spotted"
+    }
+   ],
+   "source": "imagery",
+   "signal": "Drone NDVI pass: aphid hotspot in Creek Pasture, index \u22120.12 vs last week"
+  },
+  {
+   "time": 200,
+   "type": "block_route",
+   "name": "South bridge",
+   "cells": [
+    [
+     15,
+     15
+    ]
+   ],
+   "note": "washed out after overnight rain",
+   "source": "roads",
+   "signal": "Gauge at South bridge reads 2.1 m \u2014 water over the deck"
+  },
+  {
+   "time": 240,
+   "type": "priority_change",
+   "job": "J1",
+   "priority": "high",
+   "deadline": 480,
+   "note": "rain forecast for this afternoon \u2014 cut the hay now",
+   "source": "weather",
+   "signal": "Forecast update: 70% chance of rain from 15:00 \u2014 cut hay must be down by 14:00"
+  },
+  {
+   "time": 270,
+   "type": "repair",
+   "tractor": "T1",
+   "note": "pump replaced in the field",
+   "source": "service",
+   "signal": "Ticket #4471 closed \u2014 pump replaced in the field"
+  }
+ ],
+ "policy": {
+  "lateWork": "schedule",
+  "note": "Deadlines are hard. If an event makes a deadline impossible, the job is still scheduled (without delaying any on-time job) and flagged for operator sign-off."
+ },
+ "feeds": {
+  "weather": [
+   {
+    "t": 0,
+    "text": "Dry until evening, rain risk 10%"
+   },
+   {
+    "t": 235,
+    "text": "Rain from 15:00 (70%) \u2014 hay at risk",
+    "alert": true
+   },
+   {
+    "t": 480,
+    "text": "Light rain starting, 4 mm expected",
+    "alert": true
+   }
+  ],
+  "roads": [
+   {
+    "t": 0,
+    "text": "Both bridges open \u00b7 South gauge 0.6 m"
+   },
+   {
+    "t": 150,
+    "text": "South gauge rising: 1.4 m"
+   },
+   {
+    "t": 200,
+    "text": "South bridge closed \u00b7 gauge 2.1 m over deck",
+    "alert": true
+   }
+  ],
+  "imagery": [
+   {
+    "t": 0,
+    "text": "Morning NDVI pass: no crop stress"
+   },
+   {
+    "t": 150,
+    "text": "Aphid hotspot in Creek Pasture (NDVI \u22120.12)",
+    "alert": true
+   }
+  ],
+  "service": [
+   {
+    "t": 0,
+    "text": "No open tickets"
+   },
+   {
+    "t": 102,
+    "text": "Ticket #4471: T1 hydraulic pump \u00b7 tech ETA 10:30",
+    "alert": true
+   },
+   {
+    "t": 270,
+    "text": "Ticket #4471 closed \u00b7 T1 released"
+   }
+  ],
+  "soil": [
+   {
+    "t": 0,
+    "text": "All fields workable \u00b7 18\u201324% VWC"
+   },
+   {
+    "t": 200,
+    "text": "Bottomland 31% VWC near the creek \u2014 workable, slow",
+    "alert": false
+   }
+  ]
+ }
+}

@@ -1,0 +1,23 @@
+[06:00] SUBMIT Operator submitted 12 jobs.
+[06:14] OPS    T2 refuelled to 100%.
+[08:01] DONE   T1 completed J2 Spray Ridge 80 at 08:02 (deadline 14:00).
+[08:10] DONE   T2 completed J1 Mow Creek Pasture at 08:11 (deadline 16:00).
+[08:47] DONE   T3 completed J3 Seed South Flats at 08:48 (deadline 13:00).
+[09:06] OPS    T1 refuelled to 100%.
+[10:16] DONE   T2 completed J5 Mow East Meadow at 10:17 (deadline 14:00).
+[10:24] DONE   T1 completed J4 Spray North Field at 10:25 — LATE by 55 min (deadline 09:30).
+[10:31] OPS    T3 swapped to sprayer at the depot.
+[10:46] OPS    T3 refuelled to 100%.
+[11:44] OPS    T2 swapped to tiller at the depot.
+[11:59] OPS    T2 refuelled to 100%.
+[12:00] DONE   T1 completed J9 Spray Bottomland at 12:01 — LATE by 61 min (deadline 11:00).
+[13:01] OPS    T1 refuelled to 100%.
+[13:14] DONE   T3 completed J7 Spray Long Acre at 13:15 (deadline 17:00).
+[13:23] DONE   T2 completed J6 Till Orchard Strip at 13:24 (deadline 15:00).
+[13:55] OPS    T2 swapped to mower at the depot.
+[14:15] DONE   T1 completed J11 Spray Home Quarter at 14:16 (deadline 14:30).
+[14:58] OPS    T3 swapped to seeder at the depot.
+[15:53] DONE   T2 completed J10 Mow Bottomland at 15:54 (deadline 17:30).
+[16:28] DONE   T3 completed J8 Seed Home Quarter at 16:29 — LATE by 59 min (deadline 15:30).
+[17:13] OPS    T3 refuelled to 100%.
+[18:00] END    Simulation ended at 18:00: end of shift.

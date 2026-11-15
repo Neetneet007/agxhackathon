@@ -1,0 +1,151 @@
+{
+  "coordinator": {
+    "jobsTotal": 12,
+    "jobsCompleted": 12,
+    "jobsOnTime": 12,
+    "jobsLate": 0,
+    "acresOnTime": 344,
+    "priorityValueOnTime": 678,
+    "travelMin": 540,
+    "idleMin": 0,
+    "spareMin": 175,
+    "workMin": 780,
+    "fuelStops": 4,
+    "implementSwaps": 2,
+    "makespan": 587,
+    "makespanClock": "15:47",
+    "violations": 0,
+    "lateFlagged": 0,
+    "violationList": [],
+    "perTractor": {
+      "T1": {
+        "travel": 228,
+        "work": 270,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 0,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 0,
+        "minFuelPct": 14,
+        "lastActive": 527,
+        "spare": 0
+      },
+      "T2": {
+        "travel": 198,
+        "work": 318,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 40,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 2,
+        "minFuelPct": 14.5,
+        "lastActive": 585,
+        "spare": 0
+      },
+      "T3": {
+        "travel": 114,
+        "work": 192,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 0,
+        "swap": 0,
+        "broken": 0,
+        "fuelStops": 0,
+        "swaps": 0,
+        "minFuelPct": 29.1,
+        "lastActive": 305,
+        "spare": 175
+      }
+    },
+    "nonProductiveMin": 540
+  },
+  "baseline": {
+    "jobsTotal": 12,
+    "jobsCompleted": 11,
+    "jobsOnTime": 8,
+    "jobsLate": 3,
+    "acresOnTime": 244,
+    "priorityValueOnTime": 430,
+    "travelMin": 892,
+    "idleMin": 0,
+    "spareMin": 0,
+    "workMin": 748,
+    "fuelStops": 6,
+    "implementSwaps": 4,
+    "makespan": 720,
+    "makespanClock": "18:00",
+    "violations": 3,
+    "lateFlagged": 0,
+    "violationList": [
+      {
+        "time": 264,
+        "kind": "deadline",
+        "text": "J4 finished 55 min late"
+      },
+      {
+        "time": 360,
+        "kind": "deadline",
+        "text": "J9 finished 61 min late"
+      },
+      {
+        "time": 628,
+        "kind": "deadline",
+        "text": "J8 finished 59 min late"
+      },
+      {
+        "time": 720,
+        "kind": "unfinished",
+        "text": "J12 not completed (16.0 ac left)"
+      }
+    ],
+    "perTractor": {
+      "T1": {
+        "travel": 244,
+        "work": 222,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 0,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 0,
+        "minFuelPct": 24,
+        "lastActive": 495,
+        "spare": 0
+      },
+      "T2": {
+        "travel": 206,
+        "work": 318,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 40,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 2,
+        "minFuelPct": 13.7,
+        "lastActive": 593,
+        "spare": 0
+      },
+      "T3": {
+        "travel": 442,
+        "work": 208,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 40,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 2,
+        "minFuelPct": 26.6,
+        "lastActive": 719,
+        "spare": 0
+      }
+    },
+    "nonProductiveMin": 892
+  }
+}

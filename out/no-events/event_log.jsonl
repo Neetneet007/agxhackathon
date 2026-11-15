@@ -1,0 +1,21 @@
+{"time":0,"clock":"06:00","type":"submit","text":"Operator submitted 12 jobs.","jobs":["J1","J2","J3","J4","J5","J6","J7","J8","J9","J10","J11","J12"]}
+{"time":0,"clock":"06:00","type":"plan","text":"Initial plan: 12 of 12 jobs scheduled, fleet done by 15:46.","lines":["T1: J4 Spray North Field (06:18–07:18) → J9 Spray Bottomland (08:18–08:54) → J11 Spray Home Quarter (10:15–11:09) → J2 Spray Ridge 80 (12:34–13:46) → J7 Spray Long Acre (14:00–14:48)","T2: J6 Till Orchard Strip (06:32–07:44) → J5 Mow East Meadow (09:39–11:03) → J10 Mow Bottomland (11:37–12:49) → J1 Mow Creek Pasture (14:16–15:46)","T3: J8 Seed Home Quarter (06:30–07:30) → J3 Seed South Flats (08:24–09:48) → J12 Seed Long Acre (10:18–11:06)"],"footer":"Fleet finish 15:46 · planned driving 540 min · safety check passed (66 checks).","cause":"initial","planMs":16,"warnings":[]}
+{"time":19,"clock":"06:19","type":"ops","text":"T2 swapped to tiller at the depot.","tractor":"T2"}
+{"time":77,"clock":"07:17","type":"done","text":"T1 completed J4 Spray North Field at 07:18 (deadline 09:30).","job":"J4","tractor":"T1","late":false}
+{"time":89,"clock":"07:29","type":"done","text":"T3 completed J8 Seed Home Quarter at 07:30 (deadline 15:30).","job":"J8","tractor":"T3","late":false}
+{"time":103,"clock":"07:43","type":"done","text":"T2 completed J6 Till Orchard Strip at 07:44 (deadline 15:00).","job":"J6","tractor":"T2","late":false}
+{"time":135,"clock":"08:15","type":"ops","text":"T2 swapped to mower at the depot.","tractor":"T2"}
+{"time":150,"clock":"08:30","type":"ops","text":"T2 refuelled to 100%.","tractor":"T2"}
+{"time":173,"clock":"08:53","type":"done","text":"T1 completed J9 Spray Bottomland at 08:54 (deadline 11:00).","job":"J9","tractor":"T1","late":false}
+{"time":227,"clock":"09:47","type":"done","text":"T3 completed J3 Seed South Flats at 09:48 (deadline 13:00).","job":"J3","tractor":"T3","late":false}
+{"time":234,"clock":"09:54","type":"ops","text":"T1 refuelled to 100%.","tractor":"T1"}
+{"time":302,"clock":"11:02","type":"done","text":"T2 completed J5 Mow East Meadow at 11:03 (deadline 14:00).","job":"J5","tractor":"T2","late":false}
+{"time":305,"clock":"11:05","type":"done","text":"T3 completed J12 Seed Long Acre at 11:06 (deadline 17:30).","job":"J12","tractor":"T3","late":false}
+{"time":308,"clock":"11:08","type":"done","text":"T1 completed J11 Spray Home Quarter at 11:09 (deadline 14:30).","job":"J11","tractor":"T1","late":false}
+{"time":343,"clock":"11:43","type":"ops","text":"T1 refuelled to 100%.","tractor":"T1"}
+{"time":408,"clock":"12:48","type":"done","text":"T2 completed J10 Mow Bottomland at 12:49 (deadline 17:30).","job":"J10","tractor":"T2","late":false}
+{"time":465,"clock":"13:45","type":"done","text":"T1 completed J2 Spray Ridge 80 at 13:46 (deadline 14:00).","job":"J2","tractor":"T1","late":false}
+{"time":469,"clock":"13:49","type":"ops","text":"T2 refuelled to 100%.","tractor":"T2"}
+{"time":527,"clock":"14:47","type":"done","text":"T1 completed J7 Spray Long Acre at 14:48 (deadline 17:00).","job":"J7","tractor":"T1","late":false}
+{"time":585,"clock":"15:45","type":"done","text":"T2 completed J1 Mow Creek Pasture at 15:46 (deadline 16:00).","job":"J1","tractor":"T2","late":false}
+{"time":587,"clock":"15:47","type":"end","text":"Simulation ended at 15:47: all jobs complete."}

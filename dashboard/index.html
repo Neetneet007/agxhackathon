@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fleet Command Center</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<link rel="stylesheet" href="./style3d.css">
+</head>
+<body>
+<div id="stage"></div>
+
+<header class="bar glass">
+  <div class="brand"><span class="logo">◆</span> Fleet Command Center</div>
+  <div class="clock" id="clock">06:00</div>
+  <div class="ctrls">
+    <button class="btn primary" id="play">▶ Run</button>
+    <button class="btn" id="step" title="Advance 10 minutes">+10m</button>
+    <select class="btn" id="speed" title="Simulated minutes per second">
+      <option value="5">5 min/s</option><option value="15" selected>15 min/s</option><option value="40">40 min/s</option><option value="120">120 min/s</option>
+    </select>
+    <span class="seg"><button id="modeC" class="on">AI coordinator</button><button id="modeB">FCFS baseline</button></span>
+    <details class="pop" id="settingsPop"><summary class="btn">⋯</summary>
+      <div class="popbody glass">
+        <label><input type="checkbox" id="scripted" checked> Scripted demo events</label>
+        <button class="btn" id="reset">Reset day</button>
+        <button class="btn" id="resetView">Reset camera</button>
+        <a class="btn" href="./classic.html">Classic 2D dashboard</a>
+      </div>
+    </details>
+    <button class="btn" id="compare">Compare vs baseline</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="pill" id="llmPill" title="Who writes the notifications">…</div>
+</header>
+
+<aside class="dock">
+  <div id="decisions"></div>
+  <details class="card glass" open><summary>Fleet</summary><div id="fleet"></div></details>
+  <details class="card glass"><summary>Jobs <span class="count" id="jobCount"></span></summary><div id="jobs"></div></details>
+  <details class="card glass" open><summary>Data sources <span class="count" id="srcCount"></span></summary><div id="sources"></div></details>
+  <details class="card glass"><summary>Operator</summary>
+    <div class="ops">
+      <div class="row"><select id="opTractor"></select><button class="btn danger" id="opBreak">Break down</button><button class="btn" id="opRepair">Repair</button></div>
+      <div class="row" id="opBridges"></div>
+      <div class="sub">Change priority</div>
+      <div class="row"><select id="pJob"></select></div>
+      <div class="row"><select id="pPri"><option>high</option><option>medium</option><option>low</option></select><input type="time" id="pDl" value="12:00" step="900"><button class="btn" id="pApply">Apply</button></div>
+      <div class="sub">Submit a job</div>
+      <div class="row"><select id="nType"><option value="spray">Spray</option><option value="mow">Mow</option><option value="till">Till</option><option value="seed">Seed</option></select><select id="nField"></select></div>
+      <div class="row"><select id="nPri"><option>high</option><option selected>medium</option><option>low</option></select><input type="time" id="nDl" value="15:00" step="900"><button class="btn" id="nAdd">Submit</button></div>
+      <details class="mini"><summary>Paste a job list (JSON)</summary>
+        <textarea id="bulk" spellcheck="false">[
+  {"type":"mow","fieldId":"F4","priority":"low","deadline":"17:00"},
+  {"type":"spray","fieldId":"F6","acres":20,"priority":"high","deadline":"14:30"}
+]</textarea>
+        <div class="row"><button class="btn" id="bulkAdd">Submit list</button><span class="muted" id="bulkMsg"></span></div>
+      </details>
+    </div>
+  </details>
+</aside>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<section class="timeline glass" id="timelineWrap">
+  <details id="timelineDetails"><summary>Schedule <span class="muted">— actual (solid) · plan (light) · │ deadline</span></summary><div id="gantt"></div></details>
+</section>
+
+<div class="popover glass" id="popover" hidden></div>
+
+<button class="askfab" id="askFab">✦ Ask why</button>
+<section class="ask glass" id="ask" hidden>
+  <div class="askhead"><b>✦ Copilot</b><span class="muted" id="askMode"></span><button class="x" id="askClose" aria-label="Close">×</button></div>
+  <div class="row"><label class="muted">About</label><select id="askCtx"></select></div>
+  <div class="chips" id="askChips"></div>
+  <div class="thread" id="thread"></div>
+  <form class="askform" id="askForm"><input id="askInput" placeholder="Why did T3 get the Creek Pasture spray?" autocomplete="off"><button class="btn primary">Ask</button></form>
+</section>
+
+<div class="modal" id="cmpModal"><div class="box glass">
+  <div class="askhead"><b>AI coordinator vs. FCFS baseline</b><button class="x" id="cmpClose">×</button></div>
+  <p class="muted" id="cmpNote"></p><div id="cmpBody"></div>
+</div></div>
+
+<div class="loading" id="loading">Loading 3D farm…</div>
+<script type="module" src="./app3d.js"></script>
+</body>
+</html>

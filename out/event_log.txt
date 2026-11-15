@@ -1,0 +1,69 @@
+[06:00] SUBMIT Operator submitted 12 jobs.
+[06:00] PLAN   Initial plan: 12 of 12 jobs scheduled, fleet done by 15:46.
+                 • T1: J4 Spray North Field (06:18–07:18) → J9 Spray Bottomland (08:18–08:54) → J11 Spray Home Quarter (10:15–11:09) → J2 Spray Ridge 80 (12:34–13:46) → J7 Spray Long Acre (14:00–14:48)
+                 • T2: J6 Till Orchard Strip (06:32–07:44) → J5 Mow East Meadow (09:39–11:03) → J10 Mow Bottomland (11:37–12:49) → J1 Mow Creek Pasture (14:16–15:46)
+                 • T3: J8 Seed Home Quarter (06:30–07:30) → J3 Seed South Flats (08:24–09:48) → J12 Seed Long Acre (10:18–11:06)
+                 Fleet finish 15:46 · planned driving 540 min · safety check passed (66 checks).
+[06:19] OPS    T2 swapped to tiller at the depot.
+[07:17] DONE   T1 completed J4 Spray North Field at 07:18 (deadline 09:30).
+[07:29] DONE   T3 completed J8 Seed Home Quarter at 07:30 (deadline 15:30).
+[07:40] EVENT  BREAKDOWN: T1 Atlas is out of service while on J9 Spray Bottomland (0% done, 24.0 ac left) — hydraulic pump failure. [Tractor telematics: DTC SPN 1209 FMI 1 — hydraulic pressure low, machine stopped itself]
+[07:40] PLAN   T1 broke down: 4 unfinished job(s) re-assigned, 2 completed job(s) unaffected.
+                 • J11 Spray Home Quarter → T3, finish 14:48 (deadline 14:30); only working tractor with a sprayer.
+                 • J7 Spray Long Acre → T3, finish 16:46 (deadline 17:00); only working tractor with a sprayer.
+                 • ⚠ J11 Spray Home Quarter can no longer make 14:30: T1 is out of service; T2 has no sprayer; T3 could not finish before 14:30 (earliest 14:48). Best option: T3 finishes 14:48 (18 min late). Needs operator sign-off — approve, or drop it to free T3.
+                 • ⚠ J2 Spray Ridge 80 does not fit in today's shift: T1 is out of service; T2 has no sprayer; T3 could fit it only by pushing J11 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 • ⚠ J9 Spray Bottomland does not fit in today's shift: T1 is out of service; T2 has no sprayer; T3 could fit it only by pushing J11 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 Fleet finish 15:45 → 16:46 · planned driving 429 min · safety check passed (45 checks, 1 warning(s)).
+[07:43] DONE   T2 completed J6 Till Orchard Strip at 07:44 (deadline 15:00).
+[08:15] OPS    T2 swapped to mower at the depot.
+[08:30] SUBMIT Operator submitted 1 new job(s): J13 Spray Creek Pasture. [Drone & satellite imagery: Drone NDVI pass: aphid hotspot in Creek Pasture, index −0.12 vs last week]
+[08:30] PLAN   1 new job(s) slotted into the plan.
+                 • J13 Spray Creek Pasture → T3, finish 13:27 (deadline 13:30), position 2 in queue; only working tractor with a sprayer.
+                 • J11 Spray Home Quarter now finishes 15:18 (+30 min).
+                 • J9 Spray Bottomland now scheduled on T3, finish 18:00.
+                 • ⚠ J7 Spray Long Acre does not fit in today's shift: T1 is out of service; T2 has no sprayer; T3 could fit it only by pushing J11 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 • ⚠ J12 Seed Long Acre does not fit in today's shift: T2 has no seeder; T3 could fit it only by pushing J9 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 Fleet finish 16:46 → 18:00 · planned driving 435 min · safety check passed (43 checks, 2 warning(s)).
+[08:30] OPS    T2 refuelled to 100%.
+[09:20] EVENT  ROUTE BLOCKED: South bridge — washed out after overnight rain. [Bridge & road feed: Gauge at South bridge reads 2.1 m — water over the deck]
+[09:20] PLAN   Navigation re-routed around South bridge.
+                 • T2's remaining route would need +24 min of driving to detour via the other crossing.
+                 • Best response is to keep the job order and take the detour.
+                 • J1 Mow Creek Pasture now finishes 13:16 (-150 min).
+                 • J10 Mow Bottomland now finishes 16:19 (+210 min).
+                 • J12 Seed Long Acre now scheduled on T3, finish 11:07.
+                 • J13 Spray Creek Pasture now finishes 14:51 (+84 min).
+                 • J7 Spray Long Acre now scheduled on T3, finish 16:46.
+                 • ⚠ J13 Spray Creek Pasture can no longer make 13:30: T1 is out of service; T2 has no sprayer; T3 could not finish before 13:30 (earliest 14:51). Best option: T3 finishes 14:51 (81 min late). Needs operator sign-off — approve, or drop it to free T3.
+                 • ⚠ J11 Spray Home Quarter does not fit in today's shift: T1 is out of service; T2 has no sprayer; T3 could fit it only by pushing J13 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 • ⚠ J9 Spray Bottomland does not fit in today's shift: T1 is out of service; T2 has no sprayer; T3 could fit it only by pushing J12 past the end of the shift. Carried over — operator can drop other work or extend the shift.
+                 Fleet finish 18:00 → 16:46 · planned driving 368 min · safety check passed (42 checks, 1 warning(s)).
+[09:48] DONE   T3 completed J3 Seed South Flats at 09:49 (deadline 13:00).
+[10:00] EVENT  PRIORITY CHANGE: J1 Mow Creek Pasture: priority low → high, deadline 16:00 → 14:00 — rain forecast for this afternoon — cut the hay now. [Weather service: Forecast update: 70% chance of rain from 15:00 — cut hay must be down by 14:00]
+[10:00] PLAN   J1 Mow Creek Pasture is now high priority, due 14:00.
+                 • J1 Mow Creek Pasture: T2 → T2 (position 2), finish 13:15 → 13:16.
+                 Fleet finish 16:45 → 16:48 · planned driving 339 min · safety check passed (37 checks, 1 warning(s)).
+[10:30] EVENT  REPAIRED: T1 Atlas is back in service at (4,13). [Dealer service: Ticket #4471 closed — pump replaced in the field]
+[10:30] PLAN   T1 back in service: takes over 4 job(s); fleet finish 16:48 → 17:25.
+                 • J13 Spray Creek Pasture → T1, finish 11:45 (deadline 13:30) (from T3); T3 would miss the deadline (14:53).
+                 • J11 Spray Home Quarter → T1, finish 13:40 (deadline 14:30); T3 would miss the deadline (14:56), make J7 late.
+                 • J2 Spray Ridge 80 → T1, finish 16:17 (deadline 14:00); no other option: T2 has no sprayer; T3 could fit it only by pushing J7 past the end of the shift.
+                 • J9 Spray Bottomland → T1, finish 17:25 (deadline 11:00); T3 would delay its other work.
+                 • J7 Spray Long Acre now finishes 15:48 (-60 min).
+                 Fleet finish 16:48 → 17:25 · planned driving 496 min · safety check passed (50 checks, 2 warning(s)).
+[11:03] DONE   T2 completed J5 Mow East Meadow at 11:04 (deadline 14:00).
+[11:08] DONE   T3 completed J12 Seed Long Acre at 11:09 (deadline 17:30).
+[11:44] DONE   T1 completed J13 Spray Creek Pasture at 11:45 (deadline 13:30).
+[12:25] OPS    T1 refuelled to 100%.
+[12:58] OPS    T3 swapped to sprayer at the depot.
+[13:13] OPS    T3 refuelled to 100%.
+[13:15] DONE   T2 completed J1 Mow Creek Pasture at 13:16 (deadline 14:00).
+[13:39] DONE   T1 completed J11 Spray Home Quarter at 13:40 (deadline 14:30).
+[13:56] OPS    T2 refuelled to 100%.
+[14:14] OPS    T1 refuelled to 100%.
+[15:47] DONE   T3 completed J7 Spray Long Acre at 15:48 (deadline 17:00).
+[16:16] DONE   T1 completed J2 Spray Ridge 80 at 16:17 — LATE by 137 min (deadline 14:00).
+[16:18] DONE   T2 completed J10 Mow Bottomland at 16:19 (deadline 17:30).
+[17:24] DONE   T1 completed J9 Spray Bottomland at 17:25 — LATE by 385 min (deadline 11:00).
+[17:26] END    Simulation ended at 17:26: all jobs complete.

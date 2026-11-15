@@ -1,0 +1,172 @@
+{
+  "coordinator": {
+    "jobsTotal": 13,
+    "jobsCompleted": 13,
+    "jobsOnTime": 11,
+    "jobsLate": 2,
+    "acresOnTime": 302,
+    "priorityValueOnTime": 660,
+    "travelMin": 746,
+    "idleMin": 0,
+    "spareMin": 62,
+    "workMin": 841,
+    "fuelStops": 5,
+    "implementSwaps": 3,
+    "makespan": 686,
+    "makespanClock": "17:26",
+    "violations": 0,
+    "lateFlagged": 2,
+    "violationList": [
+      {
+        "time": 616,
+        "kind": "deadline-flagged",
+        "text": "J2 finished 137 min late (forecast and flagged to operator at 10:30 after repair)"
+      },
+      {
+        "time": 684,
+        "kind": "deadline-flagged",
+        "text": "J9 finished 385 min late (forecast and flagged to operator at 08:30 after new jobs)"
+      }
+    ],
+    "perTractor": {
+      "T1": {
+        "travel": 218,
+        "work": 267,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 0,
+        "broken": 170,
+        "fuelStops": 2,
+        "swaps": 0,
+        "minFuelPct": 14.8,
+        "lastActive": 684,
+        "spare": 0
+      },
+      "T2": {
+        "travel": 231,
+        "work": 318,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 40,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 2,
+        "minFuelPct": 13.7,
+        "lastActive": 618,
+        "spare": 0
+      },
+      "T3": {
+        "travel": 297,
+        "work": 256,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 15,
+        "swap": 20,
+        "broken": 0,
+        "fuelStops": 1,
+        "swaps": 1,
+        "minFuelPct": 18.6,
+        "lastActive": 587,
+        "spare": 62
+      }
+    },
+    "nonProductiveMin": 746
+  },
+  "baseline": {
+    "jobsTotal": 13,
+    "jobsCompleted": 10,
+    "jobsOnTime": 7,
+    "jobsLate": 3,
+    "acresOnTime": 208,
+    "priorityValueOnTime": 358,
+    "travelMin": 1004,
+    "idleMin": 0,
+    "spareMin": 0,
+    "workMin": 710,
+    "fuelStops": 5,
+    "implementSwaps": 5,
+    "makespan": 720,
+    "makespanClock": "18:00",
+    "violations": 3,
+    "lateFlagged": 0,
+    "violationList": [
+      {
+        "time": 412,
+        "kind": "deadline",
+        "text": "J4 finished 203 min late"
+      },
+      {
+        "time": 615,
+        "kind": "deadline",
+        "text": "J8 finished 46 min late"
+      },
+      {
+        "time": 691,
+        "kind": "deadline",
+        "text": "J9 finished 392 min late"
+      },
+      {
+        "time": 720,
+        "kind": "unfinished",
+        "text": "J11 not completed (24.0 ac left)"
+      },
+      {
+        "time": 720,
+        "kind": "unfinished",
+        "text": "J12 not completed (16.0 ac left)"
+      },
+      {
+        "time": 720,
+        "kind": "unfinished",
+        "text": "J13 not completed (30.0 ac left)"
+      }
+    ],
+    "perTractor": {
+      "T1": {
+        "travel": 326,
+        "work": 194,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 0,
+        "broken": 170,
+        "fuelStops": 2,
+        "swaps": 0,
+        "minFuelPct": 16.8,
+        "lastActive": 719,
+        "spare": 0
+      },
+      "T2": {
+        "travel": 231,
+        "work": 318,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 30,
+        "swap": 40,
+        "broken": 0,
+        "fuelStops": 2,
+        "swaps": 2,
+        "minFuelPct": 13.7,
+        "lastActive": 618,
+        "spare": 0
+      },
+      "T3": {
+        "travel": 447,
+        "work": 198,
+        "idle": 0,
+        "wait": 0,
+        "refuel": 15,
+        "swap": 60,
+        "broken": 0,
+        "fuelStops": 1,
+        "swaps": 3,
+        "minFuelPct": 20.3,
+        "lastActive": 719,
+        "spare": 0
+      }
+    },
+    "nonProductiveMin": 1004
+  }
+}

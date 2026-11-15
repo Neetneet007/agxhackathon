@@ -1,0 +1,10 @@
+
+200 random scenarios (random jobs, fuel and 0–4 events: breakdowns, repairs, closures, priority changes, new jobs)
+                                      coord   baseline
+jobs completed                         1544       1454
+jobs on time                           1387       1108
+priority-weighted acres on time       66863      50684
+travel (tractor-min)                  80101      97402
+idle (tractor-min)                     1603       4124
+unannounced violations                    0        346
+coordinator better on on-time value in 168/200, tied 22; invariant failures 0; crashes 0; slowest re-plan 9 ms

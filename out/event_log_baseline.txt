@@ -1,0 +1,26 @@
+[06:00] SUBMIT Operator submitted 12 jobs.
+[06:14] OPS    T2 refuelled to 100%.
+[07:40] EVENT  BREAKDOWN: T1 Atlas is out of service while on J2 Spray Ridge 80 (69% done, 14.7 ac left) — hydraulic pump failure. [Tractor telematics: DTC SPN 1209 FMI 1 — hydraulic pressure low, machine stopped itself]
+[08:10] DONE   T2 completed J1 Mow Creek Pasture at 08:11 (deadline 16:00).
+[08:30] SUBMIT Operator submitted 1 new job(s): J13 Spray Creek Pasture. [Drone & satellite imagery: Drone NDVI pass: aphid hotspot in Creek Pasture, index −0.12 vs last week]
+[08:47] DONE   T3 completed J3 Seed South Flats at 08:48 (deadline 13:00).
+[09:20] EVENT  ROUTE BLOCKED: South bridge — washed out after overnight rain. [Bridge & road feed: Gauge at South bridge reads 2.1 m — water over the deck]
+[10:17] DONE   T2 completed J5 Mow East Meadow at 10:18 (deadline 14:00).
+[10:30] EVENT  REPAIRED: T1 Atlas is back in service at (21,3). [Dealer service: Ticket #4471 closed — pump replaced in the field]
+[11:10] OPS    T3 swapped to sprayer at the depot.
+[11:34] OPS    T1 refuelled to 100%.
+[11:45] OPS    T2 swapped to tiller at the depot.
+[12:00] OPS    T2 refuelled to 100%.
+[12:52] DONE   T1 completed J4 Spray North Field at 12:53 — LATE by 203 min (deadline 09:30).
+[12:55] DONE   T3 completed J2 Spray Ridge 80 at 12:56 (deadline 14:00); work shared by T1 + T3.
+[13:24] DONE   T2 completed J6 Till Orchard Strip at 13:25 (deadline 15:00).
+[13:56] OPS    T2 swapped to mower at the depot.
+[14:30] DONE   T1 completed J7 Spray Long Acre at 14:31 (deadline 17:00).
+[14:30] OPS    T3 swapped to seeder at the depot.
+[14:45] OPS    T3 refuelled to 100%.
+[15:45] OPS    T1 refuelled to 100%.
+[16:15] DONE   T3 completed J8 Seed Home Quarter at 16:16 — LATE by 46 min (deadline 15:30).
+[16:18] DONE   T2 completed J10 Mow Bottomland at 16:19 (deadline 17:30).
+[17:05] OPS    T3 swapped to sprayer at the depot.
+[17:31] DONE   T1 completed J9 Spray Bottomland at 17:32 — LATE by 392 min (deadline 11:00).
+[18:00] END    Simulation ended at 18:00: end of shift.
