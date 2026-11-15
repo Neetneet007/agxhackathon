@@ -1,0 +1,702 @@
+{
+  "about": "Weather playbook for the Weather Manager. Every rule names its source. A rule with no source or verified:false may only advise (a Caution on the roundtable); it cannot place a hold, recall the fleet, block a route or change the plan. Sources were looked up on 2026-11-15 through web search; 'checked' says how each was read. Where sources disagree or give a range, the more cautious value is used and the rule says so.",
+  "severity": {
+    "advise": 1,
+    "hold_spray": 2,
+    "hold_types": 3,
+    "hold_fields": 3,
+    "hold_all": 4,
+    "recall": 5
+  },
+  "rules": [
+    {
+      "id": "drift-wind",
+      "hazard": "Spray drift: wind",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "any": [
+          {
+            "path": "reading.wind2Mph",
+            "lt": 3
+          },
+          {
+            "path": "reading.wind2Mph",
+            "gt": 10
+          }
+        ]
+      },
+      "actions": [
+        "hold_spray"
+      ],
+      "explain": "Spraying stopped: wind at spray height is {reading.wind2Mph} mph, outside 3 to 10 mph.",
+      "note": "Labels typically allow 3-10 mph and, below 3 mph, require the applicator to rule out an inversion. We stop below 3 mph outright (more cautious). The label of the product actually used is legally binding and may be stricter.",
+      "source": [
+        {
+          "title": "Pesticide product label (example hosted by WSU Tree Fruit): 'apply only when wind speed is 3 to 10 mph at the application site'",
+          "publisher": "Washington State University Tree Fruit",
+          "url": "https://treefruit.wsu.edu/?p=10273",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Avoiding herbicide drift",
+          "publisher": "University of Minnesota Extension",
+          "url": "https://extension.umn.edu/agriculture/crop-production/weed-management/avoiding-herbicide-drift",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts; full pages could not be opened by the page reader",
+      "verified": true
+    },
+    {
+      "id": "drift-inversion",
+      "hazard": "Spray drift: inversion",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "derived.inversionC",
+        "gt": 0
+      },
+      "actions": [
+        "hold_spray"
+      ],
+      "explain": "Spraying stopped: the air at 10 m is {reading.t10C} °C, warmer than {reading.t2C} °C at 2 m, a temperature inversion.",
+      "note": "An inversion is confirmed by warmer air above cooler air near the ground; labels prohibit spraying during inversions even when ground wind looks fine.",
+      "source": [
+        {
+          "title": "Understanding air temperature inversions relating to pesticide drift",
+          "publisher": "North Dakota State University Extension",
+          "url": "https://www.ndsu.edu/agriculture/extension/publications/understanding-air-temperature-inversions-relating-pesticide-drift",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Understanding temperature inversions (SPES-827)",
+          "publisher": "Virginia Cooperative Extension",
+          "url": "https://www.pubs.ext.vt.edu/SPES/spes-827-understanding-temperature-inversions-protecting-against-pesticide-drift-during-aerial-drone-spray-applications.html",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "drift-shear",
+      "hazard": "Spray drift: wind shear between heights",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "derived.shearMph",
+        "gt": 5
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Spray with care: wind is {reading.wind10Mph} mph at 10 m against {reading.wind2Mph} mph at 2 m.",
+      "note": "The 5 mph difference is this farm's own choice; no source found sets a shear limit, so this rule only advises.",
+      "source": [],
+      "verified": false
+    },
+    {
+      "id": "drift-wind-near-limit",
+      "hazard": "Spray drift: wind near the upper limit",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "all": [
+          {
+            "path": "reading.wind2Mph",
+            "gt": 8
+          },
+          {
+            "path": "reading.wind2Mph",
+            "lte": 10
+          }
+        ]
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Spray with care: wind at spray height is {reading.wind2Mph} mph, close to the 10 mph limit.",
+      "note": "8 mph is a farm choice for an early warning; advisory only.",
+      "source": [],
+      "verified": false
+    },
+    {
+      "id": "rain-after-spray",
+      "hazard": "Rain soon after spraying",
+      "phase": "before",
+      "scale": "today",
+      "trigger": {
+        "path": "forecast.rainWithinHours",
+        "lte": 6
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Rain is forecast within {forecast.rainWithinHours} h; spraying now may wash off. The rain-free period comes from the product label.",
+      "note": "Rain-free periods differ by product and formulation (from 15 minutes to 24 hours in the sources found). No product is configured for this farm, so the rule cannot hold spraying until a label value is entered.",
+      "source": [
+        {
+          "title": "Rainfastness of pesticides",
+          "publisher": "University of Missouri IPM",
+          "url": "https://ipm.missouri.edu/MEG/2018/3/rainfastness_pesticides/",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts; value must come from the product label",
+      "verified": false
+    },
+    {
+      "id": "rain-before-dry-job",
+      "hazard": "Rain before a job that needs dry ground",
+      "phase": "before",
+      "scale": "today",
+      "trigger": {
+        "path": "forecast.rainWithinHours",
+        "lte": 24
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Rain is forecast within {forecast.rainWithinHours} h; hay, harvest and tillage jobs may need to move.",
+      "note": "No source found for when a job becomes pointless; advisory only.",
+      "source": [],
+      "verified": false
+    },
+    {
+      "id": "wet-soil",
+      "hazard": "Wet or saturated soil",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "reading.soilMoisturePct",
+        "gt": 35
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Soil moisture is {reading.soilMoisturePct} %; machines may rut and compact wet fields.",
+      "note": "The machinery limit is farm- and soil-specific; 35 % is a placeholder until the farmer sets it.",
+      "source": [],
+      "verified": false
+    },
+    {
+      "id": "freeze-warning",
+      "hazard": "Frost or freeze",
+      "phase": "before",
+      "scale": "today",
+      "trigger": {
+        "alert": [
+          "Freeze Warning",
+          "Freeze Watch",
+          "Frost Advisory"
+        ]
+      },
+      "actions": [
+        "advise",
+        "reprioritise"
+      ],
+      "explain": "{alert} in force: protective jobs first; ask the Plan Manager to reprioritise.",
+      "source": [
+        {
+          "title": "Frost and freeze information",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/abr/FallFrostFreezeDSSPage",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts; thresholds vary by NWS office, so the official alert is the trigger",
+      "verified": true
+    },
+    {
+      "id": "extreme-heat",
+      "hazard": "Extreme heat for people at the depot",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "reading.heatIndexF",
+        "gte": 103
+      },
+      "actions": [
+        "advise",
+        "tell_depot"
+      ],
+      "explain": "Heat index {reading.heatIndexF} °F (OSHA high-risk band starts at 103 °F): move fuelling and re-fitting to cooler hours.",
+      "note": "Bands from archived OSHA heat-index pages (91, 103, 115 °F); the current OSHA page was not confirmed, so this stays advisory. Machines may continue.",
+      "source": [
+        {
+          "title": "Using the Heat Index: protective measures by risk level",
+          "publisher": "OSHA (archived page)",
+          "url": "https://webarchive.library.unt.edu/web/20121016220915/http://www.osha.gov/SLTC/heatillness/heat_index/index.html",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts of archived pages",
+      "verified": false
+    },
+    {
+      "id": "dust-storm",
+      "hazard": "Dust storm",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "any": [
+          {
+            "alert": [
+              "Dust Storm Warning"
+            ]
+          },
+          {
+            "path": "reading.visibilityMi",
+            "lte": 0.25
+          }
+        ]
+      },
+      "actions": [
+        "recall",
+        "no_depot_tasks"
+      ],
+      "explain": "Dust storm: visibility is {reading.visibilityMi} mi or a Dust Storm Warning is in force; the fleet is recalled until the all-clear.",
+      "note": "NWS issues a Dust Storm Warning for visibility of 1/4 mile or less, usually with wind of 25 mph or more.",
+      "source": [
+        {
+          "title": "Watch, warning and advisory definitions",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/otx/Watch_Warning_Advisory_Definitions",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Dust Storm Warning service change notice (SCN 18-90)",
+          "publisher": "National Weather Service",
+          "url": "https://weather.gov/media/notification/pdfs/scn18-90swq_dsw_oper_aaa.pdf",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "lightning",
+      "hazard": "Thunderstorm and lightning",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "any": [
+          {
+            "alert": [
+              "Severe Thunderstorm Warning"
+            ]
+          },
+          {
+            "path": "reading.lightningMi",
+            "lte": 10
+          },
+          {
+            "path": "derived.minutesSinceLightning",
+            "lt": 30
+          }
+        ]
+      },
+      "actions": [
+        "recall",
+        "no_depot_tasks"
+      ],
+      "explain": "Lightning within 10 miles or a Severe Thunderstorm Warning (NWS: lightning can strike 10 miles from a storm; wait 30 minutes after the last strike). The fleet stays recalled and nobody works at the depot.",
+      "source": [
+        {
+          "title": "Lightning safety one-pager",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/media/owlie/LightningSafety-OnePager-11-29-18.pdf",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Lightning safety",
+          "publisher": "NOAA JetStream",
+          "url": "https://noaa.gov/jetstream/lightning/lightning-safety",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "high-wind",
+      "hazard": "High wind",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "any": [
+          {
+            "alert": [
+              "High Wind Warning"
+            ]
+          },
+          {
+            "path": "reading.gustMph",
+            "gte": 58
+          }
+        ]
+      },
+      "actions": [
+        "hold_spray",
+        "recall"
+      ],
+      "explain": "High wind: gusts {reading.gustMph} mph or a High Wind Warning (NWS: sustained 40 mph or gusts 58 mph); spraying held and the fleet recalled.",
+      "source": [
+        {
+          "title": "Non-precipitation product definitions",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/dtx/noPrecip_defs",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "wind-advisory",
+      "hazard": "Strong wind below warning level",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "any": [
+          {
+            "alert": [
+              "Wind Advisory"
+            ]
+          },
+          {
+            "all": [
+              {
+                "path": "reading.gustMph",
+                "gte": 46
+              },
+              {
+                "path": "reading.gustMph",
+                "lt": 58
+              }
+            ]
+          }
+        ]
+      },
+      "actions": [
+        "hold_spray",
+        "advise"
+      ],
+      "explain": "Wind advisory level: gusts {reading.gustMph} mph (NWS: 46 to 57 mph); no spraying, take care with tall or wide implements.",
+      "source": [
+        {
+          "title": "Non-precipitation product definitions",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/dtx/noPrecip_defs",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "flood-watch",
+      "hazard": "Flash flood or flood: watch",
+      "phase": "before",
+      "scale": "today",
+      "trigger": {
+        "alert": [
+          "Flood Watch",
+          "Flash Flood Watch"
+        ]
+      },
+      "actions": [
+        "advise",
+        "reprioritise_low_fields",
+        "fuel_all"
+      ],
+      "explain": "{alert} in force: flooding is possible. Bring work on low fields forward, fuel every machine, and move equipment and chemicals to high ground.",
+      "source": [
+        {
+          "title": "Flood watch vs. flood warning",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/safety/flood-watch-warning",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "flood-warning",
+      "hazard": "Flash flood or flood: warning",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "alert": [
+          "Flood Warning",
+          "Flash Flood Warning"
+        ]
+      },
+      "actions": [
+        "recall",
+        "block_bridges",
+        "hold_low_fields"
+      ],
+      "explain": "{alert} in force: flooding is imminent or happening. Fleet recalled to high ground, the creek bridges closed, and work on low fields held.",
+      "note": "NWS: 'Turn around, don't drown'; 12 inches of moving water can float a vehicle.",
+      "source": [
+        {
+          "title": "Flood watch vs. flood warning",
+          "publisher": "National Weather Service",
+          "url": "https://www.weather.gov/safety/flood-watch-warning",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Glossary: Flash Flood Warning",
+          "publisher": "National Weather Service",
+          "url": "https://forecast.weather.gov/glossary.php?word=Flash+Flood",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "creek-gauge",
+      "hazard": "Creek gauge above the farm's limit",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "reading.creekGaugeM",
+        "gte": 1.5
+      },
+      "actions": [
+        "advise"
+      ],
+      "explain": "Mill Creek gauge reads {reading.creekGaugeM} m; check the bridges.",
+      "note": "1.5 m is a placeholder until the farm sets its own gauge limit; advisory only. An official flood warning triggers the closures.",
+      "source": [],
+      "verified": false
+    },
+    {
+      "id": "after-flood",
+      "hazard": "After a flood",
+      "phase": "after",
+      "scale": "days",
+      "trigger": {
+        "path": "history.floodEnded",
+        "eq": true
+      },
+      "actions": [
+        "keep_holds",
+        "inspections"
+      ],
+      "explain": "The water has receded. Every hold stays until a person has inspected the machines, bridges and low fields; flooded food crops are not harvested until a person clears them (FDA: crops whose edible part touched flood water are adulterated).",
+      "source": [
+        {
+          "title": "Guidance for Industry: Evaluating the Safety of Flood-affected Food Crops for Human Consumption",
+          "publisher": "U.S. Food and Drug Administration",
+          "url": "https://www.fda.gov/regulatory-information/search-fda-guidance-documents/guidance-industry-evaluating-safety-flood-affected-food-crops-human-consumption",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "tropical-watch",
+      "hazard": "Tropical storm or hurricane: watch",
+      "phase": "before",
+      "scale": "days",
+      "trigger": {
+        "alert": [
+          "Hurricane Watch",
+          "Tropical Storm Watch"
+        ]
+      },
+      "actions": [
+        "hold_types",
+        "reprioritise_harvest",
+        "fuel_all",
+        "advise"
+      ],
+      "holdTypes": [
+        "seed",
+        "till",
+        "spray"
+      ],
+      "explain": "{alert}: storm conditions are possible within about 48 hours. Planting, tillage and spraying stop because the storm would undo them; harvest what is ready and fuel every machine.",
+      "source": [
+        {
+          "title": "Watch and warning changes (issuance criteria)",
+          "publisher": "NOAA National Hurricane Center",
+          "url": "https://www.nhc.noaa.gov/watchwarn_changes.shtml",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "tropical-warning",
+      "hazard": "Tropical storm or hurricane: warning",
+      "phase": "before",
+      "scale": "today",
+      "trigger": {
+        "alert": [
+          "Hurricane Warning",
+          "Tropical Storm Warning"
+        ]
+      },
+      "actions": [
+        "hold_all",
+        "recall",
+        "secure_depot"
+      ],
+      "explain": "{alert}: storm conditions are expected within about 36 hours. All field work ends; the fleet goes to the depot and people secure fuel and chemicals.",
+      "source": [
+        {
+          "title": "Watch and warning changes (issuance criteria)",
+          "publisher": "NOAA National Hurricane Center",
+          "url": "https://www.nhc.noaa.gov/watchwarn_changes.shtml",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "storm-conditions",
+      "hazard": "During the storm",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "reading.sustainedMph",
+        "gte": 39
+      },
+      "actions": [
+        "hold_all",
+        "recall",
+        "no_depot_tasks"
+      ],
+      "explain": "Storm conditions at the farm: sustained wind {reading.sustainedMph} mph (tropical-storm force starts at 39 mph). Nothing moves and nobody works at the depot.",
+      "source": [
+        {
+          "title": "Watch and warning changes (issuance criteria)",
+          "publisher": "NOAA National Hurricane Center",
+          "url": "https://www.nhc.noaa.gov/watchwarn_changes.shtml",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "after-storm",
+      "hazard": "After the storm",
+      "phase": "after",
+      "scale": "days",
+      "trigger": {
+        "path": "history.stormEnded",
+        "eq": true
+      },
+      "actions": [
+        "keep_holds",
+        "inspections"
+      ],
+      "explain": "All-clear received. Nothing restarts by itself: the recall stays until a person has inspected every machine, lane and bridge, and each field reopens when a person clears it.",
+      "source": [
+        {
+          "title": "Hurricane safety: after the storm (return only when officials say it is safe)",
+          "publisher": "NOAA",
+          "url": "https://noaa.gov/node/11994",
+          "dateRead": "2026-11-15"
+        },
+        {
+          "title": "Safety guidelines: after a hurricane or other tropical storm",
+          "publisher": "CDC",
+          "url": "https://www.cdc.gov/hurricanes/safety/how-to-safely-stay-safe-after-a-hurricane-or-other-tropical-storm.html",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "wildfire-evacuation",
+      "hazard": "Wildfire: evacuation order",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "alert": [
+          "Evacuation Order",
+          "Fire Warning"
+        ]
+      },
+      "actions": [
+        "recall",
+        "no_depot_tasks"
+      ],
+      "explain": "{alert}: follow the order. The fleet is recalled and people leave.",
+      "source": [
+        {
+          "title": "Wildfires",
+          "publisher": "Ready.gov (FEMA)",
+          "url": "https://www.ready.gov/wildfires",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": true
+    },
+    {
+      "id": "smoke-aqi",
+      "hazard": "Heavy smoke",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "reading.aqiPm25",
+        "gt": 150
+      },
+      "actions": [
+        "advise",
+        "tell_depot"
+      ],
+      "explain": "Air quality index for fine particles is {reading.aqiPm25}; restrict people's outdoor tasks at the depot.",
+      "note": "Cal/OSHA acts at AQI 151 and New York guidance above 150; both are outside Arizona, so this stays advisory. We use the more cautious 150.",
+      "source": [
+        {
+          "title": "Protecting outdoor workers exposed to smoke from wildfires",
+          "publisher": "Cal/OSHA",
+          "url": "https://dir.ca.gov/dosh/wildfire/worker-protection-from-wildfire-smoke.html",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "search excerpts",
+      "verified": false
+    },
+    {
+      "id": "unknown-signal",
+      "hazard": "Unknown or impossible reading",
+      "phase": "during",
+      "scale": "now",
+      "trigger": {
+        "path": "derived.implausible",
+        "eq": true
+      },
+      "actions": [
+        "hold_all",
+        "ask_person"
+      ],
+      "explain": "A weather reading is missing or impossible ({derived.implausibleWhy}); all work is held until a person checks the station.",
+      "note": "Not an external rule: the farm's operating policy says an unknown hazard gets the safest action and a person decides.",
+      "source": [
+        {
+          "title": "Farm operating policy: unknown hazard means the safest action and ask a person",
+          "publisher": "This farm (agent team brief, ground rule 7)",
+          "url": "agents/README.md#unknown-signals",
+          "dateRead": "2026-11-15"
+        }
+      ],
+      "checked": "farm's own policy, not an outside authority",
+      "verified": true
+    }
+  ]
+}
