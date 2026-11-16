@@ -25,7 +25,7 @@ stop_all
 # surveys). FRESH=1 puts the farm back to its starting mix and forgets the surveys and the AI-drive switch.
 if [ -n "${FRESH:-}" ]; then rm -f "$MULTI"/data-5175/AgOpenWeb/Fields/*/crop-record.json "$REPO"/agopen/out/field-memory.json "$REPO"/agopen/out/ai-drive.json; fi
 echo "2/5 Writing the farm and implement profiles into each AgOpenWeb copy..."
-(cd "$REPO" && node agopen/build-farm.js) || exit 1
+(cd "$REPO" && node agopen/build-farm.js ${FARM_ARGS:-}) || exit 1
 echo "3/5 Starting four AgOpenWeb copies (three tractors and the fuel truck)..."
 "$MULTI/start-fleet.sh" 4 >/dev/null 2>&1 </dev/null
 for P in 5175 5176 5177 5178; do

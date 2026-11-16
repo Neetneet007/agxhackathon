@@ -116,6 +116,7 @@ scenario.tractors.forEach((t, i) => {
 // On this miniature farm a whole field burns about 2% of a tank, so nothing would ever need fuel. Fuel use
 // is scaled up so that refuelling decisions actually arise during a short demo. Set --fuel-scale 1 for true rates.
 const FUEL_SCALE = Number(opt('fuel-scale', 25));
+if (args.includes('--full-tanks')) for (const t of scenario.tractors) t.fuel = t.fuelCapacity;      // every tractor starts the day full
 for (const t of scenario.tractors) { t.burnPerAcre = +(t.burnPerAcre * FUEL_SCALE).toFixed(2); t.burnPerCell = +(t.burnPerCell * Math.min(2, FUEL_SCALE)).toFixed(2); }
 const presetJobs = scenario.jobs.map(({ acres, ...j }) => j);   // areas come from the field outlines
 scenario.jobs = PRESET ? presetJobs : [];
@@ -813,9 +814,9 @@ const SEASON_DAYS = { corn: 120, soybeans: 110, wheat: 110, hay: 60, alfalfa: 45
 const fieldRecord = {};
 // What the farm remembers about each field between runs: the last survey of each field and when it was made.
 const MEMORY_FILE = path.join(here, 'out', 'field-memory.json');
-let lastScan = {};
-try { lastScan = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')).surveys || {}; } catch { /* nothing remembered yet */ }
-const remember = () => { try { fs.writeFileSync(MEMORY_FILE, JSON.stringify({ note: 'Last drone survey of each field. Delete this file to forget.', surveys: lastScan }, null, 1)); } catch { /* not fatal */ } };
+let lastScan = {}, farmMin = 0;      // farmMin: plan minutes the farm has worked, over all runs
+try { const mem = JSON.parse(fs.readFileSync(MEMORY_FILE, 'utf8')); lastScan = mem.surveys || {}; farmMin = mem.farmMin || 0; } catch { /* nothing remembered yet */ }
+const remember = () => { try { fs.writeFileSync(MEMORY_FILE, JSON.stringify({ note: 'Last drone survey of each field. Delete this file to forget.', farmMin, surveys: lastScan }, null, 1)); } catch { /* not fatal */ } };
 const stageOf = (m) => (m >= 95 ? 'Ready' : m >= 75 ? 'Ripening' : m >= 45 ? 'Flowering and grain fill' : m >= 15 ? 'Leaf growth' : 'Emerging');
 // Each field's record is a small file, crop-record.json, kept in that field's own AgOpenWeb folder next to its
 // boundary. It says what is on the field (a growing crop, stubble after harvest, or plowed soil) and since when,
@@ -916,7 +917,8 @@ function fieldStatusOf(f, work, { tempC, humidityPct, growth, conditionsText }) 
     const sc = lastScan[f.name]?.ground === g || (lastScan[f.name] && lastScan[f.name].ground == null) ? lastScan[f.name] : null;
     let maturity, margin, confidence, confidenceText, scanAgeMin = null;
     if (sc) {
-      scanAgeMin = Math.max(0, Math.round((Date.now() - sc.wall) / 1000 / SEC));      // in plan minutes, also across restarts
+      // Age in plan minutes of farm working time (the clock does not run while the job list is being built).
+      scanAgeMin = sc.farmMin != null ? Math.max(0, Math.round(farmMin - sc.farmMin)) : Math.max(0, Math.round((Date.now() - sc.wall) / 1000 / SEC));
       maturity = sc.maturityPct;
       margin = Math.min(25, Math.round(2 + scanAgeMin / 20));                      // widens by a point every 20 plan minutes
       confidence = scanAgeMin < 90 ? 'high' : scanAgeMin < 240 ? 'medium' : 'low';
@@ -1138,7 +1140,7 @@ function droneTick(dt) {
             problems.push({ e: +(e0 + (0.2 + rnd() * 0.6) * (e1 - e0)).toFixed(1), n: +(n0 + (0.2 + rnd() * 0.6) * (n1 - n0)).toFixed(1), radiusM: Math.round(9 + rnd() * 9), kind: 'poor growth', severity: behind > 28 ? 'high' : 'medium', text: `Crop ${behind}% behind the rest of the field: likely ${cause}` });
           }
         }
-        lastScan[r.field] = { problems, wall: Date.now(), clock: fmtTime(sim.time), ground: ground[r.field], maturityPct: r.maturityPct, standPct: r.standPct, moisturePct: r.moisturePct, pests: (r.pests || []).length, weedsPct: r.weedsPct ?? null, canopyM, canopyDeltaC, canopyC: canopyDeltaC == null ? null : +(airC + canopyDeltaC).toFixed(1), waterStress: canopyDeltaC != null && canopyDeltaC > 0.8 };
+        lastScan[r.field] = { problems, farmMin, wall: Date.now(), clock: fmtTime(sim.time), ground: ground[r.field], maturityPct: r.maturityPct, standPct: r.standPct, moisturePct: r.moisturePct, pests: (r.pests || []).length, weedsPct: r.weedsPct ?? null, canopyM, canopyDeltaC, canopyC: canopyDeltaC == null ? null : +(airC + canopyDeltaC).toFixed(1), waterStress: canopyDeltaC != null && canopyDeltaC > 0.8 };
         remember();
         surveying.delete(r.field);
         const fs1 = fieldStatus().find(x => x.name === r.field);
@@ -1395,6 +1397,7 @@ const server = http.createServer((req, res) => {
   });
   if (req.method === 'POST' && req.url === '/ai') return readBody((b) => { setAiDrive(!!b.on); ok({ on: aiDrive }); });
   if (req.method === 'POST' && req.url === '/reset') { ok(); return startOver(); }
+  if (req.method === 'POST' && req.url === '/drone/stop') { drone.cancelAll(); surveying.clear(); escort = null; trail('operator', 'drone', 'stop', 'Drone called back to its dock; queued surveys dropped.'); return ok(); }
   if (req.method === 'POST' && req.url === '/drone/scan') return readBody((b) => { const done = (b.fields || []).filter(droneScan); if (!done.length) throw new Error('Pick at least one field on the map first.'); ok({ scanning: done }); });
   if (req.url === '/weather-log') { res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end(weather.logText()); }
   if (req.method === 'POST' && req.url === '/start') { try { startDay(); return ok(); } catch (err) { res.writeHead(409); return res.end(String(err.message)); } }
@@ -1472,5 +1475,6 @@ setInterval(() => {
   fuelPlanning();
   humanGate();
   syncProgress();
+  farmMin++; if (farmMin % 15 === 0) remember();
   sim.step();
 }, SEC * 1000);

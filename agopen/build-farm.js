@@ -104,6 +104,9 @@ scenario.tractors.forEach((t, i) => {
   const settings = path.join(root, 'appsettings.json');
   if (fs.existsSync(settings)) {
     const a = JSON.parse(fs.readFileSync(settings, 'utf8'));
+    // --mounted T1=mower,T2=tiller : start a tractor with a different implement on than the scenario says
+    const want = Object.fromEntries(String(opt('mounted', '')).split(',').filter(Boolean).map(x => x.split('=')))[t.id];
+    if (want && t.implements.includes(want)) t.mounted = want;
     a.lastUsedToolProfile = TOOL[t.mounted || t.implements[0]][0];
     fs.writeFileSync(settings, JSON.stringify(a, null, 2));
   }
